@@ -1,0 +1,115 @@
+exports.payOrder = async (db, orderId, method, amount) => {
+  // Ambil order
+  const orderRes = await db.query(
+    `SELECT status, total FROM orders WHERE id=$1`,
+    [orderId]
+  )
+
+  if (!orderRes.rows.length) {
+    throw new Error("Order tidak ditemukan")
+  }
+
+  const order = orderRes.rows[0]
+
+  if (order.status === "PAID") {
+    throw new Error("Order sudah PAID")
+  }
+
+  if (order.status === "CLOSED") {
+    throw new Error("Order sudah CLOSED")
+  }
+
+  if (Number(amount) !== Number(order.total)) {
+    throw new Error("Nominal tidak sesuai total order")
+  }
+
+  // Simpan payment
+  await db.query(
+    `INSERT INTO payments (order_id, method, amount)
+     VALUES ($1,$2,$3)`,
+    [orderId, method, amount]
+  )
+
+  // Update status order
+  await db.query(
+    `UPDATE orders SET status='PAID' WHERE id=$1`,
+    [orderId]
+  )
+
+  return { order_id: orderId, status: "PAID" }
+}
+//const accounting = require("../accounting/accounting.service")
+//
+// setelah update order PAID
+//await accounting.recordIncome(
+//  db,
+//  order.branch_id,
+//  `Payment Order #${orderId} (${method})`,
+//  amount
+//)
+const accounting = require("../accounting/accounting.service")
+
+exports.payOrder = async (db, orderId, method, amount) => {
+  // Ambil order
+  const orderRes = await db.query(
+    `SELECT id, status, total, branch_id
+     FROM orders WHERE id=$1`,
+    [orderId]
+  )
+
+  if (!orderRes.rows.length) {
+    throw new Error("Order tidak ditemukan")
+  }
+
+  const order = orderRes.rows[0]
+
+  if (order.status === "PAID") {
+    throw new Error("Order sudah PAID")
+  }
+
+  if (Number(amount) !== Number(order.total)) {
+    throw new Error("Nominal tidak sesuai total order")
+  }
+
+  // Simpan payment
+  await db.query(
+    `INSERT INTO payments (order_id, method, amount)
+     VALUES ($1,$2,$3)`,
+    [orderId, method, amount]
+  )
+
+  // Update order
+  await db.query(
+    `UPDATE orders SET status='PAID' WHERE id=$1`,
+    [orderId]
+  )
+
+  // ✅ ACCOUNTING — SEKARANG AMAN
+  await accounting.recordIncome(
+    db,
+    order.branch_id,
+    `Payment Order #${orderId} (${method})`,
+    amount
+  )
+
+  return {
+    order_id: orderId,
+    status: "PAID"
+  }
+}
+
+
+const stockService = require("../stock/stock.service")
+
+// contoh: kurangi stok dari order_items category FNB
+const items = await db.query(
+  `SELECT service_id, qty
+   FROM order_items oi
+   JOIN services s ON s.id=oi.service_id
+   WHERE oi.order_id=$1 AND s.category='fnb'`,
+  [orderId]
+)
+
+for (const item of items.rows) {
+  await stockService.reduceStock(db, item.service_id, item.qty)
+}

@@ -1,0 +1,17 @@
+body {
+  background: #0e0e0e;
+  color: #c9a24d;
+  font-family: Inter, sans-serif;
+}
+
+button {
+  background: #c9a24d;
+  color: #000;
+  border: none;
+  padding: 12px;
+  font-weight: bold;
+}
+
+.green { color: #2ecc71 }
+.yellow { color: #f1c40f }
+.red { color: #e74c3c }

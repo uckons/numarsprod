@@ -1,0 +1,29 @@
+require("dotenv").config()
+const express = require("express")
+const cors = require("cors")
+
+const db = require("./config/db")
+
+const app = express()
+app.use(cors())
+app.use(express.json())
+
+app.set("db", db)
+// ⬇️ INI YANG DITAMBAHKAN (REGISTER ROUTE)
+require("./modules/auth/auth.route")(app)
+require("./modules/orders/order.route")(app)
+require("./modules/payments/payment.route")(app)
+require("./modules/revert-payment/revert.route")(app)
+require("./modules/timers/timer.route")(app)
+require("./modules/printers/printer.route")(app)
+require("./modules/commissions/commission.route")(app)
+require("./modules/accounting/accounting.route")(app)
+require("./modules/reports/report.route")(app)
+require("./modules/fnb/fnb.route")(app)
+
+// Health check
+app.get("/api/health", (req, res) => {
+  res.json({ status: "OK", service: "NUMARS POS" })
+})
+
+module.exports = app

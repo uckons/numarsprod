@@ -1,0 +1,22 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn.lock
+
+# Env
+.env
+.env.*
+*.pem
+
+# Build
+frontend/dist/
+
+# OS
+.DS_Store
+
+# PM2
+.pids/
+logs/
+
+# Redis dump
+dump.rdb

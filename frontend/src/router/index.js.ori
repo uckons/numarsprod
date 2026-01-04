@@ -1,0 +1,33 @@
+import { createRouter, createWebHistory } from "vue-router"
+import { useAuthStore } from "../store/auth.store"
+
+import Login from "../views/Login.vue"
+import Dashboard from "../views/Dashboard.vue"
+import KasirPOS from "../views/kasir/KasirPOS.vue"
+import TerapisTimer from "../views/terapis/TerapisTimer.vue"
+import BarPOS from "../views/bar/BarPOS.vue"
+import Supervisor from "../views/supervisor/SupervisorDashboard.vue"
+import Owner from "../views/owner/OwnerDashboard.vue"
+
+const routes = [
+  { path: "/", component: Login },
+  { path: "/kasir", component: KasirPOS, role: "Kasir" },
+  { path: "/terapis", component: TerapisTimer, role: "Terapis" },
+  { path: "/bar", component: BarPOS, role: "Staff Bar" },
+  { path: "/supervisor", component: Supervisor, role: "Supervisor" },
+  { path: "/owner", component: Owner, role: "Owner" }
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes
+})
+
+router.beforeEach((to, _, next) => {
+  const auth = useAuthStore()
+  if (!auth.token && to.path !== "/") return next("/")
+  if (to.role && auth.user?.role !== to.role) return next("/")
+  next()
+})
+
+export default router

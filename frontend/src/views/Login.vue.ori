@@ -1,0 +1,24 @@
+<template>
+  <div class="login">
+    <h1>NUMARS POS</h1>
+    <input v-model="phone" placeholder="Phone" />
+    <input v-model="password" type="password" placeholder="Password" />
+    <button @click="doLogin">LOGIN</button>
+  </div>
+</template>
+
+<script setup>
+import { ref } from "vue"
+import { useAuthStore } from "../store/auth.store"
+import { useRouter } from "vue-router"
+
+const phone = ref("")
+const password = ref("")
+const auth = useAuthStore()
+const router = useRouter()
+
+const doLogin = async () => {
+  await auth.login(phone.value, password.value)
+  router.push(`/${auth.user.role.toLowerCase()}`)
+}
+</script>
