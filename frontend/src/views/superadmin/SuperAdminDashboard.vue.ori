@@ -1,0 +1,12 @@
+<template>
+  <UserBar />
+
+  <div class="page">
+    <h1>Super Admin</h1>
+    <p>Global control & configuration</p>
+  </div>
+</template>
+
+<script setup>
+import UserBar from "../../components/UserBar.vue"
+</script>

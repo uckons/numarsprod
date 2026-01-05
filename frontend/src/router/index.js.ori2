@@ -1,0 +1,68 @@
+import { createRouter, createWebHistory } from "vue-router"
+import { useAuthStore } from "../store/auth.store"
+
+import Login from "../views/Login.vue"
+
+import SuperAdminDashboard from "../views/superadmin/SuperAdminDashboard.vue"
+import OwnerDashboard from "../views/owner/OwnerDashboard.vue"
+import ManagerDashboard from "../views/manager/ManagerDashboard.vue"
+import SupervisorDashboard from "../views/supervisor/SupervisorDashboard.vue"
+import KasirPOS from "../views/kasir/KasirPOS.vue"
+import TerapisDashboard from "../views/terapis/TerapisDashboard.vue"
+import BarDashboard from "../views/bar/BarDashboard.vue"
+
+const routes = [
+  { path: "/login", component: Login },
+
+  { path: "/superadmin", component: SuperAdminDashboard, meta: { requiresAuth: true, role: ["SuperAdmin"] } },
+  { path: "/owner", component: OwnerDashboard, meta: { requiresAuth: true, role: ["Owner"] } },
+  { path: "/manager", component: ManagerDashboard, meta: { requiresAuth: true, role: ["Manager"] } },
+  { path: "/supervisor", component: SupervisorDashboard, meta: { requiresAuth: true, role: ["Supervisor"] } },
+  { path: "/kasir", component: KasirPOS, meta: { requiresAuth: true, role: ["Kasir"] } },
+  { path: "/terapis", component: TerapisDashboard, meta: { requiresAuth: true, role: ["Terapis"] } },
+  { path: "/bar", component: BarDashboard, meta: { requiresAuth: true, role: ["Staff Bar"] } },
+
+  {
+    path: "/",
+    redirect: () => {
+      const auth = useAuthStore()
+      if (!auth.user) return "/login"
+
+      switch (auth.user.role) {
+        case "SuperAdmin": return "/superadmin"
+        case "Owner": return "/owner"
+        case "Manager": return "/manager"
+        case "Supervisor": return "/supervisor"
+        case "Kasir": return "/kasir"
+        case "Terapis": return "/terapis"
+        case "Staff Bar": return "/bar"
+        default: return "/login"
+      }
+    }
+  }
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes
+})
+
+router.beforeEach((to, from, next) => {
+  const auth = useAuthStore()
+
+  if (to.meta.requiresAuth && !auth.isLoggedIn) {
+    return next("/login")
+  }
+
+  if (to.meta.role && !to.meta.role.includes(auth.user.role)) {
+    return next("/")
+  }
+
+  if (to.path === "/login" && auth.isLoggedIn) {
+    return next("/")
+  }
+
+  next()
+})
+
+export default router

@@ -1,0 +1,24 @@
+const express = require("express")
+const router = express.Router()
+
+const auth = require("../../middlewares/auth.middleware")
+const rbac = require("../../middlewares/rbac.middleware")
+
+// ⬇️ CONTROLLER STUB
+const controller = {
+  createOrder: (req, res) => {
+    res.json({
+      message: "Create order (stub)"
+    })
+  }
+}
+
+// ✅ SEMUA ARGUMEN ADALAH FUNCTION
+router.post(
+  "/",
+  auth,
+  rbac(["Kasir", "Supervisor", "Manager", "Owner", "SuperAdmin"]),
+  controller.createOrder
+)
+
+module.exports = router

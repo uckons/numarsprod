@@ -4,9 +4,10 @@
       <h1>NUMARS POS</h1>
       <p class="subtitle">Login Sistem</p>
 
+      <!-- USERNAME (GANTI DARI PHONE) -->
       <input
-        v-model="phone"
-        placeholder="No. HP"
+        v-model="username"
+        placeholder="Username"
         autocomplete="username"
       />
 
@@ -29,32 +30,52 @@
 <script setup>
 import { ref } from "vue"
 import { useRouter } from "vue-router"
-import { useAuthStore } from "../store/auth.store"   // ✅ PINIA STORE
+import { useAuthStore } from "../store/auth.store"
 
 const router = useRouter()
 const auth = useAuthStore()
 
-const phone = ref("")
+// ⬇️ GANTI phone → username
+const username = ref("")
 const password = ref("")
 const loading = ref(false)
 const error = ref("")
 
+//const handleLogin = async () => {
+//  loading.value = true
+//  error.value = ""
+//
+//  try {
+    // ⬇️ KIRIM USERNAME KE BACKEND
+//    await auth.login(username.value, password.value)
+//    router.push("/")   // redirect by role
+//  } catch (err) {
+//    error.value =
+//      err.response?.data?.message ||
+//      err.message ||
+//      "Login gagal"
+//  } finally {
+//    loading.value = false
+//  }
+//}
+
 const handleLogin = async () => {
   loading.value = true
-  error.value = ""
-
   try {
-    await auth.login(phone.value, password.value)  // ✅ PAKAI STORE
-    router.push("/")                               // redirect sukses
-  } catch (err) {
-    error.value =
-      err.response?.data?.message ||
-      err.message ||
-      "Login gagal"
+    await auth.login(username.value, password.value)
+    const role = auth.role
+    if (["SuperAdmin","Owner"].includes(role)) router.push("/owner")
+    else if (role === "Manager") router.push("/manager")
+    else if (role === "Kasir") router.push("/kasir")
+    else if (role === "Terapis") router.push("/terapis")
+    else router.push("/login")
+  } catch (e) {
+    error.value = e.response?.data?.message || "Login gagal"
   } finally {
-    loading.value = false                          // ⬅️ PENTING
+    loading.value = false
   }
 }
+
 </script>
 
 <style scoped>

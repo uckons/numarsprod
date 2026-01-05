@@ -82,3 +82,34 @@ exports.closeOrder = async (db, orderId) => {
 
   return rows[0]
 }
+const db = require("../../config/db")
+
+exports.expandPackageItems = async (order_id) => {
+  // ambil item paket
+  const packages = await db.query(
+    `SELECT oi.product_id, oi.qty
+     FROM order_items oi
+     JOIN products p ON p.id=oi.product_id
+     WHERE oi.order_id=$1 AND p.type='PACKAGE'`,
+    [order_id]
+  )
+
+  for (const pkg of packages.rows) {
+    // isi paket (contoh relasi)
+    const items = await db.query(
+      `SELECT product_id, qty
+       FROM package_items
+       WHERE package_id=$1`,
+      [pkg.product_id]
+    )
+
+    for (const i of items.rows) {
+      await db.query(
+        `INSERT INTO order_items (order_id, product_id, qty, price)
+         SELECT $1, p.id, $2, p.price
+         FROM products p WHERE p.id=$3`,
+        [order_id, i.qty * pkg.qty, i.product_id]
+      )
+    }
+  }
+}

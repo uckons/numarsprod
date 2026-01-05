@@ -1,92 +1,68 @@
 const escpos = require("escpos")
-escpos.USB = require("escpos-usb")
 escpos.Network = require("escpos-network")
-//require("escpos-qrcode")(escpos)
+escpos.USB = require("escpos-usb")
 
-const qrisConfig = require("../../config/qris")
+const db = require("../../config/db")
 
-// =====================
-// Konfigurasi Printer
-// =====================
-const getPrinter = () => {
-  // PILIH SALAH SATU:
-  // LAN (disarankan)
-  return {
-    device: new escpos.Network("192.168.1.50", 9100),
-    type: "LAN"
-  }
-
-  // USB (alternatif)
-  // return { device: new escpos.USB(), type: "USB" }
-}
-
-exports.printOrderReceipt = async (db, orderId) => {
-  // Ambil order
+exports.printReceipt = async ({ order_id, printer }) => {
+  // ambil data order
   const orderRes = await db.query(
-    `SELECT o.*, b.name AS branch_name
+    `SELECT o.id, o.total_amount, o.created_at,
+            b.name AS branch
      FROM orders o
      JOIN branches b ON b.id=o.branch_id
      WHERE o.id=$1`,
-    [orderId]
+    [order_id]
   )
-
-  if (!orderRes.rows.length) {
-    throw new Error("Order tidak ditemukan")
-  }
-
   const order = orderRes.rows[0]
-  if (order.status !== "PAID") {
-    throw new Error("Hanya order PAID yang boleh dicetak")
-  }
 
-  // Ambil item
-  const itemsRes = await db.query(
-    `SELECT s.name, oi.qty, oi.price
-     FROM order_items oi
-     JOIN services s ON s.id=oi.service_id
-     WHERE oi.order_id=$1`,
-    [orderId]
+  const items = await db.query(
+    `SELECT name, qty, price
+     FROM order_items WHERE order_id=$1`,
+    [order_id]
   )
 
-  const { device } = getPrinter()
-  const printer = new escpos.Printer(device)
+  // setup printer
+  let device
+  if (printer.type === "LAN") {
+    device = new escpos.Network(printer.ip)
+  } else {
+    device = new escpos.USB()
+  }
+
+  const p = new escpos.Printer(device)
 
   device.open(() => {
-    printer
-      .align("CT")
-      .style("B")
-      .size(2, 2)
-      .text(order.branch_name)
+    p
+      .align("ct")
+      .style("b")
       .size(1, 1)
-      .text("NUMARS POS")
-      .text("------------------------------")
+      .text("NUMARS SPA & LOUNGE")
+      .size(0, 0)
+      .text(order.branch)
+      .drawLine()
 
-      .align("LT")
-      .text(`Order ID : ${order.id}`)
-      .text(`Tanggal  : ${new Date(order.created_at).toLocaleString()}`)
-      .text("------------------------------")
+      .align("lt")
+      .text(`Order #${order.id}`)
+      .text(`Tanggal: ${order.created_at}`)
+      .drawLine()
 
-    itemsRes.rows.forEach(item => {
-      printer.text(
-        `${item.name} x${item.qty}  ${item.price.toLocaleString()}`
-      )
+    items.rows.forEach(i => {
+      p.text(`${i.name} x${i.qty}`)
+      p.text(`  Rp ${i.price * i.qty}`)
     })
 
-    printer
-      .text("------------------------------")
-      .style("B")
-      .text(`TOTAL : ${order.total.toLocaleString()}`)
-      .style("NORMAL")
-      .text("------------------------------")
+    p
+      .drawLine()
+      .style("b")
+      .text(`TOTAL: Rp ${order.total_amount}`)
+      .drawLine()
 
-      // QRIS QR (opsional)
-      .align("CT")
-      .qrcode(qrisConfig.staticQrisPath, 6, 1)
-
-      .text("Terima kasih")
-      .text("Happy Relaxing ✨")
-      .feed(2)
+      .align("ct")
+      .text("Terima kasih 🙏")
+      .text("NUMARS PONDOK INDAH")
       .cut()
       .close()
   })
 }
+

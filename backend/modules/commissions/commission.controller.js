@@ -42,3 +42,17 @@ exports.getAll = async (req, res) => {
   )
   res.json(rows)
 }
+exports.byTherapist = async (req, res) => {
+  const { from, to } = req.query
+
+  const { rows } = await db.query(
+    `SELECT t.name, SUM(c.amount) total
+     FROM commissions c
+     JOIN therapists t ON t.id=c.therapist_id
+     WHERE c.created_at BETWEEN $1 AND $2
+     GROUP BY t.name`,
+    [from, to]
+  )
+
+  res.json(rows)
+}

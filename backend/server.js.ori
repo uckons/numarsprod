@@ -1,0 +1,26 @@
+require("dotenv").config()          // ⬅️ WAJIB, PALING ATAS
+const http = require("http")
+const app = require("./app")
+const { Server } = require("socket.io")
+const { initIO } = require("./sockets/io")
+const server = http.createServer(app)
+
+//const io = new Server(server, {
+//  cors: { origin: "*" }
+//})
+
+//require("./sockets")(io)
+//require("./sockets/timer.socket")(io)
+initIO(io)
+require("./sockets/timer.socket")(io)
+const io = getIO()
+io.to(`branch-${order.branch_id}`).emit("timer:start", timer)
+io.to(`branch-${branchId}`).emit("timer:extend", {
+  id,
+  end_time: newEndTime
+})
+
+const PORT = process.env.PORT || 4000
+server.listen(PORT, () => {
+  console.log(`🚀 NUMARS POS Backend running on port ${PORT}`)
+})

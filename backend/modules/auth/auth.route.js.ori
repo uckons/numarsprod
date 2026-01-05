@@ -1,0 +1,21 @@
+const express = require("express")
+const router = express.Router()
+const controller = require("./auth.controller")
+
+//module.exports = app => {
+//  app.post("/api/auth/login", controller.login)
+//}
+
+
+// POST /api/auth/login
+//router.post("/login", controller.login)
+
+
+router.post("/login", (req, res) => {
+  res.json({
+    token: "dummy-token",
+    user: { role: "SuperAdmin" }
+  })
+})
+
+module.exports = router

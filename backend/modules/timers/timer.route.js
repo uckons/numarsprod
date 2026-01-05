@@ -1,45 +1,10 @@
-const controller = require("./timer.controller")
-const auth = require("../../middlewares/auth.middleware")
-const rbac = require("../../middlewares/rbac.middleware")
+const express = require("express")
+const router = express.Router()
+const c = require("./timer.controller")
 
-module.exports = app => {
+router.post("/start-by-order", c.startTimersByOrder)
+router.post("/:id/pause", c.pauseTimer)
+router.post("/:id/resume", c.resumeTimer)
+router.post("/:id/extend", c.extendTimer)
 
-  // Supervisor / Kasir: start timer manual (opsional)
-  app.post(
-    "/api/timers/start",
-    auth,
-    rbac(["Kasir", "Supervisor"]),
-    controller.start
-  )
-
-  // Supervisor: pause timer
-  app.post(
-    "/api/timers/:id/pause",
-    auth,
-    rbac(["Supervisor"]),
-    controller.pause
-  )
-
-  // Supervisor: resume timer
-  app.post(
-    "/api/timers/:id/resume",
-    auth,
-    rbac(["Supervisor"]),
-    controller.resume
-  )
-
-  // Supervisor: extend timer
-  app.post(
-    "/api/timers/:id/extend",
-    auth,
-    rbac(["Supervisor"]),
-    controller.extend
-  )
-
-  // Semua role (terapis, supervisor): lihat timer aktif
-  app.get(
-    "/api/timers/active",
-    auth,
-    controller.getActive
-  )
-}
+module.exports = router

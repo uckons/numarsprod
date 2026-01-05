@@ -1,20 +1,21 @@
 const jwt = require("jsonwebtoken")
 
 module.exports = (req, res, next) => {
-  const header = req.headers.authorization
-  if (!header) {
-    return res.status(401).json({ message: "Authorization header missing" })
+  const authHeader = req.headers.authorization
+  if (!authHeader) {
+    return res.status(401).json({ message: "Unauthorized" })
   }
 
-  const token = header.replace("Bearer ", "")
+  const [type, token] = authHeader.split(" ")
+  if (type !== "Bearer" || !token) {
+    return res.status(401).json({ message: "Invalid token format" })
+  }
+
   try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "NUMARS_SUPER_SECRET"
-    )
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
     req.user = decoded
     next()
   } catch (err) {
-    return res.status(401).json({ message: "Invalid or expired token" })
+    return res.status(401).json({ message: "Invalid token" })
   }
 }

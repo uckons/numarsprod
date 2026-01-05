@@ -1,32 +1,30 @@
-const whatsapp = require("../../config/whatsapp")
+const db = require("../../config/db")
+const wa = require("../whatsapp/whatsapp.service")
 
-exports.reduceStock = async (db, fnbItemId, qty) => {
-
-  // Kurangi stok
-  const { rows } = await db.query(
-    `UPDATE fnb_items
-     SET stock = stock - $1
-     WHERE id=$2
-     RETURNING *`,
-    [qty, fnbItemId]
+exports.deductStockByOrder = async (order_id) => {
+  const items = await db.query(
+    `SELECT oi.product_id, oi.qty, s.qty AS stock, s.min_qty, p.name
+     FROM order_items oi
+     JOIN stocks s ON s.product_id=oi.product_id
+     JOIN products p ON p.id=oi.product_id
+     WHERE oi.order_id=$1`,
+    [order_id]
   )
 
-  const item = rows[0]
+  for (const i of items.rows) {
+    const newQty = i.stock - i.qty
 
-  // Log stok
-  await db.query(
-    `INSERT INTO stock_logs (fnb_item_id, qty_change)
-     VALUES ($1,$2)`,
-    [fnbItemId, -qty]
-  )
-
-  // Alert WhatsApp jika stok menipis
-  if (item.stock <= item.alert_stock) {
-    await whatsapp.sendMessage(
-      "628111111111",
-      `⚠️ STOCK ALERT\n${item.name}\nSisa stok: ${item.stock}`
+    await db.query(
+      `UPDATE stocks SET qty=$1 WHERE product_id=$2`,
+      [newQty, i.product_id]
     )
-  }
 
-  return item
+    // 🚨 ALERT
+    if (newQty <= i.min_qty) {
+      await wa.sendStockAlert({
+        product: i.name,
+        qty: newQty
+      })
+    }
+  }
 }

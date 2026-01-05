@@ -1,22 +1,24 @@
-const controller = require("./report.controller")
+const express = require("express")
+const router = express.Router()
+
 const auth = require("../../middlewares/auth.middleware")
 const rbac = require("../../middlewares/rbac.middleware")
 
-module.exports = app => {
-
-  // Owner / Manager: cash flow
-  app.get(
-    "/api/reports/cashflow",
-    auth,
-    rbac(["Owner", "Manager"]),
-    controller.cashflow
-  )
-
-  // Owner / Manager: laba rugi
-  app.get(
-    "/api/reports/profit-loss",
-    auth,
-    rbac(["Owner", "Manager"]),
-    controller.profitLoss
-  )
+// ⬇️ CONTROLLER STUB (AMAN)
+const controller = {
+  summary: (req, res) => {
+    res.json({
+      message: "Report summary (stub)"
+    })
+  }
 }
+
+// ✅ PASTIKAN SEMUA ARGUMEN ADALAH FUNCTION
+router.get(
+  "/summary",
+  auth,
+  rbac(["Owner", "Manager", "SuperAdmin"]),
+  controller.summary
+)
+
+module.exports = router

@@ -1,22 +1,10 @@
-const controller = require("./accounting.controller")
+const express = require("express")
+const router = express.Router()
+const c = require("./accounting.controller")
 const auth = require("../../middlewares/auth.middleware")
 const rbac = require("../../middlewares/rbac.middleware")
 
-module.exports = app => {
+router.get("/cash-flow", auth, rbac(["Owner","Manager"]), c.cashFlow)
+router.get("/profit-loss", auth, rbac(["Owner","Manager"]), c.profitLoss)
 
-  // Kasir: closing shift
-  app.post(
-    "/api/accounting/close-shift",
-    auth,
-    rbac(["Kasir", "Supervisor"]),
-    controller.closeShift
-  )
-
-  // Manager / Owner: list jurnal
-  app.get(
-    "/api/accounting/entries",
-    auth,
-    rbac(["Manager", "Owner"]),
-    controller.getEntries
-  )
-}
+module.exports = router

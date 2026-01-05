@@ -1,22 +1,8 @@
-const controller = require("./payment.controller")
+const express = require("express")
+const router = express.Router()
+const c = require("./payment.controller")
 const auth = require("../../middlewares/auth.middleware")
-const rbac = require("../../middlewares/rbac.middleware")
 
-module.exports = app => {
+router.post("/pay", auth, c.payOrder)
 
-  // Kasir / Supervisor: bayar order
-  app.post(
-    "/api/payments",
-    auth,
-    rbac(["Kasir", "Supervisor"]),
-    controller.pay
-  )
-
-  // Owner / Manager: lihat pembayaran
-  app.get(
-    "/api/payments",
-    auth,
-    rbac(["Owner", "Manager"]),
-    controller.getAll
-  )
-}
+module.exports = router

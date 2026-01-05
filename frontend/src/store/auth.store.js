@@ -1,36 +1,30 @@
 import { defineStore } from "pinia"
-import api from "../services/api"
+import axios from "axios"
 
 export const useAuthStore = defineStore("auth", {
   state: () => ({
     token: localStorage.getItem("token") || null,
-    user: JSON.parse(localStorage.getItem("user") || "null")
+    user: JSON.parse(localStorage.getItem("user") || "null"),
   }),
-
   getters: {
-    isLoggedIn: state => !!state.token,
-    role: state => state.user?.role || null
+    isLoggedIn: (s) => !!s.token,
+    role: (s) => s.user?.role || null,
   },
-
   actions: {
-    async login(phone, password) {
-      const res = await api.post("/auth/login", { phone, password })
-
+    async login(username, password) {
+      const res = await axios.post("/api/auth/login", { username, password })
       this.token = res.data.token
       this.user = res.data.user
-
-      localStorage.setItem("token", res.data.token)
-      localStorage.setItem("user", JSON.stringify(res.data.user))
-
-      return res.data
+      localStorage.setItem("token", this.token)
+      localStorage.setItem("user", JSON.stringify(this.user))
+      axios.defaults.headers.common.Authorization = `Bearer ${this.token}`
     },
-
     logout() {
       this.token = null
       this.user = null
       localStorage.removeItem("token")
       localStorage.removeItem("user")
-    }
-  }
+      delete axios.defaults.headers.common.Authorization
+    },
+  },
 })
-

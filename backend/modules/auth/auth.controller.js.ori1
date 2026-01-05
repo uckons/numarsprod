@@ -1,0 +1,65 @@
+const bcrypt = require("bcrypt")
+const jwt = require("jsonwebtoken")
+
+exports.login = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const { username, password } = req.body
+
+    if (!username || !password) {
+      return res.status(400).json({ message: "Username & password wajib" })
+    }
+
+    const q = `
+      SELECT
+        u.id,
+        u.name,
+        u.username,
+        u.password,
+        u.branch_id,
+        r.id   AS role_id,
+        r.name AS role
+      FROM users u
+      JOIN roles r ON r.id = u.role_id
+      WHERE u.username = $1
+      LIMIT 1
+    `
+
+    const { rows } = await db.query(q, [username])
+    if (!rows.length) {
+      return res.status(401).json({ message: "User tidak ditemukan" })
+    }
+
+    const user = rows[0]
+
+    const match = await bcrypt.compare(password, user.password)
+    if (!match) {
+      return res.status(401).json({ message: "Password salah" })
+    }
+
+    const token = jwt.sign(
+      {
+        id: user.id,
+        role_id: user.role_id,
+        branch_id: user.branch_id
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "12h" }
+    )
+
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        role: user.role,        // ⬅️ STRING dari DB
+        role_id: user.role_id,
+        branch_id: user.branch_id
+      }
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: "Login error" })
+  }
+}

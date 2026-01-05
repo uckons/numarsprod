@@ -1,24 +1,44 @@
-const service = require("./accounting.service")
+const db = require("../../config/db")
 
-exports.closeShift = async (req, res) => {
-  try {
-    const db = req.app.get("db")
-    const user = req.user
-    const { total_cash } = req.body
+exports.cashFlow = async (req, res) => {
+  const { from, to } = req.query
+  const branch = req.user.branch_id
 
-    if (total_cash === undefined) {
-      throw new Error("total_cash wajib")
-    }
+  const { rows } = await db.query(
+    `SELECT type, SUM(amount) total
+     FROM account_transactions
+     WHERE branch_id=$1
+     AND created_at BETWEEN $2 AND $3
+     GROUP BY type`,
+    [branch, from, to]
+  )
 
-    const result = await service.closeShift(db, user, total_cash)
-    res.json(result)
-  } catch (err) {
-    res.status(400).json({ message: err.message })
-  }
+  res.json(rows)
 }
 
-exports.getEntries = async (req, res) => {
-  const db = req.app.get("db")
-  const entries = await service.getEntries(db, req.user)
-  res.json(entries)
+exports.profitLoss = async (req, res) => {
+  const { from, to } = req.query
+  const branch = req.user.branch_id
+
+  const income = await db.query(
+    `SELECT SUM(amount) total FROM account_transactions
+     WHERE branch_id=$1 AND type='INCOME'
+     AND created_at BETWEEN $2 AND $3`,
+    [branch, from, to]
+  )
+
+  const expense = await db.query(
+    `SELECT SUM(amount) total FROM account_transactions
+     WHERE branch_id=$1 AND type='EXPENSE'
+     AND created_at BETWEEN $2 AND $3`,
+    [branch, from, to]
+  )
+
+  res.json({
+    income: income.rows[0].total || 0,
+    expense: expense.rows[0].total || 0,
+    profit:
+      (income.rows[0].total || 0) -
+      (expense.rows[0].total || 0)
+  })
 }

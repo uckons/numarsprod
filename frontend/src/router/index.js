@@ -3,79 +3,28 @@ import { useAuthStore } from "../store/auth.store"
 
 import Login from "../views/Login.vue"
 import OwnerDashboard from "../views/owner/OwnerDashboard.vue"
-import KasirPOS from "../views/kasir/KasirPOS.vue"
+import ManagerDashboard from "../views/manager/ManagerDashboard.vue"
+import KasirDashboard from "../views/kasir/KasirDashboard.vue"
 import TerapisDashboard from "../views/terapis/TerapisDashboard.vue"
 
 const routes = [
   { path: "/login", component: Login },
-
-  {
-    path: "/owner",
-    component: OwnerDashboard,
-    meta: { requiresAuth: true, role: ["Owner"] }
-  },
-  {
-    path: "/kasir",
-    component: KasirPOS,
-    meta: { requiresAuth: true, role: ["Kasir"] }
-  },
-  {
-    path: "/terapis",
-    component: TerapisDashboard,
-    meta: { requiresAuth: true, role: ["Terapis"] }
-  },
-
-  // ROOT → AUTO REDIRECT SESUAI ROLE
-  {
-    path: "/",
-    redirect: () => {
-      const auth = useAuthStore()
-      if (!auth.user) return "/login"
-
-      switch (auth.user.role) {
-        case "Owner":
-          return "/owner"
-        case "Kasir":
-          return "/kasir"
-        case "Terapis":
-          return "/terapis"
-        default:
-          return "/login"
-      }
-    }
-  }
+  { path: "/owner", component: OwnerDashboard, meta: { auth: true, roles: ["SuperAdmin","Owner"] } },
+  { path: "/manager", component: ManagerDashboard, meta: { auth: true, roles: ["Manager"] } },
+  { path: "/kasir", component: KasirDashboard, meta: { auth: true, roles: ["Kasir"] } },
+  { path: "/terapis", component: TerapisDashboard, meta: { auth: true, roles: ["Terapis"] } },
+  { path: "/", redirect: "/login" },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
 })
 
-// 🔐 GLOBAL GUARD
-router.beforeEach((to, from, next) => {
+router.beforeEach((to) => {
   const auth = useAuthStore()
-
-  // belum login
-  if (to.meta.requiresAuth && !auth.isLoggedIn) {
-    return next("/login")
-  }
-
-  // sudah login tapi akses role lain
-  if (
-    to.meta.role &&
-    auth.user &&
-    !to.meta.role.includes(auth.user.role)
-  ) {
-    // kembalikan ke dashboard sesuai role
-    return next("/")
-  }
-
-  // sudah login jangan balik ke login
-  if (to.path === "/login" && auth.isLoggedIn) {
-    return next("/")
-  }
-
-  next()
+  if (to.meta.auth && !auth.isLoggedIn) return "/login"
+  if (to.meta.roles && !to.meta.roles.includes(auth.role)) return "/login"
 })
 
 export default router

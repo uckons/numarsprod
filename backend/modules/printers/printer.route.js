@@ -1,14 +1,22 @@
-const controller = require("./printer.controller")
+//const express = require("express")
+//const router = express.Router()
+//const c = require("./printer.controller")
+//const auth = require("../../middlewares/auth.middleware")
+
+//router.post("/print", auth, c.printOrder)
+
+//module.exports = router
+const router = require("express").Router()
+const c = require("./printer.controller")
 const auth = require("../../middlewares/auth.middleware")
 const rbac = require("../../middlewares/rbac.middleware")
 
-module.exports = app => {
+// 🔁 REPRINT STRUK
+router.post(
+  "/reprint/:order_id",
+  auth,
+  rbac(["Owner", "Supervisor", "Kasir"]),
+  c.reprint
+)
 
-  // Kasir / Supervisor: cetak struk order
-  app.post(
-    "/api/printer/receipt",
-    auth,
-    rbac(["Kasir", "Supervisor"]),
-    controller.printReceipt
-  )
-}
+module.exports = router

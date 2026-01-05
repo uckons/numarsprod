@@ -1,0 +1,285 @@
+<template>
+  <div class="owner-dashboard">
+    <header class="header">
+      <h1>Owner Dashboard</h1>
+      <button class="logout" @click="logout">Logout</button>
+    </header>
+
+    <!-- FILTER -->
+    <section class="filter">
+      <input type="date" v-model="from" />
+      <input type="date" v-model="to" />
+      <button @click="loadAll">Terapkan</button>
+    </section>
+
+    <!-- SUMMARY -->
+    <section class="summary">
+      <div class="card gold">
+        <p>Omset</p>
+        <h2>Rp {{ format(totalRevenue) }}</h2>
+      </div>
+
+      <div class="card">
+        <p>Total Komisi Terapis</p>
+        <h2>Rp {{ format(totalCommission) }}</h2>
+      </div>
+
+      <div class="card">
+        <p>Jumlah Order</p>
+        <h2>{{ totalOrders }}</h2>
+      </div>
+    </section>
+
+    <!-- KOMISI TERAPIS -->
+    <section class="card section">
+      <h3>Komisi Terapis</h3>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Terapis</th>
+            <th>Total Komisi</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="t in therapistCommissions" :key="t.name">
+            <td>{{ t.name }}</td>
+            <td>Rp {{ format(t.total) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- TOP TERAPIS -->
+    <section class="card section">
+      <h3>Top Terapis</h3>
+
+      <ol>
+        <li v-for="t in topTherapists" :key="t.name">
+          {{ t.name }} — Rp {{ format(t.total) }}
+        </li>
+      </ol>
+    </section>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import { useAuthStore } from "../../store/auth.store"
+import { useRouter } from "vue-router"
+
+const auth = useAuthStore()
+const router = useRouter()
+
+/* ======================
+   STATE
+====================== */
+const from = ref("")
+const to = ref("")
+
+const totalRevenue = ref(0)
+const totalCommission = ref(0)
+const totalOrders = ref(0)
+
+const therapistCommissions = ref([])
+const topTherapists = ref([])
+
+/* ======================
+   UTILS
+====================== */
+const format = (n) =>
+  new Intl.NumberFormat("id-ID").format(n || 0)
+
+/* ======================
+   API CALLS
+====================== */
+const loadRevenue = async () => {
+  const res = await fetch(
+    `/api/reports/revenue?from=${from.value}&to=${to.value}`,
+    { headers: { Authorization: `Bearer ${auth.token}` } }
+  )
+  const data = await res.json()
+  totalRevenue.value = data.total
+  totalOrders.value = data.orders
+}
+
+const loadCommission = async () => {
+  const res = await fetch(
+    `/api/commissions/therapist?from=${from.value}&to=${to.value}`,
+    { headers: { Authorization: `Bearer ${auth.token}` } }
+  )
+  therapistCommissions.value = await res.json()
+  totalCommission.value = therapistCommissions.value.reduce(
+    (sum, x) => sum + Number(x.total),
+    0
+  )
+
+  topTherapists.value = [...therapistCommissions.value]
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5)
+}
+
+const loadAll = async () => {
+  if (!from.value || !to.value) return
+  await loadRevenue()
+  await loadCommission()
+}
+
+/* ======================
+   LOGOUT
+====================== */
+const logout = () => {
+  auth.logout()
+  router.push("/login")
+}
+
+/* ======================
+   INIT
+====================== */
+onMounted(() => {
+  const today = new Date().toISOString().slice(0, 10)
+  from.value = today
+  to.value = today
+  loadAll()
+})
+</script>
+
+<style scoped>
+.owner-dashboard {
+  min-height: 100vh;
+  padding: 20px;
+  background: #0e0e0e;
+  color: #fff;
+}
+
+/* HEADER */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+h1 {
+  color: #c9a24d;
+}
+
+.logout {
+  background: transparent;
+  border: 1px solid #c9a24d;
+  color: #c9a24d;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* FILTER */
+.filter {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.filter input,
+.filter button {
+  padding: 8px;
+  background: #111;
+  border: 1px solid #333;
+  color: #fff;
+}
+
+/* SUMMARY */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.card {
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.card.gold {
+  border-color: #c9a24d;
+}
+
+.card p {
+  font-size: 13px;
+  color: #aaa;
+}
+
+.card h2 {
+  margin: 8px 0 0;
+  color: #c9a24d;
+}
+
+/* SECTION */
+.section h3 {
+  margin-bottom: 12px;
+  color: #c9a24d;
+}
+
+/* TABLE */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 10px;
+  border-bottom: 1px solid #222;
+  text-align: left;
+}
+
+th {
+  color: #c9a24d;
+  font-size: 13px;
+}
+
+/* TOP LIST */
+ol {
+  padding-left: 18px;
+}
+
+li {
+  margin-bottom: 6px;
+}
+</style>
+<td>
+  <button
+    v-if="o.status === 'PAID'"
+    class="danger"
+    @click="revert(o.id)"
+  >
+    Revert
+  </button>
+</td>
+const revert = async (orderId) => {
+  const reason = prompt("Alasan revert?")
+  if (!reason) return
+
+  await fetch("/api/revert-payment", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${auth.token}`
+    },
+    body: JSON.stringify({ order_id: orderId, reason })
+  })
+
+  alert("Payment direvert")
+  loadOrders()
+}
+const loadAccounting = async () => {
+  const res = await fetch(
+    `/api/accounting/profit-loss?from=${from.value}&to=${to.value}`,
+    { headers: { Authorization: `Bearer ${auth.token}` } }
+  )
+  const data = await res.json()
+  profit.value = data.profit
+}

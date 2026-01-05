@@ -1,14 +1,15 @@
-const controller = require("./revert.controller")
+const express = require("express")
+const router = express.Router()
+const c = require("./revert.controller")
 const auth = require("../../middlewares/auth.middleware")
 const rbac = require("../../middlewares/rbac.middleware")
 
-module.exports = app => {
+// hanya Owner / Supervisor
+router.post(
+  "/",
+  auth,
+  rbac(["Owner", "Supervisor"]),
+  c.revertPayment
+)
 
-  // Supervisor / Manager: revert payment
-  app.post(
-    "/api/payments/revert",
-    auth,
-    rbac(["Supervisor", "Manager"]),
-    controller.revert
-  )
-}
+module.exports = router

@@ -1,94 +1,33 @@
-// ===========================
-// CONFIG HAPPY HOUR
-// ===========================
-const HAPPY_HOUR = {
-  start: 10, // jam 10.00
-  end: 15,   // jam 15.00
-  bonus: 20000
-}
+const db = require("../../config/db")
 
-const isHappyHour = () => {
-  const hour = new Date().getHours()
-  return hour >= HAPPY_HOUR.start && hour <= HAPPY_HOUR.end
-}
-
-exports.calculateCommission = async (db, orderId) => {
-
-  // Pastikan order PAID
-  const orderRes = await db.query(
-    `SELECT status FROM orders WHERE id=$1`,
-    [orderId]
+exports.calculateTherapistCommission = async (order, therapist_id) => {
+  // ambil terapis
+  const t = await db.query(
+    "SELECT grade FROM therapists WHERE id=$1",
+    [therapist_id]
   )
 
-  if (!orderRes.rows.length || orderRes.rows[0].status !== "PAID") {
-    throw new Error("Order harus PAID untuk hitung komisi")
-  }
+  const grade = t.rows[0].grade
 
-  // Ambil timer (therapist yang bekerja)
-  const timersRes = await db.query(
-    `SELECT therapist_id FROM timers WHERE order_id=$1`,
-    [orderId]
+  // persentase grade
+  const g = await db.query(
+    "SELECT percent FROM commission_settings WHERE grade=$1 AND branch_id=$2",
+    [grade, order.branch_id]
   )
 
-  if (!timersRes.rows.length) {
-    throw new Error("Tidak ada therapist pada order ini")
-  }
+  let percent = g.rows[0].percent
 
-  // Ambil total order
-  const totalRes = await db.query(
-    `SELECT total FROM orders WHERE id=$1`,
-    [orderId]
+  // cek happy hour
+  const hh = await db.query(
+    `SELECT bonus_percent FROM happy_hours
+     WHERE branch_id=$1
+     AND CURRENT_TIME BETWEEN start_time AND end_time`,
+    [order.branch_id]
   )
 
-  const orderTotal = Number(totalRes.rows[0].total)
-
-  const commissions = []
-
-  for (const row of timersRes.rows) {
-
-    // Ambil grade therapist
-    const gradeRes = await db.query(
-      `SELECT g.commission_percent
-       FROM therapists t
-       JOIN therapist_grades g ON g.id=t.grade_id
-       WHERE t.id=$1`,
-      [row.therapist_id]
-    )
-
-    const percent = Number(gradeRes.rows[0].commission_percent)
-    let amount = orderTotal * (percent / 100)
-
-    // Happy hour bonus
-    if (isHappyHour()) {
-      amount += HAPPY_HOUR.bonus
-    }
-
-    const { rows } = await db.query(
-      `INSERT INTO commissions
-       (therapist_id, order_id, amount)
-       VALUES ($1,$2,$3)
-       RETURNING *`,
-      [row.therapist_id, orderId, amount]
-    )
-
-    commissions.push(rows[0])
+  if (hh.rows.length > 0) {
+    percent += hh.rows[0].bonus_percent
   }
 
-  return commissions
-}
-
-exports.overrideCommission = async (db, commissionId, amount) => {
-  const { rows } = await db.query(
-    `UPDATE commissions
-     SET amount=$1
-     WHERE id=$2
-     RETURNING *`,
-    [amount, commissionId]
-  )
-
-  if (!rows.length) {
-    throw new Error("Commission tidak ditemukan")
-  }
-
-  return rows[0]
+  return order.total_amount * percent
 }

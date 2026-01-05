@@ -1,0 +1,33 @@
+<script setup>
+import { ref, onMounted, onUnmounted } from "vue"
+import socket from "../../services/socket"
+import TimerCard from "../../components/TimerCard.vue"
+import { useAuthStore } from "../../store/auth.store"
+
+const auth = useAuthStore()
+const timers = ref([])
+
+onMounted(() => {
+  socket.emit("join-branch", auth.user.branch_id)
+
+  socket.on("timer:start", (timer) => {
+    timers.value.push(timer)
+  })
+
+  socket.on("timer:update", (data) => {
+    const t = timers.value.find(x => x.id === data.id)
+    if (t) Object.assign(t, data)
+  })
+
+  socket.on("timer:extend", (data) => {
+    const t = timers.value.find(x => x.id === data.id)
+    if (t) t.end_time = data.end_time
+  })
+})
+
+onUnmounted(() => {
+  socket.off("timer:start")
+  socket.off("timer:update")
+  socket.off("timer:extend")
+})
+</script>
