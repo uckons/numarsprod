@@ -1,0 +1,26 @@
+<template>
+<table>
+<tr><th>User</th><th>Role</th><th>Branch</th><th>Action</th></tr>
+<tr v-for="u in users" :key="u.id">
+<td>{{ u.username }}</td>
+<td>{{ u.role }}</td>
+<td>{{ u.branch }}</td>
+<td>
+<button @click="reset(u.id)">Reset</button>
+<button @click="toggle(u.id)">Disable</button>
+</td>
+</tr>
+</table>
+</template>
+
+<script setup>
+import { ref,onMounted } from "vue"
+import api from "@/services/api"
+const users = ref([])
+
+const load = async()=> users.value=(await api.get("/superadmin/users")).data
+const reset = id=> api.put(`/superadmin/users/${id}/reset`)
+const toggle = id=> api.put(`/superadmin/users/${id}/toggle`).then(load)
+
+onMounted(load)
+</script>

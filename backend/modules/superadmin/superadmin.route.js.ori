@@ -1,0 +1,23 @@
+const router = require("express").Router()
+const auth = require("../../middlewares/auth.middleware")
+const rbac = require("../../middlewares/rbac.middleware")
+const c = require("./superadmin.controller")
+
+router.use(auth)
+router.use(rbac("SuperAdmin"))
+
+router.get("/dashboard", c.dashboard)
+router.get("/users", c.users)
+router.post("/users", c.createUser)
+router.put("/users/:id/toggle", c.toggleUser)
+router.put("/users/:id/reset", c.resetPassword)
+
+router.get("/branches", c.branches)
+router.post("/branches", c.createBranch)
+
+router.get("/orders", c.orders)
+router.get("/timers", c.timers)
+router.get("/revenue-chart", c.revenueChart)
+router.post("/users/:id/force-logout", c.forceLogout)
+
+module.exports = router

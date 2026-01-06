@@ -1,0 +1,47 @@
+<template>
+  <div class="page">
+    <h1>SUPER ADMIN</h1>
+
+    <div class="stats">
+      <div class="card">Users {{ stats.users }}</div>
+      <div class="card">Branches {{ stats.branches }}</div>
+      <div class="card">Orders {{ stats.orders }}</div>
+      <div class="card">Revenue {{ stats.revenue }}</div>
+    </div>
+
+    <nav>
+      <button @click="tab='users'">Users</button>
+      <button @click="tab='branches'">Branches</button>
+      <button @click="tab='orders'">Orders</button>
+      <button @click="tab='timers'">Timers</button>
+    </nav>
+
+    <Users v-if="tab==='users'" />
+    <Branches v-if="tab==='branches'" />
+    <Orders v-if="tab==='orders'" />
+    <Timers v-if="tab==='timers'" />
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import api from "@/services/api"
+import Users from "./Users.vue"
+import Branches from "./Branches.vue"
+import Orders from "./Orders.vue"
+import Timers from "./Timers.vue"
+
+const tab = ref("users")
+const stats = ref({})
+
+onMounted(async () => {
+  stats.value = (await api.get("/superadmin/dashboard")).data
+})
+</script>
+
+<style scoped>
+.page { background:#0e0e0e;color:white;padding:20px }
+.stats { display:grid;grid-template-columns:repeat(4,1fr);gap:10px }
+.card { border:1px solid #C9A24D;padding:16px }
+nav button { margin-right:8px }
+</style>

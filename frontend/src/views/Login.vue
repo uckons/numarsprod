@@ -64,7 +64,9 @@ const handleLogin = async () => {
   try {
     await auth.login(username.value, password.value)
     const role = auth.role
-    if (["SuperAdmin","Owner"].includes(role)) router.push("/owner")
+    //if (["SuperAdmin","Owner"].includes(role)) router.push("/owner")
+    if (role === "SuperAdmin") router.push("/superadmin")
+    else if (role === "Owner") router.push("/owner")
     else if (role === "Manager") router.push("/manager")
     else if (role === "Kasir") router.push("/kasir")
     else if (role === "Terapis") router.push("/terapis")

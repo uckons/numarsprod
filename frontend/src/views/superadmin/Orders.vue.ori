@@ -1,0 +1,9 @@
+<template>
+  <div>
+    <h2>Orders Monitoring</h2>
+    <p>Daftar order</p>
+  </div>
+</template>
+
+<script setup>
+</script>

@@ -21,6 +21,7 @@ app.use("/api/orders", require("./modules/orders/order.route"))
 app.use("/api/timers", require("./modules/timers/timer.route"))
 app.use("/api/revert-payment", require("./modules/revert-payment/revert.route"))
 app.use("/api/printers", require("./modules/printers/printer.route"))
+app.use("/api/superadmin", require("./modules/superadmin/superadmin.route"))
 
 // ❗ JANGAN load module yang belum siap
 // app.use("/api/payments", require("./modules/payments/payment.route"))

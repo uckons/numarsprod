@@ -1,0 +1,9 @@
+<template>
+  <div>
+    <h2>Timers Monitoring</h2>
+    <p>Status timer terapis</p>
+  </div>
+</template>
+
+<script setup>
+</script>
