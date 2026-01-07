@@ -1,26 +1,41 @@
 <template>
-<table>
-<tr><th>User</th><th>Role</th><th>Branch</th><th>Action</th></tr>
-<tr v-for="u in users" :key="u.id">
-<td>{{ u.username }}</td>
-<td>{{ u.role }}</td>
-<td>{{ u.branch }}</td>
-<td>
-<button @click="reset(u.id)">Reset</button>
-<button @click="toggle(u.id)">Disable</button>
-</td>
-</tr>
-</table>
+  <div>
+    <h2>User Management</h2>
+
+    <button @click="openCreate">+ Create User</button>
+
+    <table>
+      <tr>
+        <th>Username</th><th>Role</th><th>Branch</th><th>Status</th><th>Aksi</th>
+      </tr>
+      <tr v-for="u in users" :key="u.id">
+        <td>{{ u.username }}</td>
+        <td>{{ u.role }}</td>
+        <td>{{ u.branch || "-" }}</td>
+        <td>{{ u.is_active ? "Aktif" : "Nonaktif" }}</td>
+        <td>
+          <button @click="reset(u.id)">Reset</button>
+          <button @click="toggle(u.id)">On/Off</button>
+          <button class="danger" @click="del(u.id)">Hapus</button>
+        </td>
+      </tr>
+    </table>
+  </div>
 </template>
 
 <script setup>
-import { ref,onMounted } from "vue"
+import { ref, onMounted } from "vue"
 import api from "@/services/api"
+
 const users = ref([])
 
-const load = async()=> users.value=(await api.get("/superadmin/users")).data
-const reset = id=> api.put(`/superadmin/users/${id}/reset`)
-const toggle = id=> api.put(`/superadmin/users/${id}/toggle`).then(load)
+const load = async () => {
+  users.value = (await api.get("/users")).data
+}
+
+const reset = id => api.put(`/users/${id}/reset-password`).then(load)
+const toggle = id => api.put(`/users/${id}/toggle`).then(load)
+const del = id => confirm("Hapus user?") && api.delete(`/users/${id}`).then(load)
 
 onMounted(load)
 </script>

@@ -1,0 +1,15 @@
+const router = require("express").Router()
+const c = require("./user.controller")
+const auth = require("../../middlewares/auth.middleware")
+const rbac = require("../../middlewares/rbac.middleware")
+
+router.use(auth, rbac(["SuperAdmin"]))
+
+router.get("/",auth, c.list)
+router.post("/", auth,c.create)
+router.put("/:id", auth,c.update)
+router.put("/:id/reset-password", auth, c.resetPassword)
+router.put("/:id/toggle", auth, c.toggleActive)
+router.delete("/:id", auth, c.remove)
+
+module.exports = router

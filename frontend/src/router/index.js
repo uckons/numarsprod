@@ -7,15 +7,25 @@ import OwnerDashboard from "../views/owner/OwnerDashboard.vue"
 import ManagerDashboard from "../views/manager/ManagerDashboard.vue"
 import KasirDashboard from "../views/kasir/KasirDashboard.vue"
 import TerapisDashboard from "../views/terapis/TerapisDashboard.vue"
+//import SuperAdminDashboard from "../views/superadmin/SuperAdminDashboard.vue"
+import Users from "../views/superadmin/Users.vue"
+import AuditLogs from "../views/superadmin/AuditLogs.vue"
 
 const routes = [
   { path: "/login", component: Login },
 
   // 🔥 SUPER ADMIN (GLOBAL)
-  { path: "/superadmin", component: SuperAdminDashboard, meta: { auth: true, roles: ["SuperAdmin"] }},
-
+ // { path: "/superadmin", component: SuperAdminDashboard, meta: { auth: true, roles: ["SuperAdmin"] }},
+   {
+  path: "/superadmin",
+  component: SuperAdminDashboard,
+  meta: { auth: true, roles: ["SuperAdmin"] },
+  children: [
+    { path: "users", component: Users }
+  ]
+},
   // OWNER
-  { path: "/owner",component: OwnerDashboard,meta: { auth: true, roles: ["SuperAdmin", "Owner"] }},
+  { path: "/owner",component: OwnerDashboard,meta: { auth: true, roles: ["SuperAdmin","Owner"] }},
 
   // MANAGER
   { path: "/manager",
@@ -29,6 +39,12 @@ const routes = [
     component: KasirDashboard,
     meta: { auth: true, roles: ["Kasir"] }
   },
+//AUDIT
+{
+  path: "/superadmin/audit-logs",
+  component: AuditLogs,
+  meta: { auth: true, roles: ["SuperAdmin"] }
+},
 
   // TERAPIS
   {

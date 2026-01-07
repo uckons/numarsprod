@@ -67,41 +67,31 @@ const load = async () => {
 
 onMounted(load)
 
+const reload = async () => {
+  showForm.value = false
+  selected.value = null
+  await load()
+}
+
 const openAdd = () => {
   selected.value = null
   showForm.value = true
 }
 
 const edit = (u) => {
-  // clone agar tidak langsung ubah table
-  selected.value = { ...u }
+  selected.value = u
   showForm.value = true
 }
 
-const saveOptimistic = async (payload) => {
-  // cari index user di table
-  const idx = users.value.findIndex(u => u.id === payload.id)
-  const backup = { ...users.value[idx] }
-
-  // optimistic update (UI dulu)
-  users.value[idx] = { ...users.value[idx], ...payload }
-
-  try {
-    await api.put(`/users/${payload.id}`, payload)
-  } catch (err) {
-    // rollback jika gagal
-    users.value[idx] = backup
-    alert("Gagal update user")
-  }
+const reset = async (u) => {
+  if (!confirm(`Reset password ${u.username}?`)) return
+  await api.put(`/users/${u.id}/reset-password`)
+  alert("Password reset ke: 123456")
 }
 
-const reload = async (payload) => {
-  showForm.value = false
-  if (payload?.id) {
-    await saveOptimistic(payload)
-  } else {
-    await load()
-  }
+const toggle = async (u) => {
+  await api.put(`/users/${u.id}/toggle`)
+  await load()
 }
 
 const close = () => {
@@ -109,7 +99,6 @@ const close = () => {
   selected.value = null
 }
 </script>
-
 
 <style scoped>
 .page {

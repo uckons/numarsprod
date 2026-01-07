@@ -1,0 +1,9 @@
+const router = require("express").Router()
+const c = require("./branch.controller")
+const auth = require("../../middlewares/auth.middleware")
+
+// Semua user login boleh lihat branch
+router.get("/", auth, c.list)
+
+module.exports = router
+

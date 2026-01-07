@@ -22,6 +22,10 @@ app.use("/api/timers", require("./modules/timers/timer.route"))
 app.use("/api/revert-payment", require("./modules/revert-payment/revert.route"))
 app.use("/api/printers", require("./modules/printers/printer.route"))
 app.use("/api/superadmin", require("./modules/superadmin/superadmin.route"))
+app.use("/api/users", require("./modules/users/user.route"))
+app.use("/api/roles", require("./modules/roles/role.route"))
+app.use("/api/branches", require("./modules/branches/branch.route"))
+app.use("/api/audit-logs", require("./modules/audit/audit.route"))
 
 // ❗ JANGAN load module yang belum siap
 // app.use("/api/payments", require("./modules/payments/payment.route"))

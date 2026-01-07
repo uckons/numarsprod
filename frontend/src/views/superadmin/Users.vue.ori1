@@ -1,0 +1,232 @@
+<template>
+  <div class="page">
+    <header class="header">
+      <h2>User Management</h2>
+      <button class="primary" @click="openCreate">+ Add User</button>
+    </header>
+
+    <!-- TABLE -->
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Branch</th>
+          <th>Status</th>
+          <th width="260">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="u in users" :key="u.id">
+          <td>{{ u.username }}</td>
+          <td>{{ u.role }}</td>
+          <td>{{ u.branch || "-" }}</td>
+          <td>
+            <span :class="u.is_active ? 'on' : 'off'">
+              {{ u.is_active ? "ACTIVE" : "DISABLED" }}
+            </span>
+          </td>
+          <td class="actions">
+            <button @click="openEdit(u)">Edit</button>
+            <button @click="reset(u.id)">Reset PW</button>
+            <button @click="toggle(u.id)">
+              {{ u.is_active ? "Disable" : "Enable" }}
+            </button>
+            <button class="danger" @click="remove(u.id)">Delete</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- MODAL -->
+    <div v-if="showModal" class="modal">
+      <div class="modal-box">
+        <h3>{{ form.id ? "Edit User" : "Create User" }}</h3>
+
+        <input v-model="form.username" placeholder="Username" />
+
+        <input
+          v-if="!form.id"
+          v-model="form.password"
+          type="password"
+          placeholder="Password"
+        />
+
+        <select v-model="form.role_id">
+          <option value="">Select Role</option>
+          <option v-for="r in roles" :key="r.id" :value="r.id">
+            {{ r.name }}
+          </option>
+        </select>
+
+        <select v-model="form.branch_id">
+          <option value="">Global / No Branch</option>
+          <option v-for="b in branches" :key="b.id" :value="b.id">
+            {{ b.name }}
+          </option>
+        </select>
+
+        <div class="modal-actions">
+          <button class="primary" @click="save">Save</button>
+          <button @click="close">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import api from "@/services/api"
+
+const users = ref([])
+const roles = ref([])
+const branches = ref([])
+const showModal = ref(false)
+
+const form = ref({
+  id: null,
+  username: "",
+  password: "",
+  role_id: "",
+  branch_id: ""
+})
+
+/* ================= LOAD DATA ================= */
+const loadUsers = async () => {
+  users.value = (await api.get("/users")).data
+}
+
+const loadRoles = async () => {
+  roles.value = (await api.get("/roles")).data
+}
+
+const loadBranches = async () => {
+  branches.value = (await api.get("/branches")).data
+}
+
+/* ================= MODAL ================= */
+const openCreate = () => {
+  form.value = { id: null, username: "", password: "", role_id: "", branch_id: "" }
+  showModal.value = true
+}
+
+const openEdit = (u) => {
+  form.value = {
+    id: u.id,
+    username: u.username,
+    role_id: roles.value.find(r => r.name === u.role)?.id,
+    branch_id: branches.value.find(b => b.name === u.branch)?.id || ""
+  }
+  showModal.value = true
+}
+
+const close = () => showModal.value = false
+
+/* ================= ACTION ================= */
+const save = async () => {
+  if (!form.value.username || !form.value.role_id) {
+    alert("Username & role wajib")
+    return
+  }
+
+  if (form.value.id) {
+    await api.put(`/users/${form.value.id}`, {
+      role_id: form.value.role_id,
+      branch_id: form.value.branch_id
+    })
+  } else {
+    await api.post("/users", form.value)
+  }
+
+  close()
+  loadUsers()
+}
+
+const reset = async (id) => {
+  if (!confirm("Reset password ke 123456?")) return
+  await api.put(`/users/${id}/reset-password`)
+  alert("Password direset")
+}
+
+const toggle = async (id) => {
+  await api.put(`/users/${id}/toggle`)
+  loadUsers()
+}
+
+const remove = async (id) => {
+  if (!confirm("Hapus user ini?")) return
+  await api.delete(`/users/${id}`)
+  loadUsers()
+}
+
+onMounted(() => {
+  loadUsers()
+  loadRoles()
+  loadBranches()
+})
+</script>
+
+<style scoped>
+.page {
+  padding: 20px;
+  color: white;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.primary {
+  background: #C9A24D;
+  border: none;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  border-bottom: 1px solid #333;
+  padding: 8px;
+}
+.on { color: #2ecc71 }
+.off { color: #e74c3c }
+.actions button {
+  margin-right: 4px;
+}
+.danger {
+  background: #b02a2a;
+  border: none;
+  color: white;
+  padding: 4px 8px;
+}
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-box {
+  background: #111;
+  padding: 20px;
+  width: 300px;
+  border: 1px solid #C9A24D;
+}
+input, select {
+  width: 100%;
+  margin-bottom: 10px;
+  background: #000;
+  color: white;
+  border: 1px solid #333;
+  padding: 6px;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+</style>

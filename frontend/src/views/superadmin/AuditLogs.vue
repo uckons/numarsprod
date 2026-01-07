@@ -1,75 +1,88 @@
 <template>
-  <div class="box">
+  <div class="page">
     <h2>Audit Logs</h2>
 
     <!-- FILTER -->
-    <div class="filters">
-      <input v-model="filters.user_id" placeholder="User ID" />
-      <input type="date" v-model="filters.from" />
-      <input type="date" v-model="filters.to" />
+    <div class="filter">
+      <input v-model="filter.user_id" placeholder="User ID" />
+      <input type="date" v-model="filter.from" />
+      <input type="date" v-model="filter.to" />
       <button @click="load">Filter</button>
     </div>
 
     <!-- TABLE -->
     <table>
-      <tr>
-        <th>Waktu</th>
-        <th>User</th>
-        <th>Aksi</th>
-      </tr>
-
-      <tr v-for="l in logs" :key="l.id">
-        <td>{{ format(l.created_at) }}</td>
-        <td>{{ l.username || "-" }}</td>
-        <td>{{ l.action }}</td>
-      </tr>
+      <thead>
+        <tr>
+          <th>Waktu</th>
+          <th>User</th>
+          <th>Aksi</th>
+          <th>Target</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="l in logs" :key="l.id">
+          <td>{{ format(l.created_at) }}</td>
+          <td>{{ l.username }}</td>
+          <td>{{ l.action }}</td>
+          <td>{{ l.target }}</td>
+        </tr>
+      </tbody>
     </table>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from "vue"
-import api from "@/services/api"
+import api from "../../services/api"
 
 const logs = ref([])
-const filters = ref({
+const filter = ref({
   user_id: "",
   from: "",
   to: ""
 })
 
 const load = async () => {
-  logs.value = (
-    await api.get("/superadmin/audit-logs", {
-      params: filters.value
-    })
-  ).data
+  const params = {}
+  if (filter.value.user_id) params.user_id = filter.value.user_id
+  if (filter.value.from) params.from = filter.value.from
+  if (filter.value.to) params.to = filter.value.to
+
+  logs.value = (await api.get("/audit-logs", { params })).data
 }
 
-const format = (d) => new Date(d).toLocaleString()
-
 onMounted(load)
+
+const format = (v) =>
+  new Date(v).toLocaleString("id-ID")
 </script>
 
 <style scoped>
-.filters {
+.page {
+  padding: 20px;
+}
+.filter {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 input {
-  background:#000;
-  color:#fff;
-  border:1px solid #C9A24D;
-  padding:6px;
+  background: #000;
+  border: 1px solid #333;
+  color: #fff;
+  padding: 6px;
 }
 button {
-  background:#C9A24D;
-  border:none;
-  padding:6px 12px;
+  background: #C9A24D;
+  padding: 6px 10px;
 }
 table {
-  width:100%;
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  border: 1px solid #333;
+  padding: 8px;
 }
 </style>
-

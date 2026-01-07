@@ -1,24 +1,16 @@
-const express = require("express")
-const router = express.Router()
-
-const controller = require("./user.controller")
+const router = require("express").Router()
+const c = require("./user.controller")
 const auth = require("../../middlewares/auth.middleware")
 const rbac = require("../../middlewares/rbac.middleware")
 
-// 🔐 HANYA SUPER ADMIN BOLEH
-router.get(
-  "/",
-  auth,
-  rbac(["SuperAdmin"]),
-  controller.listUsers
-)
+// 🔐 Semua user login boleh LIST (filter ada di service)
+router.get("/", auth, c.list)
 
-// 🔐 SUPER ADMIN BUAT USER
-router.post(
-  "/",
-  auth,
-  rbac(["SuperAdmin"]),
-  controller.createUser
-)
+// 🔒 HANYA SUPERADMIN
+router.post("/", auth, rbac(["SuperAdmin"]), c.create)
+router.put("/:id", auth, rbac(["SuperAdmin"]), c.update)
+router.put("/:id/reset-password", auth, rbac(["SuperAdmin"]), c.resetPassword)
+router.put("/:id/toggle", auth, rbac(["SuperAdmin"]), c.toggleActive)
+router.delete("/:id", auth, rbac(["SuperAdmin"]), c.remove)
 
 module.exports = router
