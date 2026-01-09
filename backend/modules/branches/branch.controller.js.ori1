@@ -1,0 +1,11 @@
+const service = require("./branch.service")
+
+exports.list = async (req, res) => {
+  try {
+    const data = await service.list(req.user, req.query)
+    res.json(data)
+  } catch (err) {
+    console.error("BRANCH LIST ERROR 👉", err) // 🔥 WAJIB
+    res.status(500).json({ message: "Failed load branches", error: err.message })
+  }
+}

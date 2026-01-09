@@ -1,0 +1,166 @@
+<template>
+  <div class="page">
+    <!-- HEADER -->
+    <div class="header">
+      <div>
+        <h2>Branch Management</h2>
+        <p class="subtitle">Manage outlet & operating hours</p>
+      </div>
+
+      <button class="btn-primary" @click="openAdd">
+        + Add Branch
+      </button>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats">
+      <div class="stat">
+        <label>Total</label>
+        <span>{{ stats.total }}</span>
+      </div>
+      <div class="stat success">
+        <label>Active</label>
+        <span>{{ stats.active }}</span>
+      </div>
+      <div class="stat danger">
+        <label>Disabled</label>
+        <span>{{ stats.disabled }}</span>
+      </div>
+    </div>
+
+    <!-- FILTER -->
+    <div class="card filter">
+      <input v-model="q" placeholder="Search branch name..." />
+      <button class="btn-outline" @click="load">Search</button>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Branch</th>
+            <th>Address</th>
+            <th>Users</th>
+            <th>Hours</th>
+            <th>Status</th>
+            <th width="220">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr v-if="loading">
+            <td colspan="6">Loading...</td>
+          </tr>
+
+          <tr v-else-if="!branches.length">
+            <td colspan="6" class="empty">No branches found</td>
+          </tr>
+
+          <tr v-for="b in branches" :key="b.id" class="hover">
+            <td class="name">{{ b.name }}</td>
+            <td>{{ b.address || "-" }}</td>
+            <td>{{ b.user_count }}</td>
+            <td>
+              {{ b.open_time }} – {{ b.close_time }}
+            </td>
+            <td>
+              <span
+                class="badge"
+                :class="b.deleted_at ? 'danger' : 'success'"
+              >
+                {{ b.deleted_at ? "DISABLED" : "ACTIVE" }}
+              </span>
+            </td>
+            <td>
+              <button @click="edit(b)">Edit</button>
+              <button
+                :class="b.deleted_at ? 'success' : 'danger'"
+                @click="toggle(b)"
+              >
+                {{ b.deleted_at ? "Enable" : "Disable" }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- PAGINATION -->
+      <div class="pagination">
+        <button :disabled="page===1" @click="page--; load()">Prev</button>
+        <span>Page {{ page }}</span>
+        <button :disabled="page*limit>=total" @click="page++; load()">Next</button>
+      </div>
+    </div>
+
+    <BranchForm
+      v-if="showForm"
+      :edit="!!selected"
+      :data="selected"
+      @saved="reload"
+      @close="close"
+    />
+  </div>
+</template>
+<script setup>
+import { ref, onMounted } from "vue"
+import api from "@/services/api"
+import BranchForm from "./BranchForm.vue"
+
+const branches = ref([])
+const stats = ref({ total:0, active:0, disabled:0 })
+const q = ref("")
+const page = ref(1)
+const limit = 10
+const total = ref(0)
+const loading = ref(false)
+
+const showForm = ref(false)
+const selected = ref(null)
+
+const load = async () => {
+  loading.value = true
+  const res = await api.get("/branches/search", {
+    params: { q: q.value, page: page.value, limit }
+  })
+  branches.value = res.data.data
+  total.value = res.data.total
+  loading.value = false
+}
+
+const loadStats = async () => {
+  stats.value = (await api.get("/branches/stats")).data
+}
+
+onMounted(() => {
+  load()
+  loadStats()
+})
+
+const openAdd = () => {
+  selected.value = null
+  showForm.value = true
+}
+
+const edit = (b) => {
+  selected.value = { ...b }
+  showForm.value = true
+}
+
+const toggle = async (b) => {
+  await api.put(`/branches/${b.id}/toggle`)
+  load()
+  loadStats()
+}
+
+const reload = async () => {
+  showForm.value = false
+  await load()
+  await loadStats()
+}
+
+const close = () => {
+  showForm.value = false
+  selected.value = null
+}
+</script>

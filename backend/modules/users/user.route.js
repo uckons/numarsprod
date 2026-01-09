@@ -4,7 +4,9 @@ const auth = require("../../middlewares/auth.middleware")
 const rbac = require("../../middlewares/rbac.middleware")
 
 // 🔐 Semua user login boleh LIST (filter ada di service)
+router.get("/stats", auth, c.stats)
 router.get("/", auth, c.list)
+router.get("/search", auth, c.search)
 
 // 🔒 HANYA SUPERADMIN
 router.post("/", auth, rbac(["SuperAdmin"]), c.create)

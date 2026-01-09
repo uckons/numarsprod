@@ -1,0 +1,103 @@
+<template>
+  <div class="page">
+    <div class="header">
+      <div>
+        <h2>Branch Management</h2>
+        <p class="subtitle">Manage outlet / branch locations</p>
+      </div>
+
+      <button class="btn-primary" @click="openAdd">
+        + Add Branch
+      </button>
+    </div>
+
+    <div class="card table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Branch</th>
+            <th>Address</th>
+            <th>Status</th>
+            <th width="220">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr v-if="!branches.length">
+            <td colspan="4" class="empty">No branches found</td>
+          </tr>
+
+          <tr v-for="b in branches" :key="b.id">
+            <td class="bold">{{ b.name }}</td>
+            <td>{{ b.address || "-" }}</td>
+            <td>
+              <span
+                class="badge"
+                :class="b.is_active ? 'success' : 'danger'"
+              >
+                {{ b.is_active ? "ACTIVE" : "DISABLED" }}
+              </span>
+            </td>
+            <td class="actions">
+              <button @click="edit(b)">Edit</button>
+              <button
+                :class="b.is_active ? 'danger' : 'success'"
+                @click="toggle(b)"
+              >
+                {{ b.is_active ? "Disable" : "Enable" }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <BranchForm
+      v-if="showForm"
+      :data="selected"
+      @saved="reload"
+      @close="close"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import api from "@/services/api"
+import BranchForm from "./BranchForm.vue"
+
+const branches = ref([])
+const showForm = ref(false)
+const selected = ref(null)
+
+const load = async () => {
+  branches.value = (await api.get("/branches")).data
+}
+
+onMounted(load)
+
+const openAdd = () => {
+  selected.value = null
+  showForm.value = true
+}
+
+const edit = (b) => {
+  selected.value = { ...b }
+  showForm.value = true
+}
+
+const toggle = async (b) => {
+  await api.put(`/branches/${b.id}/toggle`)
+  b.is_active = !b.is_active
+}
+
+const reload = async () => {
+  showForm.value = false
+  await load()
+}
+
+const close = () => {
+  showForm.value = false
+  selected.value = null
+}
+</script>

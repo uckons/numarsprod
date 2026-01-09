@@ -12,7 +12,9 @@ exports.list = async (actor) => {
     const { rows } = await db.query(`
       SELECT 
         u.id,
+        u.name,
         u.username,
+        u.phone,
         r.name AS role,
         b.name AS branch,
         u.is_active
@@ -29,7 +31,9 @@ exports.list = async (actor) => {
   const { rows } = await db.query(`
     SELECT 
       u.id,
+      u.name,
       u.username,
+      u.phone,
       r.name AS role,
       b.name AS branch,
       u.is_active
@@ -58,9 +62,9 @@ exports.create = async (data, actor) => {
       : actor.branch_id
 
   await db.query(`
-    INSERT INTO users (username, password, role_id, branch_id)
-    VALUES ($1,$2,$3,$4)
-  `, [data.username, hash, data.role_id, branchId])
+    INSERT INTO users (name, username, phone, password, role_id, branch_id)
+    VALUES ($1,$2,$3,$4,$5,$6)
+  `, [data.name, data.username, data.phone, hash, data.role_id, branchId])
 
   await audit(actor.id, "CREATE_USER", data.username)
   return { success: true }
@@ -129,4 +133,83 @@ async function audit(user_id, action, target) {
     INSERT INTO audit_logs (user_id, action, target)
     VALUES ($1,$2,$3)
   `, [user_id, action, target])
+}
+exports.search = async (actor, query) => {
+  const { q = "", role = "", page = 1, limit = 10 } = query
+  const offset = (page - 1) * limit
+
+  const params = []
+  let where = "u.deleted_at IS NULL"
+
+  // 🔒 Role-based scope
+  if (actor.role !== "SuperAdmin") {
+    params.push(actor.branch_id)
+    where += ` AND u.branch_id = $${params.length}`
+  }
+
+  if (q) {
+    params.push(`%${q}%`)
+    /**where += ` AND u.username ILIKE $${params.length}`
+  }*/
+    where += ` AND (u.username ILIKE $${params.length} OR u.name ILIKE $${params.length})`
+  }
+
+  if (role) {
+    params.push(role)
+    where += ` AND r.name = $${params.length}`
+  }
+
+  const data = await db.query(`
+    SELECT
+      u.id,
+      u.name,
+      u.phone,
+      u.username,
+      r.name AS role,
+      b.name AS branch,
+      u.is_active
+    FROM users u
+    JOIN roles r ON r.id = u.role_id
+    LEFT JOIN branches b ON b.id = u.branch_id
+    WHERE ${where}
+    ORDER BY u.id DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `, params)
+
+  const total = await db.query(`
+    SELECT COUNT(*) 
+    FROM users u
+    JOIN roles r ON r.id = u.role_id
+    WHERE ${where}
+  `, params)
+
+  return {
+    data: data.rows,
+    total: Number(total.rows[0].count)
+  }
+}
+exports.stats = async (actor) => {
+  const where =
+    actor.role === "SuperAdmin"
+      ? ""
+      : "WHERE branch_id = $1"
+
+  const params =
+    actor.role === "SuperAdmin"
+      ? []
+      : [actor.branch_id]
+
+  const { rows } = await db.query(`
+    SELECT
+      COUNT(*) AS total,
+      COUNT(*) FILTER (WHERE is_active = true) AS active,
+      COUNT(*) FILTER (WHERE is_active = false) AS disabled,
+      COUNT(*) FILTER (
+        WHERE created_at >= date_trunc('month', NOW())
+      ) AS new_month
+    FROM users
+    ${where}
+  `, params)
+
+  return rows[0]
 }

@@ -1,0 +1,51 @@
+const db = require("../../config/db")
+
+exports.list = async () => {
+  const { rows } = await db.query(`
+    SELECT
+      id,
+      name,
+      address,
+      is_active,
+      created_at
+    FROM branches
+    WHERE deleted_at IS NULL
+    ORDER BY id DESC
+  `)
+  return rows
+}
+
+exports.create = async (data) => {
+  await db.query(`
+    INSERT INTO branches (name, address)
+    VALUES ($1,$2)
+  `, [data.name, data.address])
+  return { success: true }
+}
+
+exports.update = async (id, data) => {
+  await db.query(`
+    UPDATE branches
+    SET name=$1, address=$2
+    WHERE id=$3
+  `, [data.name, data.address, id])
+  return { success: true }
+}
+
+exports.toggle = async (id) => {
+  await db.query(`
+    UPDATE branches
+    SET is_active = NOT is_active
+    WHERE id=$1
+  `, [id])
+  return { success: true }
+}
+
+exports.remove = async (id) => {
+  await db.query(`
+    UPDATE branches
+    SET deleted_at = NOW()
+    WHERE id=$1
+  `, [id])
+  return { success: true }
+}

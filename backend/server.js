@@ -15,7 +15,7 @@ const io = new Server(server, {
 })
 
 // 3️⃣ LOAD SOCKET MODULE SETELAH io ADA
-require("./sockets")(io)
+//require("./sockets")(io)
 require("./sockets/timer.socket")(io)
 
 // 4️⃣ LISTEN

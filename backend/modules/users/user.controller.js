@@ -72,3 +72,21 @@ exports.remove = async (req, res) => {
     res.status(400).json({ message: err.message })
   }
 }
+exports.search = async (req, res) => {
+  try {
+    const result = await service.search(req.user, req.query)
+    res.json(result)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: "Search failed" })
+  }
+}
+exports.stats = async (req, res) => {
+  try {
+    const stats = await service.stats(req.user)
+    res.json(stats)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: "Failed load user stats" })
+  }
+}

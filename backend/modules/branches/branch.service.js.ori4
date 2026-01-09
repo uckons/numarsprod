@@ -1,0 +1,110 @@
+const db = require("../../config/db")
+
+/**
+ * LIST + SEARCH + PAGINATION + USER COUNT
+ */
+exports.search = async (query) => {
+  const { q = "", page = 1, limit = 10 } = query
+  const offset = (page - 1) * limit
+
+  const params = []
+  let where = "b.deleted_at IS NULL"
+
+  if (q) {
+    params.push(`%${q}%`)
+    where += ` AND b.name ILIKE $${params.length}`
+  }
+
+  const data = await db.query(`
+    SELECT
+      b.id,
+      b.name,
+      b.address,
+      b.open_time,
+      b.close_time,
+      b.created_at,
+      COUNT(u.id) AS user_count
+    FROM branches b
+    LEFT JOIN users u ON u.branch_id = b.id AND u.deleted_at IS NULL
+    WHERE ${where}
+    GROUP BY b.id
+    ORDER BY b.id DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `, params)
+
+  const total = await db.query(`
+    SELECT COUNT(*) FROM branches b WHERE ${where}
+  `, params)
+
+  return {
+    data: data.rows,
+    total: Number(total.rows[0].count)
+  }
+}
+
+/**
+ * STATS
+ */
+exports.stats = async () => {
+  const { rows } = await db.query(`
+    SELECT
+      COUNT(*) AS total,
+      COUNT(*) FILTER (WHERE deleted_at IS NULL) AS active,
+      COUNT(*) FILTER (WHERE deleted_at IS NOT NULL) AS disabled
+    FROM branches
+  `)
+
+  return rows[0]
+}
+
+/**
+ * CREATE
+ */
+exports.create = async (data) => {
+  await db.query(`
+    INSERT INTO branches (name, address, open_time, close_time)
+    VALUES ($1,$2,$3,$4)
+  `, [
+    data.name,
+    data.address,
+    data.open_time || "10:00",
+    data.close_time || "03:00"
+  ])
+
+  return { success: true }
+}
+
+/**
+ * UPDATE
+ */
+exports.update = async (id, data) => {
+  await db.query(`
+    UPDATE branches
+    SET name=$1, address=$2, open_time=$3, close_time=$4
+    WHERE id=$5
+  `, [
+    data.name,
+    data.address,
+    data.open_time,
+    data.close_time,
+    id
+  ])
+
+  return { success: true }
+}
+
+/**
+ * ENABLE / DISABLE (SOFT)
+ */
+exports.toggle = async (id) => {
+  await db.query(`
+    UPDATE branches
+    SET deleted_at = CASE
+      WHEN deleted_at IS NULL THEN NOW()
+      ELSE NULL
+    END
+    WHERE id = $1
+  `, [id])
+
+  return { success: true }
+}

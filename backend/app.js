@@ -26,6 +26,7 @@ app.use("/api/users", require("./modules/users/user.route"))
 app.use("/api/roles", require("./modules/roles/role.route"))
 app.use("/api/branches", require("./modules/branches/branch.route"))
 app.use("/api/audit-logs", require("./modules/audit/audit.route"))
+//app.use("/api/services", require("./modules/services/service.route"))
 
 // ❗ JANGAN load module yang belum siap
 // app.use("/api/payments", require("./modules/payments/payment.route"))

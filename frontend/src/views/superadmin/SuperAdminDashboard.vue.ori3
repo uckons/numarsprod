@@ -1,0 +1,73 @@
+<template>
+  <div class="layout">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <h2>SUPER ADMIN</h2>
+
+      <nav>
+        <button :class="{active:tab==='users'}" @click="tab='users'">
+          <UsersIcon size="18" /> Users
+        </button>
+
+        <button :class="{active:tab==='branches'}" @click="tab='branches'">
+          <Store size="18" /> Branches
+        </button>
+
+        <button :class="{active:tab==='orders'}" @click="tab='orders'">
+          <ClipboardList size="18" /> Orders
+        </button>
+
+        <button :class="{active:tab==='timers'}" @click="tab='timers'">
+          <Timer size="18" /> Timers
+        </button>
+
+        <button :class="{active:tab==='audit'}" @click="tab='audit'">
+          <ShieldCheck size="18" /> Audit Logs
+        </button>
+      </nav>
+
+      <button class="logout" @click="logout">
+        <LogOut size="18" /> Logout
+      </button>
+    </aside>
+
+    <!-- CONTENT -->
+    <main class="content">
+      <Users v-show="tab==='users'" />
+      <Branches v-show="tab==='branches'" />
+      <Orders v-show="tab==='orders'" />
+      <Timers v-show="tab==='timers'" />
+      <AuditLogs v-show="tab==='audit'" />
+    </main>
+  </div>
+</template>
+
+<script setup>
+import { ref } from "vue"
+import { useRouter } from "vue-router"
+import { useAuthStore } from "@/store/auth.store"
+
+import {
+  Users as UsersIcon,
+  Store,
+  ClipboardList,
+  Timer,
+  LogOut,
+  ShieldCheck
+} from "lucide-vue-next"
+
+import Users from "./Users.vue"
+import Branches from "./Branches.vue"
+import Orders from "./Orders.vue"
+import Timers from "./Timers.vue"
+import AuditLogs from "./AuditLogs.vue"
+
+const tab = ref("users")
+const auth = useAuthStore()
+const router = useRouter()
+
+const logout = () => {
+  auth.logout()
+  router.push("/login")
+}
+</script>

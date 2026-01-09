@@ -1,53 +1,87 @@
 <template>
   <div class="overlay">
     <div class="modal">
-      <h3>{{ edit ? "Edit User" : "Tambah User" }}</h3>
-
-      <!-- USERNAME -->
-      <label>Username</label>
-      <input
-        v-model="form.username"
-        placeholder="Username"
-        :disabled="edit"
-      />
-
-      <!-- ROLE -->
-      <label>Role</label>
-      <select v-model="form.role_id">
-        <option value="">-- Pilih Role --</option>
-        <option
-          v-for="r in roles"
-          :key="r.id"
-          :value="r.id"
-        >
-          {{ r.name }}
-        </option>
-      </select>
-
-      <!-- BRANCH -->
-      <label>Cabang</label>
-      <select v-model="form.branch_id">
-        <option value="">-- Pilih Cabang --</option>
-        <option
-          v-for="b in branches"
-          :key="b.id"
-          :value="b.id"
-        >
-          {{ b.name }}
-        </option>
-      </select>
-
-      <!-- ACTION -->
-      <div class="actions">
-        <button class="primary" @click="submit">
-          {{ edit ? "Simpan Perubahan" : "Buat User" }}
-        </button>
-        <button class="ghost" @click="$emit('close')">
-          Batal
-        </button>
+      <!-- HEADER -->
+      <div class="modal-header">
+        <h3>{{ edit ? "Edit User" : "Add New User" }}</h3>
+        <button class="close" @click="$emit('close')">×</button>
       </div>
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <!-- BODY -->
+      <div class="modal-body">
+        <div class="form-group">
+  <label>Full Name</label>
+  <input
+    v-model="form.name"
+    placeholder="Full name"
+  />
+</div>
+<div class="form-group">
+  <label>Phone</label>
+  <input
+    v-model="form.phone"
+    placeholder="08xxxxxxxxxx"
+  />
+</div>
+
+        <div class="form-group">
+          <label>Username</label>
+          <input
+            v-model="form.username"
+            :disabled="edit"
+            placeholder="username"
+          />
+        </div>
+
+        <div class="form-group" v-if="!edit">
+          <label>Password</label>
+          <input
+            type="password"
+            v-model="form.password"
+            placeholder="Default: 123456"
+          />
+        </div>
+
+        <div class="row">
+          <div class="form-group">
+            <label>Role</label>
+            <select v-model="form.role_id">
+              <option disabled value="">Select Role</option>
+              <option
+                v-for="r in roles"
+                :key="r.id"
+                :value="r.id"
+              >
+                {{ r.name }}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Branch</label>
+            <select v-model="form.branch_id">
+              <option value="">All / None</option>
+              <option
+                v-for="b in branches"
+                :key="b.id"
+                :value="b.id"
+              >
+                {{ b.name }}
+              </option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- FOOTER -->
+      <div class="modal-footer">
+        <button class="btn-outline" @click="$emit('close')">
+          Cancel
+        </button>
+        <button class="btn-primary" @click="save" :disabled="loading">
+          {{ loading ? "Saving..." : "Save" }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -55,147 +89,184 @@
 <script setup>
 import { ref, onMounted } from "vue"
 import api from "../../services/api"
-
+const emit = defineEmits(["saved", "close"])
 const props = defineProps({
   edit: Boolean,
-  data: Object
+  data: Object,
+})
+const form = ref({
+  name:"",
+  username:"",
+  phone: "",
+  password: "",
+  role_id: "",
+  branch_id: "",
 })
 
-const emit = defineEmits(["saved", "close"])
-
+const loading = ref(false)
 const roles = ref([])
 const branches = ref([])
-const error = ref("")
 
-const form = ref({
-  username: "",
-  role_id: "",
-  branch_id: ""
-})
 
+/* INIT */
 onMounted(async () => {
-  try {
-    const [r, b] = await Promise.all([
-      api.get("/roles"),
-      api.get("/branches")
-    ])
+  const [r, b] = await Promise.all([
+    api.get("/roles"),
+    api.get("/branches"),
+  ])
 
-    roles.value = r.data
-    branches.value = b.data
+  roles.value = r.data
+  branches.value = b.data
 
-    // MODE EDIT
-    if (props.edit && props.data) {
-      form.value = {
-        username: props.data.username,
-        role_id: props.data.role_id || "",
-        branch_id: props.data.branch_id || ""
-      }
-    }
-  } catch (err) {
-    error.value = "Gagal load role / cabang"
-  }
-})
-
-const submit = async () => {
-  error.value = ""
-
-  if (!form.value.username || !form.value.role_id) {
-    error.value = "Username & Role wajib diisi"
-    return
-  }
-
-  // EDIT → biarkan parent handle API (optimistic)
-  if (props.edit) {
-    emit("saved", {
-      id: props.data.id,
-      username: form.value.username,
-      role_id: form.value.role_id,
-      branch_id: form.value.branch_id
-    })
-    return
-  }
-
-  // CREATE USER
-  try {
-    await api.post("/users", {
-      ...form.value,
-      password: "123456"
-    })
-    emit("saved")
-  } catch (err) {
-    error.value =
-      err.response?.data?.message || "Gagal buat user"
+  if (props.edit && props.data) {
+  form.value = {
+    name: props.data.name,
+    username: props.data.username,
+    phone: props.data.phone,
+    role_id: props.data.role_id,
+    branch_id: props.data.branch_id || "",
+    password: ""
   }
 }
+
+})
+
+/* SAVE */
+const save = async () => {
+  if (!form.value.name || !form.value.phone || !form.value.username || !form.value.role_id) {
+    return alert("Name, Phone, Username & Role required")
+  }
+
+  loading.value = true
+  try {
+    if (props.edit) {
+      // ⛔ JANGAN kirim password saat edit
+      await api.put(`/users/${props.data.id}`, {
+        role_id: form.value.role_id,
+        branch_id: form.value.branch_id
+      })
+
+      emit("saved", {
+        id: props.data.id,
+        role_id: form.value.role_id,
+        branch_id: form.value.branch_id
+      })
+    } else {
+      // ✅ DEFAULT PASSWORD
+      if (!form.value.password) {
+        form.value.password = "123456"
+      }
+
+      await api.post("/users", form.value)
+      emit("saved")
+    }
+  } catch (err) {
+    console.error(err.response?.data)
+    alert(err.response?.data?.message || "Failed save user")
+  } finally {
+    loading.value = false
+  }
+}
+
 </script>
 
 <style scoped>
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.6);
+  background: rgba(0,0,0,.7);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  z-index: 100;
 }
 
 .modal {
-  width: 360px;
-  background: #0e0e0e;
-  border: 1px solid #C9A24D;
-  padding: 20px;
-  color: #fff;
+  width: 420px;
+  max-height: 85vh;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-strong);
+  animation: pop .2s ease;
+  display: flex;
+  flex-direction: column;
 }
 
-h3 {
-  margin-bottom: 16px;
-  color: #C9A24D;
+@keyframes pop {
+  from { transform: scale(.95); opacity: 0 }
+  to { transform: scale(1); opacity: 1 }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.modal-header h3 {
+  margin: 0;
+}
+
+.close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 16px;
+  overflow-y: auto;
+  max-height: calc(85vh - 120px);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
 }
 
 label {
-  font-size: 13px;
-  color: #aaa;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
 }
 
 input, select {
-  width: 100%;
-  margin: 6px 0 14px;
-  padding: 8px;
   background: #000;
-  border: 1px solid #333;
-  color: #fff;
+  border: 1px solid var(--border-soft);
+  color: white;
+  padding: 8px;
+  border-radius: var(--radius);
 }
 
-input:disabled {
-  opacity: .6;
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
-.actions {
+.modal-footer {
   display: flex;
-  justify-content: space-between;
-  margin-top: 10px;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid var(--border-soft);
 }
 
-.primary {
-  background: #C9A24D;
-  border: none;
+.btn-primary {
+  background: var(--gold);
+  color: black;
   padding: 8px 14px;
-  font-weight: bold;
-  cursor: pointer;
 }
 
-.ghost {
+.btn-outline {
   background: none;
-  border: 1px solid #555;
-  color: #aaa;
+  border: 1px solid var(--gold);
+  color: var(--gold);
   padding: 8px 14px;
-  cursor: pointer;
-}
-
-.error {
-  margin-top: 10px;
-  color: #e74c3c;
-  font-size: 13px;
 }
 </style>

@@ -1,0 +1,222 @@
+<template>
+  <div class="page">
+    <h2>User Management</h2>
+
+    <button class="add" @click="openAdd">+ Add User</button>
+
+    <div class="toolbar">
+      <input v-model="q" placeholder="Search username..." />
+      <select v-model="role">
+        <option value="">All Roles</option>
+        <option v-for="r in roles" :key="r" :value="r">
+          {{ r }}
+        </option>
+      </select>
+      <button @click="fetchUsers">Search</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Branch</th>
+          <th>Status</th>
+          <th width="240">Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr v-for="u in users" :key="u.id">
+          <td>{{ u.username }}</td>
+          <td>{{ u.role }}</td>
+          <td>{{ u.branch || "-" }}</td>
+
+          <td>
+            <span :class="u.is_active ? 'on' : 'off'">
+              {{ u.is_active ? "ACTIVE" : "DISABLED" }}
+            </span>
+          </td>
+
+          <td class="actions">
+            <button @click="edit(u)">Edit</button>
+            <button class="warn" @click="reset(u)">Reset PW</button>
+            <button
+              :class="u.is_active ? 'danger' : 'ok'"
+              @click="toggle(u)"
+            >
+              {{ u.is_active ? "Disable" : "Enable" }}
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="pagination">
+      <button :disabled="page === 1" @click="prevPage">Prev</button>
+      <span>Page {{ page }}</span>
+      <button :disabled="page * limit >= total" @click="nextPage">Next</button>
+    </div>
+
+    <!-- FORM MODAL -->
+    <UserForm
+      v-if="showForm"
+      :edit="!!selected"
+      :data="selected"
+      @saved="reload"
+      @close="close"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import api from "../../services/api"
+import UserForm from "./UserForm.vue"
+
+const users = ref([])
+const showForm = ref(false)
+const selected = ref(null)
+
+const q = ref("")
+const role = ref("")
+const page = ref(1)
+const limit = 10
+const total = ref(0)
+
+const roles = ["SuperAdmin", "Owner", "Manager", "Kasir", "Terapis"]
+
+/**
+ * 🔥 SATU-SATUNYA FUNGSI LOAD USER
+ */
+const fetchUsers = async () => {
+  const res = await api.get("/users/search", {
+    params: {
+      q: q.value,
+      role: role.value,
+      page: page.value,
+      limit
+    }
+  })
+  users.value = res.data.data
+  total.value = res.data.total
+}
+
+onMounted(fetchUsers)
+
+/**
+ * PAGINATION
+ */
+const nextPage = async () => {
+  page.value++
+  await fetchUsers()
+}
+
+const prevPage = async () => {
+  page.value--
+  await fetchUsers()
+}
+
+/**
+ * FORM HANDLER
+ */
+const openAdd = () => {
+  selected.value = null
+  showForm.value = true
+}
+
+const edit = (u) => {
+  selected.value = { ...u }
+  showForm.value = true
+}
+
+/**
+ * OPTIMISTIC UPDATE
+ */
+const saveOptimistic = async (payload) => {
+  const idx = users.value.findIndex(u => u.id === payload.id)
+  const backup = { ...users.value[idx] }
+
+  users.value[idx] = { ...users.value[idx], ...payload }
+
+  try {
+    await api.put(`/users/${payload.id}`, payload)
+  } catch {
+    users.value[idx] = backup
+    alert("Gagal update user")
+  }
+}
+
+const reload = async (payload) => {
+  showForm.value = false
+  selected.value = null
+
+  if (payload?.id) {
+    await saveOptimistic(payload)
+  } else {
+    await fetchUsers()
+  }
+}
+
+const close = () => {
+  showForm.value = false
+  selected.value = null
+}
+
+/**
+ * ACTION BUTTONS
+ */
+const reset = async (u) => {
+  if (!confirm(`Reset password ${u.username}?`)) return
+  await api.put(`/users/${u.id}/reset-password`)
+  alert("Password reset ke 123456")
+}
+
+const toggle = async (u) => {
+  await api.put(`/users/${u.id}/toggle`)
+  u.is_active = !u.is_active
+}
+</script>
+
+<style scoped>
+.page {
+  padding: 20px;
+}
+.toolbar {
+  margin: 10px 0;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+th, td {
+  border: 1px solid #333;
+  padding: 8px;
+}
+.actions button {
+  margin-right: 4px;
+}
+.add {
+  background: #C9A24D;
+  padding: 8px;
+}
+.warn {
+  background: #f39c12;
+}
+.danger {
+  background: #c0392b;
+}
+.ok {
+  background: #27ae60;
+}
+.on {
+  color: #2ecc71;
+}
+.off {
+  color: #e74c3c;
+}
+.pagination {
+  margin-top: 10px;
+}
+</style>

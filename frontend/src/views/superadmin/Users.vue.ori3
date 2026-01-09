@@ -1,0 +1,187 @@
+<template>
+  <div class="page">
+    <h2>User Management</h2>
+
+    <button class="add" @click="openAdd">+ Add User</button>
+
+<div class="toolbar">
+  <input v-model="q" placeholder="Search username..." />
+  <select v-model="role">
+    <option value="">All Roles</option>
+    <option v-for="r in roles" :key="r">{{ r }}</option>
+  </select>
+  <button @click="load">Search</button>
+</div>
+
+    <table>
+
+<div class="pagination">
+  <button :disabled="page===1" @click="page--; load()">Prev</button>
+  <span>Page {{ page }}</span>
+  <button :disabled="page*limit>=total" @click="page++; load()">Next</button>
+</div>
+
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Branch</th>
+          <th>Status</th>
+          <th width="240">Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr v-for="u in users" :key="u.id">
+          <td>{{ u.username }}</td>
+          <td>{{ u.role }}</td>
+          <td>{{ u.branch || "-" }}</td>
+
+          <td>
+            <span :class="u.is_active ? 'on' : 'off'">
+              {{ u.is_active ? "ACTIVE" : "DISABLED" }}
+            </span>
+          </td>
+
+          <td class="actions">
+            <button @click="edit(u)">Edit</button>
+            <button class="warn" @click="reset(u)">Reset PW</button>
+            <button
+              :class="u.is_active ? 'danger' : 'ok'"
+              @click="toggle(u)"
+            >
+              {{ u.is_active ? "Disable" : "Enable" }}
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- FORM MODAL -->
+    <UserForm
+      v-if="showForm"
+      :edit="!!selected"
+      :data="selected"
+      @saved="reload"
+      @close="close"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import api from "../../services/api"
+import UserForm from "./UserForm.vue"
+
+const users = ref([])
+const showForm = ref(false)
+const selected = ref(null)
+
+const q = ref("")
+const role = ref("")
+const page = ref(1)
+const limit = 10
+const total = ref(0)
+
+const roles = ["SuperAdmin","Owner","Manager","Kasir","Terapis"]
+
+const load = async () => {
+  const res = await api.get("/users/search", {
+    params: {
+      q: q.value,
+      role: role.value,
+      page: page.value,
+      limit
+    }
+  })
+  users.value = res.data.data
+  total.value = res.data.total
+}
+
+const load = async () => {
+  users.value = (await api.get("/users")).data
+}
+
+onMounted(load)
+
+const openAdd = () => {
+  selected.value = null
+  showForm.value = true
+}
+
+const edit = (u) => {
+  // clone agar tidak langsung ubah table
+  selected.value = { ...u }
+  showForm.value = true
+}
+
+const saveOptimistic = async (payload) => {
+  // cari index user di table
+  const idx = users.value.findIndex(u => u.id === payload.id)
+  const backup = { ...users.value[idx] }
+
+  // optimistic update (UI dulu)
+  users.value[idx] = { ...users.value[idx], ...payload }
+
+  try {
+    await api.put(`/users/${payload.id}`, payload)
+  } catch (err) {
+    // rollback jika gagal
+    users.value[idx] = backup
+    alert("Gagal update user")
+  }
+}
+
+const reload = async (payload) => {
+  showForm.value = false
+  if (payload?.id) {
+    await saveOptimistic(payload)
+  } else {
+    await load()
+  }
+}
+
+const close = () => {
+  showForm.value = false
+  selected.value = null
+}
+</script>
+
+
+<style scoped>
+.page {
+  padding: 20px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+th, td {
+  border: 1px solid #333;
+  padding: 8px;
+  text-align: left;
+}
+.actions button {
+  margin-right: 4px;
+}
+.add {
+  background: #C9A24D;
+  padding: 8px;
+}
+.warn {
+  background: #f39c12;
+}
+.danger {
+  background: #c0392b;
+}
+.ok {
+  background: #27ae60;
+}
+.on {
+  color: #2ecc71;
+}
+.off {
+  color: #e74c3c;
+}
+</style>

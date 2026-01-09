@@ -1,0 +1,161 @@
+<template>
+  <div class="overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>{{ edit ? "Edit Branch" : "Add Branch" }}</h3>
+        <button class="close" @click="$emit('close')">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Branch Name</label>
+          <input v-model="form.name" placeholder="Branch name" />
+        </div>
+
+        <div class="form-group">
+          <label>Address</label>
+          <textarea v-model="form.address" placeholder="Address"></textarea>
+        </div>
+
+        <div class="row">
+          <div class="form-group">
+            <label>Open Time</label>
+            <input type="time" v-model="form.open_time" />
+          </div>
+
+          <div class="form-group">
+            <label>Close Time</label>
+            <input type="time" v-model="form.close_time" />
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-outline" @click="$emit('close')">Cancel</button>
+        <button class="btn-primary" @click="save" :disabled="loading">
+          {{ loading ? "Saving..." : "Save" }}
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import api from "../../services/api"
+
+const props = defineProps({
+  edit: Boolean,
+  data: Object,
+})
+const emit = defineEmits(["saved", "close"])
+
+const form = ref({
+  name: "",
+  address: "",
+  open_time: "10:00",
+  close_time: "03:00",
+})
+
+const loading = ref(false)
+
+onMounted(() => {
+  if (props.edit && props.data) {
+    form.value = {
+      name: props.data.name,
+      address: props.data.address,
+      open_time: props.data.open_time,
+      close_time: props.data.close_time,
+    }
+  }
+})
+
+const save = async () => {
+  if (!form.value.name) {
+    return alert("Branch name required")
+  }
+
+  loading.value = true
+  try {
+    if (props.edit) {
+      await api.put(`/branches/${props.data.id}`, form.value)
+    } else {
+      await api.post("/branches", form.value)
+    }
+    emit("saved")
+  } catch (err) {
+    alert("Failed save branch")
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+<style scoped>
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal {
+  width: 420px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-strong);
+}
+.modal-header,
+.modal-footer {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.modal-footer {
+  border-top: 1px solid var(--border-soft);
+  border-bottom: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.modal-body {
+  padding: 16px;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+input, textarea {
+  background: #000;
+  border: 1px solid var(--border-soft);
+  color: white;
+  padding: 8px;
+  border-radius: var(--radius);
+}
+textarea {
+  min-height: 60px;
+}
+.btn-primary {
+  background: var(--gold);
+  color: black;
+  padding: 8px 14px;
+}
+.btn-outline {
+  background: none;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  padding: 8px 14px;
+}
+.close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+}
+</style>

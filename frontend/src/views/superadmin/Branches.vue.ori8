@@ -1,0 +1,274 @@
+<template>
+  <div class="page">
+
+    <!-- HEADER -->
+    <div class="header">
+      <div>
+        <h2>Branch Management</h2>
+        <p class="subtitle">Manage outlet / branch locations</p>
+      </div>
+      <button class="btn-primary" @click="openAdd">+ Add Branch</button>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats">
+      <div class="stat-card">
+        <span>Total</span>
+        <b>{{ stats.total }}</b>
+      </div>
+      <div class="stat-card success">
+        <span>Active</span>
+        <b>{{ stats.active }}</b>
+      </div>
+      <div class="stat-card danger">
+        <span>Disabled</span>
+        <b>{{ stats.disabled }}</b>
+      </div>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="card filter">
+      <input v-model="q" placeholder="Search branch name..." />
+      <button class="btn-outline" @click="load">Search</button>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Branch</th>
+            <th>Address</th>
+            <th>Operating Hours</th>
+            <th>Users</th>
+            <th>Status</th>
+            <th width="220">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr v-if="!branches.length">
+            <td colspan="6" class="empty">No branches found</td>
+          </tr>
+
+          <tr
+            v-for="b in branches"
+            :key="b.id"
+            class="table-row"
+          >
+            <td class="name">{{ b.name }}</td>
+            <td class="address">{{ b.address || "-" }}</td>
+            <td class="hours">
+              {{ b.open_time }} – {{ b.close_time }}
+            </td>
+            <td>
+              <span class="badge role">
+                {{ b.user_count }} users
+              </span>
+            </td>
+            <td>
+              <span
+                class="badge"
+                :class="b.is_active ? 'success' : 'danger'"
+              >
+                {{ b.is_active ? "ACTIVE" : "DISABLED" }}
+              </span>
+            </td>
+            <td class="actions">
+              <button class="btn-edit" @click="edit(b)">Edit</button>
+              <button
+                :class="b.is_active ? 'btn-danger' : 'btn-success'"
+                @click="toggle(b)"
+              >
+                {{ b.is_active ? "Disable" : "Enable" }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- PAGINATION -->
+      <div class="pagination">
+        <button :disabled="page===1" @click="prev">Prev</button>
+        <span>Page {{ page }}</span>
+        <button :disabled="page*limit>=total" @click="next">Next</button>
+      </div>
+    </div>
+
+    <!-- MODAL -->
+    <BranchForm
+      v-if="showForm"
+      :data="selected"
+      @close="close"
+      @saved="reload"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import api from "@/services/api"
+import BranchForm from "./BranchForm.vue"
+
+const branches = ref([])
+const stats = ref({ total:0, active:0, disabled:0 })
+const q = ref("")
+const page = ref(1)
+const limit = 10
+const total = ref(0)
+
+const showForm = ref(false)
+const selected = ref(null)
+
+const load = async () => {
+  const res = await api.get("/branches", {
+    params: { q: q.value, page: page.value, limit }
+  })
+  branches.value = res.data.data
+  total.value = res.data.total
+}
+
+const loadStats = async () => {
+  stats.value = (await api.get("/branches/stats")).data
+}
+
+onMounted(() => {
+  load()
+  loadStats()
+})
+
+const openAdd = () => {
+  selected.value = null
+  showForm.value = true
+}
+
+const edit = (b) => {
+  selected.value = { ...b }
+  showForm.value = true
+}
+
+const toggle = async (b) => {
+  await api.put(`/branches/${b.id}/toggle`)
+  b.is_active = !b.is_active
+}
+
+const reload = async () => {
+  showForm.value = false
+  await load()
+  await loadStats()
+}
+
+const close = () => {
+  showForm.value = false
+}
+
+const next = () => {
+  page.value++
+  load()
+}
+const prev = () => {
+  if (page.value > 1) {
+    page.value--
+    load()
+  }
+}
+</script>
+
+<style scoped>
+/* ==== SAMA FEEL DENGAN USERS ==== */
+.page { padding: 24px }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.subtitle { color: #999; font-size: 13px }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 12px;
+  margin: 16px 0;
+}
+.stat-card {
+  background: #121212;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+}
+.stat-card b { font-size: 22px }
+.stat-card.success b { color: #2ecc71 }
+.stat-card.danger b { color: #e74c3c }
+
+.card {
+  background: radial-gradient(circle at top, rgba(255,255,255,.04), #0a0a0a);
+  border-radius: 16px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 10px;
+}
+.table-row {
+  transition: 
+    transform .25s ease,
+    box-shadow .25s ease,
+    background .25s ease;
+}
+.table-row:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 40px rgba(0,0,0,.65);
+  background: rgba(255,255,255,.03);
+}
+.name { font-weight: 600 }
+.address { color: #aaa }
+.hours { font-size: 13px }
+
+.badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+.success { background: rgba(46,204,113,.2); color:#2ecc71 }
+.danger { background: rgba(231,76,60,.2); color:#e74c3c }
+.role { background: rgba(201,162,77,.2); color:#d8b45a }
+
+.actions { display:flex; gap:8px }
+.actions button {
+  transition: 
+    transform .15s ease,
+    box-shadow .15s ease,
+    filter .15s ease;
+}
+.actions button:hover {
+  transform: scale(1.08);
+  box-shadow: 0 8px 20px rgba(0,0,0,.6);
+  filter: brightness(1.1);
+}
+.actions button:active {
+  transform: scale(.95);
+}
+.btn-edit { background:#c9a24d; color:black }
+.btn-danger { background:#7b2a22; color:#ff6b6b }
+.btn-success { background:#1e6b3f; color:#2ecc71 }
+
+.pagination {
+  display:flex;
+  justify-content:center;
+  gap:12px;
+  margin-top:16px;
+}
+.card {
+  transition: box-shadow .3s ease, transform .3s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 45px rgba(0,0,0,.7);
+}
+
+
+</style>
