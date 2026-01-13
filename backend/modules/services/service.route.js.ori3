@@ -1,0 +1,19 @@
+const router = require("express").Router()
+const c = require("./service.controller")
+const auth = require("../../middlewares/auth.middleware")
+const rbac = require("../../middlewares/rbac.middleware")
+
+router.use(auth)
+
+/**
+ * GET services per branch
+ * ?branch_id=1&type=SPA
+ */
+router.get("/", c.list)
+
+/**
+ * POST clone services (SuperAdmin only)
+ */
+router.post("/clone", rbac(["SuperAdmin"]), c.clone)
+
+module.exports = router

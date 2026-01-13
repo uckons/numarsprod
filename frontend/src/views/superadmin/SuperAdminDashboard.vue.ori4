@@ -10,7 +10,6 @@
         <button :class="{active:tab==='orders'}" @click="tab='orders'"> <UsersIcon size="18" />Orders</button>
         <button :class="{active:tab==='timers'}" @click="tab='timers'"> <UsersIcon size="18" />Timers</button>
         <button :class="{active:tab==='audit'}" @click="tab='audit'"> <ShieldCheck size="18" /> Audit Logs</button>
-        <button :class="{active:tab==='services'}" @click="tab='services'"> <Store size="18" /> Services</button>
 
       </nav>
 
@@ -24,7 +23,6 @@
       <Branches v-if="tab==='branches'" />
       <Orders v-if="tab==='orders'" />
       <Timers v-if="tab==='timers'" />
-      <Services v-if="tab==='services'" :branch-id="1" />
     </main>
   </div>
 </template>
@@ -41,8 +39,6 @@ import Users from "./Users.vue"
 import Branches from "./Branches.vue"
 import Orders from "./Orders.vue"
 import Timers from "./Timers.vue"
-import Services from "./Services.vue"
-
 
 const tab = ref("users")
 const auth = useAuthStore()

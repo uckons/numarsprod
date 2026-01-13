@@ -1,0 +1,326 @@
+<template>
+  <div class="page">
+    <!-- HEADER -->
+    <div class="header">
+      <div>
+        <h2>Services</h2>
+        <p class="subtitle">Manage SPA / LC / FNB / Karaoke services</p>
+      </div>
+
+      <button class="btn-primary" @click="openAdd">
+        + Add Service
+      </button>
+    </div>
+
+    <!-- STATS (SAMA PERSIS USERS.VUE) -->
+    <div class="stats">
+      <div class="stat-card">
+        <p>Total Services</p>
+        <h3>{{ stats.total }}</h3>
+      </div>
+
+      <div class="stat-card active">
+        <p>Active</p>
+        <h3>{{ stats.active }}</h3>
+      </div>
+
+      <div class="stat-card disabled">
+        <p>Disabled</p>
+        <h3>{{ stats.disabled }}</h3>
+      </div>
+
+      <div class="stat-card new">
+        <p>New This Month</p>
+        <h3>+{{ stats.new_month }}</h3>
+      </div>
+    </div>
+
+    <!-- FILTER -->
+    <div class="filters">
+      <input v-model="keyword" placeholder="Search service..." class="input" />
+
+      <select v-model="selectedBranch" class="select">
+        <option value="">All Branches</option>
+        <option v-for="b in branches" :key="b.id" :value="b.id">
+          {{ b.name }}
+        </option>
+      </select>
+
+      <select v-model="selectedType" class="select">
+        <option value="">All Types</option>
+        <option value="SPA">SPA</option>
+        <option value="LC">LC</option>
+        <option value="FNB">FNB</option>
+        <option value="KARAOKE">KARAOKE</option>
+      </select>
+
+      <button class="btn-search" @click="loadServices">
+        Search
+      </button>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Branch</th>
+            <th>Duration</th>
+            <th>Price</th>
+            <th>Status</th>
+            <th width="220">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr v-if="loading">
+            <td colspan="7" class="empty">Loading...</td>
+          </tr>
+
+          <tr v-else-if="!services.length">
+            <td colspan="7" class="empty">No services found</td>
+          </tr>
+
+          <tr
+            v-for="s in services"
+            :key="s.id"
+            class="row-hover"
+          >
+            <td class="name">{{ s.name }}</td>
+
+            <td>
+              <span class="badge type">{{ s.type }}</span>
+            </td>
+
+            <td>
+              <span class="badge branch">
+                {{ s.branch_name }}
+              </span>
+            </td>
+
+            <td>
+              {{ s.duration_minutes ? s.duration_minutes + " min" : "-" }}
+            </td>
+
+            <td class="price">
+              Rp {{ format(s.base_price) }}
+            </td>
+
+            <td>
+              <span
+                class="badge"
+                :class="s.is_active ? 'success' : 'danger'"
+              >
+                {{ s.is_active ? "ACTIVE" : "DISABLED" }}
+              </span>
+            </td>
+
+            <td class="actions">
+              <button @click="edit(s)">Edit</button>
+              <button
+                :class="s.is_active ? 'danger' : 'success'"
+                @click="toggle(s)"
+              >
+                {{ s.is_active ? "Disable" : "Enable" }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- PAGINATION -->
+      <div class="pagination">
+        <div>
+          Show
+          <select v-model="perPage" @change="changePerPage">
+            <option :value="30">30</option>
+            <option :value="50">50</option>
+            <option :value="100">100</option>
+          </select>
+          entries
+        </div>
+
+        <div class="pager">
+          <button :disabled="page === 1" @click="page-- && loadServices()">
+            Prev
+          </button>
+          <span>Page {{ page }} / {{ totalPages }}</span>
+          <button :disabled="page === totalPages" @click="page++ && loadServices()">
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL -->
+    <ServiceForm
+      v-if="showForm"
+      :edit="!!selected"
+      :data="selected"
+      @saved="reload"
+      @close="close"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed } from "vue"
+import api from "@/services/api"
+import ServiceForm from "./ServiceForm.vue"
+
+const services = ref([])
+const branches = ref([])
+const showForm = ref(false)
+const selected = ref(null)
+const loading = ref(false)
+
+const keyword = ref("")
+const selectedBranch = ref("")
+const selectedType = ref("")
+
+const page = ref(1)
+const perPage = ref(30)
+const total = ref(0)
+
+const stats = ref({
+  total: 0,
+  active: 0,
+  disabled: 0,
+  new_month: 0
+})
+
+const totalPages = computed(() =>
+  Math.ceil(total.value / perPage.value) || 1
+)
+
+/* LOAD BRANCHES */
+const loadBranches = async () => {
+  const res = await api.get("/branches")
+  branches.value = res.data.data || res.data
+}
+
+/* LOAD SERVICES */
+const loadServices = async () => {
+  loading.value = true
+  const res = await api.get("/services", {
+    params: {
+      q: keyword.value || undefined,
+      branch_id: selectedBranch.value || undefined,
+      type: selectedType.value || undefined,
+      page: page.value,
+      limit: perPage.value
+    }
+  })
+
+  services.value = res.data.data
+  total.value = res.data.total
+
+  stats.value = res.data.stats || stats.value
+  loading.value = false
+}
+
+const changePerPage = () => {
+  page.value = 1
+  loadServices()
+}
+
+onMounted(async () => {
+  await loadBranches()
+  await loadServices()
+})
+
+const openAdd = () => {
+  selected.value = null
+  showForm.value = true
+}
+
+const edit = (s) => {
+  selected.value = { ...s }
+  showForm.value = true
+}
+
+const toggle = async (s) => {
+  await api.put(`/services/${s.id}/toggle`)
+  s.is_active = !s.is_active
+}
+
+const reload = async () => {
+  showForm.value = false
+  await loadServices()
+}
+
+const close = () => {
+  showForm.value = false
+  selected.value = null
+}
+
+const format = (v) =>
+  Number(v || 0).toLocaleString("id-ID")
+</script>
+
+<style scoped>
+/* === STAT CARD (COPY EXACT USERS.VUE) === */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.stat-card {
+  background: linear-gradient(145deg, #0e0e0e, #151515);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  transition: all .25s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+
+.stat-card p {
+  font-size: 13px;
+  color: #999;
+}
+
+.stat-card h3 {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.stat-card.active h3 { color: #2ecc71 }
+.stat-card.disabled h3 { color: #e74c3c }
+.stat-card.new h3 { color: #c9a24d }
+
+/* BRANCH BADGE */
+.badge.branch {
+  background: rgba(255,255,255,.08);
+  color: #ccc;
+}
+
+/* PAGINATION */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.pagination select {
+  margin: 0 6px;
+  background: #000;
+  color: #fff;
+  border: 1px solid #222;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.pager button {
+  margin: 0 6px;
+}
+</style>

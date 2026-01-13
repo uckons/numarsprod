@@ -1,0 +1,45 @@
+<template>
+  <div class="overlay">
+    <div class="modal">
+      <h3>Edit Service</h3>
+
+      <div class="form-group">
+        <label>Name</label>
+        <input v-model="form.name" disabled />
+      </div>
+
+      <div class="form-group">
+        <label>Base Price</label>
+        <input type="number" v-model="form.base_price" />
+      </div>
+
+      <div class="form-group">
+        <label>Duration (minutes)</label>
+        <input type="number" v-model="form.duration_minutes" />
+      </div>
+
+      <div class="actions">
+        <button @click="$emit('close')">Cancel</button>
+        <button class="gold" @click="save">Save</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref } from "vue"
+import api from "@/services/api"
+
+const props = defineProps({ data:Object })
+const emit = defineEmits(["saved","close"])
+
+const form = ref({ ...props.data })
+
+const save = async () => {
+  await api.put(`/services/${form.value.id}`, {
+    base_price: form.value.base_price,
+    duration_minutes: form.value.duration_minutes
+  })
+  emit("saved")
+}
+</script>

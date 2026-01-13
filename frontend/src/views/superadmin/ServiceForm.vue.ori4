@@ -1,0 +1,338 @@
+<template>
+  <div class="overlay" @click.self="emit('close')">
+    <div class="modal">
+      <!-- HEADER -->
+      <div class="modal-header">
+        <h3>{{ edit ? "Edit Service" : "Add New Service" }}</h3>
+        <button class="close" @click="emit('close')">×</button>
+      </div>
+
+      <!-- BODY -->
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Service Name</label>
+          <input v-model="form.name" placeholder="Service name" />
+        </div>
+
+        <div class="row">
+          <div class="form-group">
+            <label>Type</label>
+            <select v-model="form.type">
+              <option disabled value="">Select Type</option>
+              <option value="SPA">SPA</option>
+              <option value="LC">LC</option>
+              <option value="FNB">FNB</option>
+              <option value="KARAOKE">KARAOKE</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Branch</label>
+            <select v-model="form.branch_id">
+              <option disabled value="">Select Branch</option>
+              <option
+                v-for="b in branches"
+                :key="b.id"
+                :value="b.id"
+              >
+                {{ b.name }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="form-group">
+            <label>Duration (minutes)</label>
+            <input
+              type="number"
+              min="0"
+              v-model.number="form.duration_minutes"
+              placeholder="ex: 60"
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Base Price</label>
+            <input
+              type="number"
+              min="0"
+              v-model.number="form.base_price"
+              placeholder="ex: 350000"
+            />
+          </div>
+        </div>
+
+        <div class="form-group switch">
+          <label>Status</label>
+          <label class="toggle">
+            <input type="checkbox" v-model="form.is_active" />
+            <span></span>
+            <small>{{ form.is_active ? "ACTIVE" : "DISABLED" }}</small>
+          </label>
+        </div>
+      </div>
+
+      <!-- FOOTER -->
+      <div class="modal-footer">
+        <button class="btn-outline" @click="emit('close')">
+          Cancel
+        </button>
+        <button
+          class="btn-primary"
+          :disabled="loading"
+          @click="save"
+        >
+          {{ loading ? "Saving..." : "Save" }}
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import api from "../../services/api"
+
+const emit = defineEmits(["saved", "close"])
+const props = defineProps({
+  edit: Boolean,
+  data: Object,
+  branches: Array
+})
+
+const loading = ref(false)
+
+const form = ref({
+  name: "",
+  type: "",
+  branch_id: "",
+  duration_minutes: "",
+  base_price: 0,
+  is_active: true
+})
+
+onMounted(() => {
+  if (props.edit && props.data) {
+    form.value = {
+      name: props.data.name,
+      type: props.data.type,
+      branch_id: props.data.branch_id,
+      duration_minutes: props.data.duration_minutes || "",
+      base_price: props.data.base_price || 0,
+      is_active: props.data.is_active
+    }
+  }
+})
+
+const save = async () => {
+  if (!form.value.name || !form.value.type || !form.value.branch_id) {
+    return alert("Name, Type & Branch required")
+  }
+
+  loading.value = true
+  try {
+    const payload = {
+      name: form.value.name,
+      type: form.value.type,
+      branch_id: form.value.branch_id,
+      base_price: form.value.base_price,
+      duration_minutes: form.value.duration_minutes,
+      is_active: form.value.is_active
+    }
+
+    if (props.edit) {
+      await api.put(`/services/${props.data.id}`, payload)
+    } else {
+      await api.post("/services", payload)
+    }
+
+    emit("saved")
+  } catch (err) {
+    console.error(err.response?.data)
+    alert(err.response?.data?.message || "Failed save service")
+  } finally {
+    loading.value = false
+  }
+}
+
+</script>
+
+<style scoped>
+/* OVERLAY */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: fade .25s ease;
+}
+
+@keyframes fade {
+  from { opacity: 0 }
+  to { opacity: 1 }
+}
+
+/* MODAL */
+.modal {
+  width: 460px;
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.06),
+    rgba(0,0,0,0.85)
+  );
+  border-radius: 20px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.7);
+  animation: pop .25s ease;
+}
+
+@keyframes pop {
+  from { transform: scale(.96); opacity: 0 }
+  to { transform: scale(1); opacity: 1 }
+}
+
+/* HEADER */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  color: #aaa;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: white;
+}
+
+/* BODY */
+.modal-body {
+  padding: 18px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 14px;
+}
+
+label {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 6px;
+}
+
+input,
+select {
+  background: rgba(0,0,0,.7);
+  border: 1px solid rgba(255,255,255,.12);
+  color: white;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: #d4af37;
+  box-shadow: 0 0 0 2px rgba(212,175,55,.25);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* TOGGLE */
+.switch {
+  margin-top: 8px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toggle input {
+  display: none;
+}
+
+.toggle span {
+  width: 42px;
+  height: 22px;
+  background: #333;
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+}
+
+.toggle span::after {
+  content: "";
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: all .25s ease;
+}
+
+.toggle input:checked + span {
+  background: #2ecc71;
+}
+
+.toggle input:checked + span::after {
+  transform: translateX(20px);
+}
+
+.toggle small {
+  font-weight: 600;
+}
+
+/* FOOTER */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 18px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg,#d4af37,#b8962e);
+  color: black;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 12px 30px rgba(212,175,55,.45);
+}
+
+.btn-outline {
+  background: none;
+  border: 1px solid #d4af37;
+  color: #d4af37;
+  padding: 10px 16px;
+  border-radius: 999px;
+}
+</style>

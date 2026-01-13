@@ -2,30 +2,73 @@ const service = require("./branch.service")
 
 exports.list = async (req, res) => {
   try {
-    const data = await service.list(req.user, req.query)
-    res.json(data)
-  } catch (e) {
-    console.error(e)
-    res.status(500).json({ message: "Failed load branches" })
+    const result = await service.list(req.user)
+    res.json(result)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({
+  message: "Failed load branches",
+  error: err.message,
+  stack: err.stack
+})
+  }
+}
+
+exports.search = async (req, res) => {
+  try {
+    const result = await service.search(req.user, req.query)
+    res.json(result)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({
+  message: "Failed load branches",
+  error: err.message,
+  stack: err.stack
+})
   }
 }
 
 exports.stats = async (req, res) => {
-  const stats = await service.stats()
-  res.json(stats)
+  try {
+    const result = await service.stats(req.user)
+    res.json(result)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({
+  message: "Failed load branches",
+  error: err.message,
+  stack: err.stack
+})
+
+  }
 }
 
 exports.create = async (req, res) => {
-  await service.create(req.body)
-  res.json({ success: true })
+  try {
+    await service.create(req.body)
+    res.json({ success: true })
+  } catch (err) {
+    console.error(err)
+    res.status(400).json({ message: err.message })
+  }
 }
 
 exports.update = async (req, res) => {
-  await service.update(req.params.id, req.body)
-  res.json({ success: true })
+  try {
+    await service.update(req.params.id, req.body)
+    res.json({ success: true })
+  } catch (err) {
+    console.error(err)
+    res.status(400).json({ message: err.message })
+  }
 }
 
 exports.toggle = async (req, res) => {
-  await service.toggle(req.params.id)
-  res.json({ success: true })
+  try {
+    await service.toggle(req.params.id)
+    res.json({ success: true })
+  } catch (err) {
+    console.error(err)
+    res.status(400).json({ message: err.message })
+  }
 }

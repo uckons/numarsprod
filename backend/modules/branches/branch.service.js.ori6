@@ -1,0 +1,27 @@
+const db = require("../../config/db")
+
+exports.cloneServicesFromTemplate = async (
+  templateBranchId,
+  newBranchId
+) => {
+  await db.query(`
+    INSERT INTO services (
+      branch_id,
+      type,
+      name,
+      base_price,
+      duration_minutes,
+      is_active
+    )
+    SELECT
+      $1,
+      type,
+      name,
+      base_price,
+      duration_minutes,
+      false -- DRAFT
+    FROM services
+    WHERE branch_id = $2
+      AND deleted_at IS NULL
+  `, [newBranchId, templateBranchId])
+}

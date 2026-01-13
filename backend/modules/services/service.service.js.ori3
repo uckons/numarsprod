@@ -1,0 +1,49 @@
+const db = require("../../config/db")
+
+/**
+ * LIST SERVICE PER BRANCH
+ */
+exports.listByBranch = async (branch_id, type) => {
+  const params = [branch_id]
+  let where = "s.branch_id = $1 AND s.deleted_at IS NULL"
+
+  if (type) {
+    params.push(type)
+    where += ` AND s.type = $${params.length}`
+  }
+
+  const { rows } = await db.query(`
+    SELECT
+      s.id,
+      s.type,
+      s.name,
+      s.base_price,
+      s.duration_minutes,
+      s.is_active
+    FROM services s
+    WHERE ${where}
+    ORDER BY s.type, s.name
+  `, params)
+
+  return rows
+}
+
+/**
+ * CLONE SERVICES FROM TEMPLATE BRANCH
+ */
+exports.cloneFromTemplate = async (templateBranchId, newBranchId, actor) => {
+  await db.query(`
+    INSERT INTO services (branch_id, type, name, base_price, duration_minutes)
+    SELECT
+      $2,
+      type,
+      name,
+      base_price,
+      duration_minutes
+    FROM services
+    WHERE branch_id = $1
+      AND deleted_at IS NULL
+  `, [templateBranchId, newBranchId])
+
+  return { success: true }
+}

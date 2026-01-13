@@ -1,0 +1,19 @@
+const router = require("express").Router()
+const controller = require("./service.controller")
+const auth = require("../../middlewares/auth.middleware")
+const rbac = require("../../middlewares/rbac.middleware")
+
+// ? JANGAN auth()
+// ? PAKAI auth LANGSUNG
+
+router.use(auth, rbac(["SuperAdmin"]))
+
+router.get("/", controller.list)
+router.post("/", controller.create)
+router.put("/:id", controller.update)
+router.delete("/:id", controller.remove)
+
+// clone dari Pondok Indah
+router.post("/clone/:fromBranchId/:toBranchId", controller.clone)
+
+module.exports = router

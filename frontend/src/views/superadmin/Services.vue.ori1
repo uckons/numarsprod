@@ -1,0 +1,118 @@
+<template>
+  <div class="page">
+    <!-- HEADER -->
+    <div class="header">
+      <h2>Branch Services</h2>
+      <select v-model="type" @change="load">
+        <option v-for="t in types" :key="t" :value="t">
+          {{ t }}
+        </option>
+      </select>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>Duration</th>
+            <th>Price</th>
+            <th>Status</th>
+            <th width="120">Action</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr v-if="loading">
+            <td colspan="5" class="empty">Loading...</td>
+          </tr>
+
+          <ServiceRow
+            v-for="s in services"
+            :key="s.id"
+            :service="s"
+            @updated="load"
+          />
+
+          <tr v-if="!loading && !services.length">
+            <td colspan="5" class="empty">No services</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import api from "@/services/api"
+import ServiceRow from "./ServiceRow.vue"
+
+const props = defineProps({
+  branchId: {
+    type: Number,
+    required: true
+  }
+})
+
+const types = ["SPA","LC","FNB","KARAOKE"]
+const type = ref("SPA")
+const services = ref([])
+const loading = ref(false)
+
+const load = async () => {
+  loading.value = true
+  try {
+    const res = await api.get(
+      `/services/branch/${props.branchId}`,
+      { params: { type: type.value } }
+    )
+    services.value = res.data
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(load)
+</script>
+
+<style scoped>
+.page {
+  padding: 20px;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.card {
+  background: var(--bg-card);
+  margin-top: 16px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-soft);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th {
+  text-align: left;
+  padding: 12px;
+  color: var(--text-muted);
+}
+td {
+  padding: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+.empty {
+  text-align: center;
+  color: var(--text-muted);
+}
+select {
+  background: #000;
+  color: white;
+  padding: 8px;
+  border-radius: 8px;
+}
+</style>

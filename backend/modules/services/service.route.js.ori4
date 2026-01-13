@@ -1,15 +1,17 @@
 const router = require("express").Router()
-const c = require("./branch.controller")
+const c = require("./service.controller")
 const auth = require("../../middlewares/auth.middleware")
 const rbac = require("../../middlewares/rbac.middleware")
 
+// ?? hanya SuperAdmin
 router.use(auth, rbac(["SuperAdmin"]))
 
 router.get("/", c.list)
-router.get("/search", c.search)
-router.get("/stats", c.stats)
+// Tambahan
 router.post("/", c.create)
 router.put("/:id", c.update)
 router.put("/:id/toggle", c.toggle)
+// Tambahan
+router.delete("/:id", c.remove)
 
 module.exports = router

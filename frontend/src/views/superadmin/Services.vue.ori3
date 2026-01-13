@@ -1,0 +1,255 @@
+<template>
+  <div>
+
+    <!-- HEADER -->
+    <div class="page-header">
+      <div>
+        <h2>Services</h2>
+        <p class="subtitle">Manage SPA / LC / FNB / Karaoke</p>
+      </div>
+
+      <button class="btn-primary" @click="openAdd">
+        + Add Service
+      </button>
+    </div>
+
+    <!-- FILTER -->
+    <div class="filter-bar">
+      <select v-model="filter.type">
+        <option value="">All Types</option>
+        <option value="SPA">SPA</option>
+        <option value="LC">LC</option>
+        <option value="FNB">FNB</option>
+        <option value="KARAOKE">Karaoke</option>
+      </select>
+
+      <select v-model="filter.branch_id">
+        <option value="">All Branches</option>
+        <option v-for="b in branches" :key="b.id" :value="b.id">
+          {{ b.name }}
+        </option>
+      </select>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>Type</th>
+            <th>Price</th>
+            <th>Duration</th>
+            <th>Status</th>
+            <th width="220">Action</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr v-for="s in services" :key="s.id">
+            <td>{{ s.name }}</td>
+
+            <td>
+              <span class="badge">{{ s.type }}</span>
+            </td>
+
+            <td>Rp {{ format(s.base_price) }}</td>
+
+            <td>{{ s.duration_minutes ? s.duration_minutes + ' min' : '-' }}</td>
+
+            <td>
+              <span :class="['status', s.is_active ? 'on' : 'off']">
+                {{ s.is_active ? 'ACTIVE' : 'DISABLED' }}
+              </span>
+            </td>
+
+            <td class="actions">
+              <button class="btn-outline" @click="openEdit(s)">Edit</button>
+              <button
+                :class="s.is_active ? 'btn-danger' : 'btn-success'"
+                @click="toggle(s)"
+              >
+                {{ s.is_active ? 'Disable' : 'Enable' }}
+              </button>
+            </td>
+          </tr>
+
+          <tr v-if="services.length === 0">
+            <td colspan="6" class="empty">No services found</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- MODAL -->
+    <ServiceForm
+      v-if="showForm"
+      :edit="!!editData"
+      :data="editData"
+      @close="closeForm"
+      @saved="reload"
+    />
+
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import api from "@/services/api"
+import ServiceForm from "./ServiceForm.vue"
+
+const services = ref([])
+const branches = ref([])
+
+const showForm = ref(false)
+const editData = ref(null)
+
+const filter = ref({
+  type: "",
+  branch_id: ""
+})
+
+const load = async () => {
+  const res = await api.get("/services", {
+    params: filter.value
+  })
+  services.value = res.data.data
+}
+
+const loadBranches = async () => {
+  const res = await api.get("/branches")
+  branches.value = res.data.data
+}
+
+onMounted(() => {
+  load()
+  loadBranches()
+})
+
+const openAdd = () => {
+  editData.value = null
+  showForm.value = true
+}
+
+const openEdit = (row) => {
+  editData.value = row
+  showForm.value = true
+}
+
+const closeForm = () => {
+  showForm.value = false
+  editData.value = null
+}
+
+const reload = () => {
+  closeForm()
+  load()
+}
+
+const toggle = async (row) => {
+  await api.patch(`/services/${row.id}/toggle`)
+  load()
+}
+
+const format = (n) =>
+  Number(n).toLocaleString("id-ID")
+</script>
+
+<style scoped>
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.badge {
+  background: rgba(201,162,77,.15);
+  color: var(--gold);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+
+.status.on {
+  background: #0f3;
+  color: #000;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.status.off {
+  background: #a22;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-primary {
+  background: var(--gold);
+  color: black;
+  padding: 8px 14px;
+}
+
+.btn-outline {
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  padding: 6px 12px;
+}
+
+.btn-danger {
+  background: #7a1e1e;
+  color: white;
+  padding: 6px 12px;
+}
+
+.btn-success {
+  background: #1e7a3a;
+  color: white;
+  padding: 6px 12px;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+.empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+}
+</style>

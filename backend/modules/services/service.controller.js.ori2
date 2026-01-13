@@ -1,0 +1,27 @@
+const service = require("./service.service")
+
+exports.list = async (req, res) => {
+  try {
+    const { branch_id, type } = req.query
+    const data = await service.listByBranch(branch_id, type)
+    res.json(data)
+  } catch (err) {
+    res.status(400).json({ message: "Failed load services" })
+  }
+}
+
+exports.clone = async (req, res) => {
+  try {
+    const { new_branch_id } = req.body
+
+    await service.cloneFromTemplate(
+      1, // Pondok Indah
+      new_branch_id,
+      req.user
+    )
+
+    res.json({ success: true })
+  } catch (err) {
+    res.status(400).json({ message: "Clone service failed" })
+  }
+}

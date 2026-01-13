@@ -1,28 +1,12 @@
-const router = require("express").Router()
+const express = require("express")
+const router = express.Router()
+
 const auth = require("../../middlewares/auth.middleware")
-const svc = require("./service.service")
+const controller = require("./service.controller")
 
-router.use(auth)
-
-router.get("/", async (req,res) => {
-  const data = await svc.list(req.user.branch_id)
-  res.json(data)
-})
-
-router.post("/", async (req,res) => {
-  res.json(await svc.create(req.body, req.user))
-})
-
-router.put("/:id", async (req,res) => {
-  res.json(await svc.update(req.params.id, req.body))
-})
-
-router.put("/:id/toggle", async (req,res) => {
-  res.json(await svc.toggle(req.params.id))
-})
-
-router.delete("/:id", async (req,res) => {
-  res.json(await svc.remove(req.params.id))
-})
-
+router.get("/", auth, controller.list)
+router.post("/", auth, controller.create)
+router.put("/:id", auth, controller.update)
+router.delete("/:id", auth, controller.remove)
+router.put("/:id/toggle",auth, controller.toggleStatus)
 module.exports = router

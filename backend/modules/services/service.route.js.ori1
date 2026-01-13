@@ -1,0 +1,20 @@
+const router = require("express").Router()
+const c = require("./service.controller")
+const auth = require("../../middlewares/auth.middleware")
+const rbac = require("../../middlewares/rbac.middleware")
+
+router.use(auth)
+
+router.get(
+  "/branch/:branch_id",
+  rbac(["SuperAdmin","Owner","Manager"]),
+  c.listByBranch
+)
+
+router.put(
+  "/:id/toggle",
+  rbac(["SuperAdmin","Owner"]),
+  c.toggle
+)
+
+module.exports = router

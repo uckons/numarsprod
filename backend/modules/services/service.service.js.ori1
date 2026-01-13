@@ -1,0 +1,24 @@
+exports.listByBranch = async (branch_id, type) => {
+  const params = [branch_id]
+  let where = "branch_id = $1 AND deleted_at IS NULL"
+
+  if (type) {
+    params.push(type)
+    where += ` AND type = $${params.length}`
+  }
+
+  const { rows } = await db.query(`
+    SELECT
+      id,
+      type,
+      name,
+      base_price,
+      duration_minutes,
+      is_active
+    FROM services
+    WHERE ${where}
+    ORDER BY type, name
+  `, params)
+
+  return rows
+}

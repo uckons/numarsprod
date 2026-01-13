@@ -1,0 +1,34 @@
+const db = require("../../config/db")
+const branchService = require("./branch.service")
+
+const TEMPLATE_BRANCH_ID = 1 // 🔒 Pondok Indah
+
+exports.create = async (req, res) => {
+  const { name, address, open_time, close_time } = req.body
+
+  const { rows } = await db.query(`
+    INSERT INTO branches (
+      name,
+      address,
+      open_time,
+      close_time,
+      is_active
+    )
+    VALUES ($1,$2,$3,$4,false)
+    RETURNING id
+  `, [name, address, open_time, close_time])
+
+  const newBranchId = rows[0].id
+
+  // 🔥 AUTO CLONE SERVICE
+  await branchService.cloneServicesFromTemplate(
+    TEMPLATE_BRANCH_ID,
+    newBranchId
+  )
+
+  res.json({
+    success: true,
+    branch_id: newBranchId,
+    status: "DRAFT",
+  })
+}
