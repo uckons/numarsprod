@@ -83,70 +83,46 @@ const handleLogin = async () => {
 <style scoped>
 .login-wrapper {
   min-height: 100vh;
-  background: var(--bg-main);
+  background: #0e0e0e;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-lg);
 }
 
 .login-card {
-  width: 100%;
-  max-width: 360px;
-  background: var(--bg-card);
-  border: 1px solid var(--gold);
-  padding: var(--space-3xl);
+  width: 320px;
+  background: #111;
+  border: 1px solid #c9a24d;
+  padding: 24px;
   text-align: center;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-hover);
 }
 
 h1 {
-  color: var(--gold);
-  margin-bottom: var(--space-xs);
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
+  color: #c9a24d;
+  margin-bottom: 4px;
 }
 
 .subtitle {
-  color: var(--text-secondary);
-  margin-bottom: var(--space-xl);
-  font-size: var(--font-size-sm);
+  color: #aaa;
+  margin-bottom: 20px;
 }
 
 input {
   width: 100%;
-  margin-bottom: var(--space-md);
-  padding: var(--space-md);
-  background: var(--bg-main);
-  border: 1px solid var(--border-light);
-  color: var(--text-main);
-  border-radius: var(--radius-xs);
-  font-size: var(--font-size-sm);
-  transition: border-color var(--transition-fast);
-}
-
-input:focus {
-  outline: none;
-  border-color: var(--gold);
+  margin-bottom: 12px;
+  padding: 10px;
+  background: #000;
+  border: 1px solid #333;
+  color: #fff;
 }
 
 button {
   width: 100%;
-  padding: var(--space-md);
-  background: var(--gold);
+  padding: 10px;
+  background: #c9a24d;
   border: none;
-  font-weight: var(--font-weight-bold);
+  font-weight: bold;
   cursor: pointer;
-  border-radius: var(--radius-xs);
-  color: #000;
-  font-size: var(--font-size-sm);
-  transition: all var(--transition-fast);
-}
-
-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-soft);
 }
 
 button:disabled {
@@ -155,21 +131,7 @@ button:disabled {
 }
 
 .error {
-  color: var(--danger);
-  margin-top: var(--space-md);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-}
-
-/* Mobile optimization */
-@media (max-width: 480px) {
-  .login-card {
-    padding: var(--space-2xl);
-    max-width: 320px;
-  }
-  
-  h1 {
-    font-size: var(--font-size-xl);
-  }
+  color: #e74c3c;
+  margin-top: 12px;
 }
 </style>
