@@ -1,14 +1,15 @@
 <template>
-  <div class="login-wrapper">
-    <div class="login-card">
-      <h1>NUMARS POS</h1>
-      <p class="subtitle">Login Sistem</p>
+  <div class="min-h-screen bg-bg-main flex items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-[#111] border border-gold p-6 text-center rounded-lg shadow-soft">
+      <h1 class="text-gold text-2xl font-semibold mb-1">NUMARS POS</h1>
+      <p class="text-text-muted mb-5">Login Sistem</p>
 
       <!-- USERNAME (GANTI DARI PHONE) -->
       <input
         v-model="username"
         placeholder="Username"
         autocomplete="username"
+        class="w-full mb-3 px-2.5 py-2.5 bg-black border border-[#333] text-white rounded focus:outline-none focus:border-gold"
       />
 
       <input
@@ -16,13 +17,18 @@
         type="password"
         placeholder="Password"
         autocomplete="current-password"
+        class="w-full mb-3 px-2.5 py-2.5 bg-black border border-[#333] text-white rounded focus:outline-none focus:border-gold"
       />
 
-      <button @click="handleLogin" :disabled="loading">
+      <button 
+        @click="handleLogin" 
+        :disabled="loading"
+        class="w-full py-2.5 bg-gold text-black font-bold rounded cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+      >
         {{ loading ? "Loading..." : "Login" }}
       </button>
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="text-danger mt-3">{{ error }}</p>
     </div>
   </div>
 </template>
@@ -79,59 +85,3 @@ const handleLogin = async () => {
 }
 
 </script>
-
-<style scoped>
-.login-wrapper {
-  min-height: 100vh;
-  background: #0e0e0e;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.login-card {
-  width: 320px;
-  background: #111;
-  border: 1px solid #c9a24d;
-  padding: 24px;
-  text-align: center;
-}
-
-h1 {
-  color: #c9a24d;
-  margin-bottom: 4px;
-}
-
-.subtitle {
-  color: #aaa;
-  margin-bottom: 20px;
-}
-
-input {
-  width: 100%;
-  margin-bottom: 12px;
-  padding: 10px;
-  background: #000;
-  border: 1px solid #333;
-  color: #fff;
-}
-
-button {
-  width: 100%;
-  padding: 10px;
-  background: #c9a24d;
-  border: none;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.error {
-  color: #e74c3c;
-  margin-top: 12px;
-}
-</style>
