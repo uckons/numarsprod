@@ -1,12 +1,13 @@
 <template>
-  <tr class="row">
-    <td class="name">{{ service.name }}</td>
+  <tr class="transition-all duration-200 hover:bg-gold/10 hover:translate-x-0.5">
+    <td class="font-semibold">{{ service.name }}</td>
 
     <td>
       <input
         type="number"
         v-model="local.duration_minutes"
         @blur="save"
+        class="w-20 bg-black border border-gray-800 text-white p-1.5 rounded-md focus:outline-none focus:border-gold transition-colors"
       /> min
     </td>
 
@@ -15,18 +16,19 @@
         type="number"
         v-model="local.base_price"
         @blur="save"
+        class="w-20 bg-black border border-gray-800 text-white p-1.5 rounded-md focus:outline-none focus:border-gold transition-colors"
       />
     </td>
 
     <td>
-      <span :class="service.is_active ? 'on' : 'off'">
+      <span :class="service.is_active ? 'text-success' : 'text-warn'">
         {{ service.is_active ? "ACTIVE" : "DRAFT" }}
       </span>
     </td>
 
     <td>
       <button
-        class="toggle"
+        class="bg-gold border-none px-3 py-1.5 rounded-lg cursor-pointer transition-transform hover:scale-105"
         @click="toggle"
       >
         {{ service.is_active ? "Disable" : "Enable" }}
@@ -59,41 +61,3 @@ const toggle = async () => {
   emit("updated")
 }
 </script>
-
-<style scoped>
-.row {
-  transition: all .2s ease;
-}
-.row:hover {
-  background: rgba(201,162,77,.08);
-  transform: translateX(2px);
-}
-input {
-  width: 80px;
-  background: #000;
-  border: 1px solid var(--border-soft);
-  color: white;
-  padding: 6px;
-  border-radius: 6px;
-}
-.toggle {
-  background: var(--gold);
-  border: none;
-  padding: 6px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: transform .15s ease;
-}
-.toggle:hover {
-  transform: scale(1.05);
-}
-.on {
-  color: #2ecc71;
-}
-.off {
-  color: #e67e22;
-}
-.name {
-  font-weight: 600;
-}
-</style>

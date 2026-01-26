@@ -1,19 +1,45 @@
 <template>
-  <div class="overlay">
-    <div class="modal">
-      <h3>{{ edit ? "Edit Branch" : "Add Branch" }}</h3>
+  <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] modal-backdrop">
+    <div class="w-[400px] bg-bg-card p-5 rounded-lg shadow-2xl animate-[pop_0.2s_ease] modal">
+      <h3 class="text-lg font-semibold mb-4">{{ edit ? "Edit Branch" : "Add Branch" }}</h3>
 
-      <input v-model="form.name" placeholder="Branch name" />
-      <input v-model="form.address" placeholder="Address" />
+      <input 
+        v-model="form.name" 
+        placeholder="Branch name" 
+        class="w-full mb-3 p-2 bg-black border border-gray-800 text-white rounded focus:outline-none focus:border-gold transition-colors"
+      />
+      <input 
+        v-model="form.address" 
+        placeholder="Address" 
+        class="w-full mb-3 p-2 bg-black border border-gray-800 text-white rounded focus:outline-none focus:border-gold transition-colors"
+      />
 
-      <div class="row">
-        <input type="time" v-model="form.open_time" />
-        <input type="time" v-model="form.close_time" />
+      <div class="flex gap-3 mb-3">
+        <input 
+          type="time" 
+          v-model="form.open_time" 
+          class="flex-1 p-2 bg-black border border-gray-800 text-white rounded focus:outline-none focus:border-gold transition-colors"
+        />
+        <input 
+          type="time" 
+          v-model="form.close_time" 
+          class="flex-1 p-2 bg-black border border-gray-800 text-white rounded focus:outline-none focus:border-gold transition-colors"
+        />
       </div>
 
-      <div class="actions">
-        <button @click="$emit('close')">Cancel</button>
-        <button class="primary" @click="save">Save</button>
+      <div class="flex justify-end gap-3">
+        <button 
+          @click="$emit('close')" 
+          class="px-4 py-2 bg-transparent border border-gold text-gold rounded cursor-pointer hover:bg-gold hover:text-black transition-all"
+        >
+          Cancel
+        </button>
+        <button 
+          class="px-4 py-2 bg-gold text-black rounded cursor-pointer hover:opacity-90 transition-opacity" 
+          @click="save"
+        >
+          Save
+        </button>
       </div>
     </div>
   </div>
@@ -51,46 +77,3 @@ const save = async () => {
   emit("saved")
 }
 </script>
-
-<style scoped>
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal {
-  width: 400px;
-  background: #111;
-  padding: 20px;
-  border-radius: 10px;
-}
-
-input {
-  width: 100%;
-  margin-bottom: 10px;
-  padding: 8px;
-  background: black;
-  border: 1px solid #333;
-  color: white;
-}
-
-.row {
-  display: flex;
-  gap: 10px;
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.primary {
-  background: #C9A24D;
-  color: black;
-}
-</style>
