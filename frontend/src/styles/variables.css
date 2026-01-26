@@ -1,12 +1,111 @@
 :root {
+  /* ========================================
+     NUMARS POS - CENTRALIZED DESIGN TOKENS
+     ======================================== */
+  
+  /* Color Palette */
   --primary-color: #3498db;
   --secondary-color: #2ecc71;
-  --text-color: #2c3e50;
-  --background-color: #ecf0f1;
-  --font-family: 'Helvetica Neue', Arial, sans-serif;
+  
+  /* Brand Colors */
+  --gold: #c9a24d;
+  --gold-soft: rgba(201, 162, 77, 0.15);
+  --gold-rgb: 201, 162, 77;
+  
+  /* Semantic Colors */
+  --success: #2ecc71;
+  --success-soft: rgba(46, 204, 113, 0.2);
+  --danger: #e74c3c;
+  --danger-soft: rgba(231, 76, 60, 0.2);
+  --danger-dark: #c0392b;
+  --warning: #f39c12;
+  --warning-soft: rgba(243, 156, 18, 0.2);
+  --info: #3498db;
+  
+  /* Background Colors */
+  --bg-main: #0e0e0e;
+  --bg-card: #111;
+  --bg-sidebar: #111;
+  --bg-soft: #1c1c1c;
+  --bg-dark: #0f0f0f;
+  --bg-light: #151515;
+  --bg-input: #1c1c1c;
+  --background-color: #ecf0f1; /* legacy */
+  
+  /* Text Colors */
+  --text-main: #ffffff;
+  --text-color: #2c3e50; /* legacy */
+  --text-muted: #9a9a9a;
+  --text-secondary: #aaa;
+  --text-tertiary: #888;
+  --text-disabled: #666;
+  --text-dark: #bbb;
+  
+  /* Border Colors */
+  --border-soft: #2a2a2a;
+  --border-medium: #222;
+  --border-light: #333;
+  --border-dark: #1a1a1a;
+  
+  /* Typography */
+  --font-main: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-family: 'Helvetica Neue', Arial, sans-serif; /* legacy */
   --font-size-base: 16px;
+  --font-size-sm: 14px;
+  --font-size-xs: 12px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 30px;
   --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
   --font-weight-bold: 700;
-  --border-radius: 4px;
-  --box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --font-weight-extrabold: 800;
+  
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 24px;
+  --space-3xl: 32px;
+  
+  /* Border Radius */
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-xs: 8px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+  --border-radius: 4px; /* legacy */
+  
+  /* Shadows */
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-hover: 0 14px 40px rgba(0, 0, 0, 0.55);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* legacy */
+  
+  /* Transitions */
+  --transition-fast: 0.15s;
+  --transition-base: 0.2s;
+  --transition-slow: 0.3s;
+  
+  /* Z-index */
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-fixed: 30;
+  --z-modal-backdrop: 50;
+  --z-modal: 60;
+  --z-popover: 70;
+  --z-tooltip: 80;
+  --z-notification: 90;
+  --z-max: 9999;
+  
+  /* Breakpoints (for reference in media queries) */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
 }

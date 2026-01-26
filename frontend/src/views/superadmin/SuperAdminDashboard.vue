@@ -59,50 +59,144 @@ const logout = () => {
 .layout {
   display: flex;
   min-height: 100vh;
-  background: #0e0e0e;
-  color: white;
+  background: var(--bg-main);
+  color: var(--text-main);
 }
 
 .sidebar {
   width: 220px;
-  background: #111;
-  border-right: 1px solid #C9A24D;
-  padding: 16px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--gold);
+  padding: var(--space-lg);
   display: flex;
   flex-direction: column;
+  transition: transform var(--transition-base) ease;
 }
 
 .sidebar h2 {
-  color: #C9A24D;
-  margin-bottom: 16px;
+  color: var(--gold);
+  margin-bottom: var(--space-lg);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
 }
 
 nav button {
   width: 100%;
   background: transparent;
   border: none;
-  color: white;
-  padding: 10px;
+  color: var(--text-main);
+  padding: var(--space-sm) var(--space-md);
   text-align: left;
   cursor: pointer;
+  border-radius: var(--radius-xs);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+nav button:hover {
+  background: var(--gold-soft);
 }
 
 nav button.active {
-  background: #C9A24D;
-  color: black;
+  background: var(--gold);
+  color: #000;
+  font-weight: var(--font-weight-semibold);
 }
 
 .logout {
   margin-top: auto;
-  background: #b02a2a;
+  background: var(--danger-dark);
   border: none;
-  padding: 10px;
-  color: white;
+  padding: var(--space-sm) var(--space-md);
+  color: var(--text-main);
   cursor: pointer;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  transition: all var(--transition-fast);
+}
+
+.logout:hover {
+  background: var(--danger);
 }
 
 .content {
   flex: 1;
-  padding: 20px;
+  padding: var(--space-xl);
+  overflow-x: hidden;
+}
+
+/* ======================
+   MOBILE-FIRST RESPONSIVE
+====================== */
+
+/* Mobile - Sidebar hidden by default */
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--gold);
+    padding: var(--space-md);
+  }
+  
+  .sidebar h2 {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--space-md);
+  }
+  
+  nav {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-xs);
+  }
+  
+  nav button {
+    font-size: var(--font-size-xs);
+    padding: var(--space-sm);
+  }
+  
+  .content {
+    padding: var(--space-md);
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  nav {
+    grid-template-columns: 1fr;
+  }
+  
+  .sidebar {
+    padding: var(--space-sm);
+  }
+}
+
+/* Tablet and Desktop - Show sidebar */
+@media (min-width: 769px) {
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+}
+
+/* Large Desktop */
+@media (min-width: 1024px) {
+  .sidebar {
+    width: 260px;
+  }
+  
+  .content {
+    padding: var(--space-2xl) var(--space-3xl);
+  }
 }
 </style>
