@@ -209,12 +209,12 @@ button:hover {
 }
 
 .pause { 
-  background: #e67e22; 
+  background: var(--warning-orange);
   color: var(--text-main); 
 }
 
 .resume { 
-  background: #27ae60; 
+  background: var(--success-dark);
   color: var(--text-main); 
 }
 

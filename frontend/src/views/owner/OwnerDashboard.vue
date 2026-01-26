@@ -223,20 +223,20 @@ onMounted(loadDashboard)
 }
 
 .karaoke { 
-  border-color: #9b59b6; 
+  border-color: var(--category-karaoke);
 }
 
 .karaoke:hover {
-  border-color: #9b59b6;
+  border-color: var(--category-karaoke);
   box-shadow: 0 0 16px rgba(155, 89, 182, 0.2);
 }
 
 .fnb { 
-  border-color: #e67e22; 
+  border-color: var(--category-fnb);
 }
 
 .fnb:hover {
-  border-color: #e67e22;
+  border-color: var(--category-fnb);
   box-shadow: 0 0 16px rgba(230, 126, 34, 0.2);
 }
 

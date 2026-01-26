@@ -15,12 +15,18 @@
   /* Semantic Colors */
   --success: #2ecc71;
   --success-soft: rgba(46, 204, 113, 0.2);
+  --success-dark: #27ae60;
   --danger: #e74c3c;
   --danger-soft: rgba(231, 76, 60, 0.2);
   --danger-dark: #c0392b;
   --warning: #f39c12;
   --warning-soft: rgba(243, 156, 18, 0.2);
+  --warning-orange: #e67e22;
   --info: #3498db;
+  
+  /* Category Colors */
+  --category-karaoke: #9b59b6;
+  --category-fnb: #e67e22;
   
   /* Background Colors */
   --bg-main: #0e0e0e;
@@ -30,7 +36,6 @@
   --bg-dark: #0f0f0f;
   --bg-light: #151515;
   --bg-input: #1c1c1c;
-  --background-color: #ecf0f1; /* legacy */
   
   /* Text Colors */
   --text-main: #ffffff;
