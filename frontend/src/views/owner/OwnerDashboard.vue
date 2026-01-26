@@ -1,57 +1,62 @@
 <template>
-  <div class="owner-dashboard">
+  <div class="min-h-screen bg-bg-main text-text-main p-4 md:p-5">
     <!-- HEADER -->
-    <header class="topbar">
+    <header class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-gold pb-3 mb-6">
       <div>
-        <h1>NUMARS POS</h1>
-        <p>Owner Dashboard</p>
+        <h1 class="text-gold text-xl md:text-2xl font-semibold">NUMARS POS</h1>
+        <p class="text-text-muted text-sm">Owner Dashboard</p>
       </div>
-      <button class="logout" @click="logout">Logout</button>
+      <button 
+        class="bg-transparent border border-gold text-gold px-4 py-1.5 rounded-[10px] hover:bg-gold-soft transition-colors cursor-pointer self-start sm:self-auto"
+        @click="logout"
+      >
+        Logout
+      </button>
     </header>
 
     <!-- SUMMARY -->
-    <section class="summary">
-      <div class="box">
-        <p>Omset Bulanan</p>
-        <h2>Rp {{ format(summary.monthlyTotal) }}</h2>
+    <section class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+      <div class="bg-bg-card border border-border-soft p-5 text-center rounded-[10px]">
+        <p class="text-text-muted text-sm mb-2">Omset Bulanan</p>
+        <h2 class="text-gold text-2xl font-semibold">Rp {{ format(summary.monthlyTotal) }}</h2>
       </div>
-      <div class="box">
-        <p>Omset Tahunan</p>
-        <h2>Rp {{ format(summary.yearlyTotal) }}</h2>
+      <div class="bg-bg-card border border-border-soft p-5 text-center rounded-[10px]">
+        <p class="text-text-muted text-sm mb-2">Omset Tahunan</p>
+        <h2 class="text-gold text-2xl font-semibold">Rp {{ format(summary.yearlyTotal) }}</h2>
       </div>
     </section>
 
     <!-- CATEGORY TOTAL -->
-    <section class="categories">
-      <div class="card spa">
-        <p>SPA</p>
-        <h3>Rp {{ format(summary.spa) }}</h3>
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div class="p-4 text-center border border-success rounded-[10px] bg-bg-card">
+        <p class="text-text-muted text-sm mb-2">SPA</p>
+        <h3 class="text-success text-xl font-semibold">Rp {{ format(summary.spa) }}</h3>
       </div>
-      <div class="card karaoke">
-        <p>KARAOKE</p>
-        <h3>Rp {{ format(summary.karaoke) }}</h3>
+      <div class="p-4 text-center border border-purple-500 rounded-[10px] bg-bg-card">
+        <p class="text-text-muted text-sm mb-2">KARAOKE</p>
+        <h3 class="text-purple-400 text-xl font-semibold">Rp {{ format(summary.karaoke) }}</h3>
       </div>
-      <div class="card fnb">
-        <p>F&B</p>
-        <h3>Rp {{ format(summary.fnb) }}</h3>
+      <div class="p-4 text-center border border-orange-500 rounded-[10px] bg-bg-card">
+        <p class="text-text-muted text-sm mb-2">F&B</p>
+        <h3 class="text-orange-400 text-xl font-semibold">Rp {{ format(summary.fnb) }}</h3>
       </div>
     </section>
 
     <!-- CHART -->
-    <section class="chart">
-      <h3>Grafik Pendapatan Harian</h3>
+    <section>
+      <h3 class="text-lg font-semibold mb-4">Grafik Pendapatan Harian</h3>
 
-      <div class="chart-bars">
+      <div class="flex items-end gap-2 md:gap-3 h-[220px] border-l border-b border-border-soft p-2 md:p-3 overflow-x-auto">
         <div
           v-for="d in daily"
           :key="d.date"
-          class="bar-wrapper"
+          class="flex flex-col items-center justify-end min-w-[24px]"
         >
           <div
-            class="bar"
+            class="w-full bg-gradient-to-t from-[#8f6b1f] to-gold transition-all duration-300 ease-in-out"
             :style="{ height: barHeight(d.total) }"
           ></div>
-          <span>{{ d.date.slice(8,10) }}</span>
+          <span class="text-[11px] text-text-muted mt-1">{{ d.date.slice(8,10) }}</span>
         </div>
       </div>
     </section>
@@ -103,106 +108,3 @@ const loadDashboard = async () => {
 
 onMounted(loadDashboard)
 </script>
-
-<style scoped>
-.owner-dashboard {
-  min-height: 100vh;
-  background: #0e0e0e;
-  color: white;
-  padding: 20px;
-}
-
-/* HEADER */
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #c9a24d;
-  padding-bottom: 12px;
-}
-
-.topbar h1 {
-  color: #c9a24d;
-  margin: 0;
-}
-
-.logout {
-  background: transparent;
-  border: 1px solid #c9a24d;
-  color: #c9a24d;
-  padding: 6px 12px;
-  cursor: pointer;
-}
-
-/* SUMMARY */
-.summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  margin: 24px 0;
-}
-
-.box {
-  background: #111;
-  border: 1px solid #333;
-  padding: 20px;
-  text-align: center;
-}
-
-.box h2 {
-  color: #c9a24d;
-}
-
-/* CATEGORY */
-.categories {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-  margin-bottom: 32px;
-}
-
-.card {
-  padding: 16px;
-  text-align: center;
-  border: 1px solid #333;
-}
-
-.card h3 {
-  margin-top: 8px;
-}
-
-.spa { border-color: #2ecc71; }
-.karaoke { border-color: #9b59b6; }
-.fnb { border-color: #e67e22; }
-
-/* CHART */
-.chart h3 {
-  margin-bottom: 16px;
-}
-
-.chart-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  height: 200px;
-  border-left: 1px solid #333;
-  border-bottom: 1px solid #333;
-  padding: 10px;
-}
-
-.bar-wrapper {
-  text-align: center;
-  width: 24px;
-}
-
-.bar {
-  width: 100%;
-  background: linear-gradient(#c9a24d, #8f6b1f);
-  transition: height 0.3s ease;
-}
-
-.bar-wrapper span {
-  font-size: 11px;
-  color: #aaa;
-}
-</style>

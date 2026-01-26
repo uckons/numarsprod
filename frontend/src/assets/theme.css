@@ -132,6 +132,26 @@
     transform: translateY(-1px);
   }
 
+  /* NAV LINKS (for DashboardLayout) */
+  nav a {
+    display: block;
+    padding: 10px;
+    border-radius: var(--radius-default);
+    color: var(--color-text-main);
+    text-decoration: none;
+    margin-bottom: 6px;
+    transition: all 0.2s;
+  }
+  
+  nav a:hover {
+    background: rgb(201 162 77 / 0.08);
+  }
+  
+  nav a.router-link-active {
+    background: var(--color-gold-soft);
+    color: var(--color-gold);
+  }
+
   /* INPUT */
   input:not([type="checkbox"]):not([type="radio"]), 
   select {
