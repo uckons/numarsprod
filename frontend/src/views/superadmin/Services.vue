@@ -14,17 +14,17 @@
 
     <!-- STATS -->
     <div class="grid grid-cols-3 gap-4 mt-4">
-      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-5 shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-3xl cursor-default">
+      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-5 shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl cursor-default">
         <p class="text-sm text-gray-400">Total Service</p>
         <h3 class="mt-2 text-3xl font-bold">{{ total }}</h3>
       </div>
 
-      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-5 shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-3xl cursor-default">
+      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-5 shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl cursor-default">
         <p class="text-sm text-gray-400">Active</p>
         <h3 class="mt-2 text-3xl font-bold text-success">{{ active }}</h3>
       </div>
 
-      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-5 shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-3xl cursor-default">
+      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-5 shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl cursor-default">
         <p class="text-sm text-gray-400">Disabled</p>
         <h3 class="mt-2 text-3xl font-bold text-danger">{{ disabled }}</h3>
       </div>
