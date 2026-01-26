@@ -1,26 +1,28 @@
 <template>
-  <div class="page">
-    <h2>SUPERVISOR DASHBOARD</h2>
+  <div class="min-h-screen p-5 md:p-8 bg-bg-main">
+    <h2 class="text-2xl md:text-3xl font-bold text-gold mb-6">SUPERVISOR DASHBOARD</h2>
 
-    <h3>Timer Terapis Aktif</h3>
-    <div v-for="t in timers" :key="t.id" :class="timerClass(t)">
+    <h3 class="text-xl font-semibold mb-4 text-white">Timer Terapis Aktif</h3>
+    <div v-for="t in timers" :key="t.id" :class="timerClass(t)" class="mb-2 p-2 rounded font-medium">
       {{ t.therapist_name }} —
       {{ remaining(t) }} menit
     </div>
 
-    <h3>Order Hari Ini</h3>
-    <table>
-      <tr>
-        <th>ID</th>
-        <th>Status</th>
-        <th>Total</th>
-      </tr>
-      <tr v-for="o in orders" :key="o.id">
-        <td>#{{ o.id }}</td>
-        <td>{{ o.status }}</td>
-        <td>Rp {{ format(o.total) }}</td>
-      </tr>
-    </table>
+    <h3 class="text-xl font-semibold mt-8 mb-4 text-white">Order Hari Ini</h3>
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <tr class="border-b border-gray-700">
+          <th class="text-left p-2 md:p-3 text-gold">ID</th>
+          <th class="text-left p-2 md:p-3 text-gold">Status</th>
+          <th class="text-left p-2 md:p-3 text-gold">Total</th>
+        </tr>
+        <tr v-for="o in orders" :key="o.id" class="border-b border-gray-800 hover:bg-bg-soft transition-colors">
+          <td class="p-2 md:p-3">#{{ o.id }}</td>
+          <td class="p-2 md:p-3">{{ o.status }}</td>
+          <td class="p-2 md:p-3">Rp {{ format(o.total) }}</td>
+        </tr>
+      </table>
+    </div>
   </div>
 </template>
 
@@ -49,25 +51,12 @@ const remaining = t =>
 
 const timerClass = t => {
   const r = remaining(t)
-  if (r > 30) return "green"
-  if (r > 10) return "yellow"
-  return "red"
+  if (r > 30) return "text-success"
+  if (r > 10) return "text-warn"
+  return "text-danger"
 }
 
 const format = v => v.toLocaleString()
 </script>
 
-<style scoped>
-.green { color: #2ecc71 }
-.yellow { color: #f1c40f }
-.red { color: #e74c3c }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-td, th {
-  border-bottom: 1px solid #333;
-  padding: 8px;
-}
-</style>
