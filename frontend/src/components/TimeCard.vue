@@ -1,228 +1,187 @@
 <template>
-  <div class="timer-card" :class="colorClass">
+  <div class="timer-card" :class="statusClass">
     <!-- HEADER -->
     <div class="header">
       <div>
-        <h3 class="name">{{ therapistName }}</h3>
-        <p class="order">Order #{{ orderId }}</p>
+        <h4>{{ title }}</h4>
+        <small v-if="timer.order_id">
+          Order #{{ timer.order_id }}
+        </small>
       </div>
-      <span class="status">{{ statusText }}</span>
+
+      <span class="badge" v-if="timer.service_type">
+        {{ timer.service_type }}
+      </span>
+    </div>
+
+    <!-- INFO -->
+    <div class="info" v-if="timer.status !== 'EMPTY'">
+      <div>Terapis: <strong>{{ timer.therapist_name }}</strong></div>
+      <div v-if="timer.service_type === 'SPA'">
+        Room: <strong>{{ timer.room_no }}</strong>
+      </div>
+      <div v-if="timer.service_type === 'LC'">
+        Sofa: <strong>{{ timer.sofa_no }}</strong>
+      </div>
     </div>
 
     <!-- TIME -->
     <div class="time">
-      ⏱ {{ formattedTime }}
+      ? {{ displayTime }}
     </div>
 
     <!-- ACTIONS -->
     <div class="actions">
+      <!-- START -->
       <button
-        v-if="!paused"
-        class="btn pause"
-        @click="$emit('pause', timerId)"
+        v-if="timer.status !== 'RUNNING'"
+        class="start"
+        @click="$emit('start', timer.slot)"
       >
-        Pause
+        ? Start
+      </button>
+
+      <!-- PAUSE / RESUME -->
+      <button
+        v-if="timer.status === 'RUNNING' && !timer.paused"
+        class="pause"
+        @click="$emit('pause', timer.slot)"
+      >
+        ? Pause
       </button>
 
       <button
-        v-else
-        class="btn resume"
-        @click="$emit('resume', timerId)"
+        v-if="timer.status === 'RUNNING' && timer.paused"
+        class="resume"
+        @click="$emit('resume', timer.slot)"
       >
-        Resume
+        ? Resume
       </button>
 
+      <!-- EXTEND -->
       <button
-        class="btn extend"
-        @click="$emit('extend', timerId, 10)"
+        v-if="timer.status === 'RUNNING'"
+        class="extend"
+        @click="$emit('extend', timer.slot, 10)"
       >
-        +10 Menit
+        +10m
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue"
+import { computed } from "vue"
 
-/* =====================
-   PROPS
-===================== */
 const props = defineProps({
-  timerId: { type: Number, required: true },
-  orderId: { type: Number, required: true },
-  therapistName: { type: String, required: true },
-  endTime: { type: String, required: true },
-  paused: { type: Boolean, default: false }
+  timer: { type: Object, required: true }
 })
 
-/* =====================
-   REALTIME CLOCK
-===================== */
-const now = ref(new Date())
-let interval = null
-
-onMounted(() => {
-  interval = setInterval(() => {
-    now.value = new Date()
-  }, 1000)
+const title = computed(() => {
+  if (props.timer.status === "EMPTY") return `Slot ${props.timer.slot}`
+  return props.timer.therapist_name || "Terapis"
 })
 
-onUnmounted(() => {
-  if (interval) clearInterval(interval)
+const remainingMs = computed(() => {
+  if (!props.timer.planned_end_time) return 0
+  return (
+    new Date(props.timer.planned_end_time).getTime() -
+    Date.now()
+  )
 })
 
-/* =====================
-   TIME CALCULATION
-===================== */
-const remainingSeconds = computed(() => {
-  const end = new Date(props.endTime)
-  return Math.max(0, Math.floor((end - now.value) / 1000))
+const displayTime = computed(() => {
+  if (props.timer.status !== "RUNNING") return "00:00"
+  const ms = Math.max(0, remainingMs.value)
+  const m = Math.floor(ms / 60000)
+  const s = Math.floor((ms % 60000) / 1000)
+  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
 })
 
-const remainingMinutes = computed(() =>
-  Math.floor(remainingSeconds.value / 60)
-)
-
-const formattedTime = computed(() => {
-  const min = Math.floor(remainingSeconds.value / 60)
-  const sec = remainingSeconds.value % 60
-  return `${min}:${sec.toString().padStart(2, "0")}`
-})
-
-/* =====================
-   COLOR LOGIC
-===================== */
-const colorClass = computed(() => {
-  if (props.paused) return "paused"
-  if (remainingMinutes.value <= 10) return "red"
-  if (remainingMinutes.value <= 30) return "yellow"
-  return "green"
-})
-
-const statusText = computed(() => {
-  if (props.paused) return "PAUSED"
-  if (remainingMinutes.value <= 10) return "HAMPIR HABIS"
-  if (remainingMinutes.value <= 30) return "SEGERA HABIS"
-  return "AKTIF"
-})
-
-import { watch } from "vue"
-
-const alertShown = ref(false)
-
-watch(remainingMinutes, (val) => {
-  if (val <= 10 && !alertShown.value) {
-    alertShown.value = true
-    alert(`⏰ TIMER HAMPIR HABIS!\n${props.timer.therapist_name}\nSisa ${val} menit`)
-  }
-})
-
-
+const statusClass = computed(() => ({
+  empty: props.timer.status === "EMPTY",
+  running: props.timer.status === "RUNNING",
+  finished: props.timer.status === "FINISHED",
+  paused: props.timer.paused
+}))
 </script>
 
 <style scoped>
-/* =====================
-   BASE
-===================== */
 .timer-card {
-  background: #0e0e0e;
-  border: 2px solid #333;
-  border-radius: 14px;
-  padding: 16px;
-  margin-bottom: 14px;
-  color: #fff;
-  transition: all 0.3s ease;
+  background: #0f0f0f;
+  border: 2px solid #222;
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all .2s ease;
 }
 
-/* =====================
-   HEADER
-===================== */
+/* STATES */
+.running { border-color: #2ecc71; }
+.finished { border-color: #e74c3c; }
+.empty { border-color: #333; }
+.paused { opacity: .7; }
+
+/* HEADER */
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
 }
 
-.name {
+.header h4 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 14px;
 }
 
-.order {
-  margin: 0;
-  font-size: 12px;
-  color: #aaa;
+.header small {
+  color: #888;
+  font-size: 11px;
 }
 
-.status {
-  font-size: 12px;
-  font-weight: bold;
+.badge {
+  background: rgba(201,162,77,.2);
   color: #c9a24d;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 12px;
 }
 
-/* =====================
-   TIME
-===================== */
+/* INFO */
+.info {
+  font-size: 12px;
+  color: #bbb;
+  line-height: 1.4;
+}
+
+/* TIME */
 .time {
-  margin: 14px 0;
-  font-size: 28px;
-  font-weight: bold;
   text-align: center;
+  font-size: 30px;
+  font-weight: 800;
   letter-spacing: 1px;
 }
 
-/* =====================
-   ACTIONS
-===================== */
+/* ACTIONS */
 .actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
-.btn {
+button {
   flex: 1;
-  padding: 8px;
-  font-size: 13px;
-  font-weight: bold;
-  border-radius: 8px;
+  padding: 8px 0;
+  border-radius: 10px;
   border: none;
+  font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
 }
 
-.pause {
-  background: #e67e22;
-  color: #fff;
-}
-
-.resume {
-  background: #27ae60;
-  color: #fff;
-}
-
-.extend {
-  background: #c9a24d;
-  color: #000;
-}
-
-/* =====================
-   COLOR STATES
-===================== */
-.green {
-  border-color: #2ecc71;
-}
-
-.yellow {
-  border-color: #f1c40f;
-}
-
-.red {
-  border-color: #e74c3c;
-}
-
-.paused {
-  border-color: #7f8c8d;
-  opacity: 0.6;
-}
+.start { background: #c9a24d; color: #000; }
+.pause { background: #e67e22; color: #fff; }
+.resume { background: #27ae60; color: #fff; }
+.extend { background: #444; color: #fff; }
 </style>

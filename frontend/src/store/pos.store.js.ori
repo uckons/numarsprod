@@ -1,0 +1,32 @@
+import { defineStore } from "pinia"
+import { ref } from "vue"
+
+export const usePosStore = defineStore("pos", () => {
+  const items = ref([])
+
+  const add = (service) => {
+  console.log("ADD TO CART:", service)
+
+    const exist = items.value.find(i => i.id === service.id)
+    if (exist) {
+      exist.qty++
+    } else {
+      items.value.push({
+        id: service.id,
+        name: service.name,
+        base_price: service.base_price,
+        qty: 1
+      })
+    }
+  }
+
+  const remove = (id) => {
+    items.value = items.value.filter(i => i.id !== id)
+  }
+
+  const clear = () => {
+    items.value = []
+  }
+
+  return { items, add, remove, clear }
+})

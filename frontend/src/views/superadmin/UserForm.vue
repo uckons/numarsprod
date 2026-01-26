@@ -115,8 +115,8 @@ onMounted(async () => {
     api.get("/branches"),
   ])
 
-  roles.value = r.data
-  branches.value = b.data
+  roles.value = r.data.data || r.data
+  branches.value = b.data.data || b.data
 
   if (props.edit && props.data) {
   form.value = {

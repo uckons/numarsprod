@@ -33,6 +33,34 @@ exports.addItem = async (db, orderId, serviceId, qty) => {
      RETURNING *`,
     [orderId, serviceId, qty, price, duration]
   )
+// ⏱️ BUAT TIMER OTOMATIS
+await db.query(`
+  INSERT INTO timers (
+    order_id,
+    service_id,
+    therapist_id,
+    room_id,
+    branch_id,
+    start_time,
+    planned_end_time
+  )
+  VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    NOW(),
+    NOW() + INTERVAL '1 minute' * $6
+  )
+`, [
+  orderId,
+  serviceId,
+  therapist_id,   // dari payload / assignment
+  room_id,        // dari payload
+  user.branch_id,
+  service.duration_minutes
+])
 
   // Update total order
   await db.query(
@@ -82,34 +110,34 @@ exports.closeOrder = async (db, orderId) => {
 
   return rows[0]
 }
-const db = require("../../config/db")
+//const db = require("../../config/db")
 
-exports.expandPackageItems = async (order_id) => {
+//exports.expandPackageItems = async (order_id) => {
   // ambil item paket
-  const packages = await db.query(
-    `SELECT oi.product_id, oi.qty
-     FROM order_items oi
-     JOIN products p ON p.id=oi.product_id
-     WHERE oi.order_id=$1 AND p.type='PACKAGE'`,
-    [order_id]
-  )
+//  const packages = await db.query(
+//    `SELECT oi.product_id, oi.qty
+//     FROM order_items oi
+//     JOIN products p ON p.id=oi.product_id
+//     WHERE oi.order_id=$1 AND p.type='PACKAGE'`,
+//   [order_id]
+//  )
 
-  for (const pkg of packages.rows) {
-    // isi paket (contoh relasi)
-    const items = await db.query(
-      `SELECT product_id, qty
-       FROM package_items
-       WHERE package_id=$1`,
-      [pkg.product_id]
-    )
+//  for (const pkg of packages.rows) {
+//    // isi paket (contoh relasi)
+//    const items = await db.query(
+//      `SELECT product_id, qty
+//       FROM package_items
+//       WHERE package_id=$1`,
+//      [pkg.product_id]
+//    )
 
-    for (const i of items.rows) {
-      await db.query(
-        `INSERT INTO order_items (order_id, product_id, qty, price)
-         SELECT $1, p.id, $2, p.price
-         FROM products p WHERE p.id=$3`,
-        [order_id, i.qty * pkg.qty, i.product_id]
-      )
-    }
-  }
-}
+//    for (const i of items.rows) {
+//      await db.query(
+//        `INSERT INTO order_items (order_id, product_id, qty, price)
+//         SELECT $1, p.id, $2, p.price
+//         FROM products p WHERE p.id=$3`,
+//        [order_id, i.qty * pkg.qty, i.product_id]
+//      )
+//    }
+//  }
+//}

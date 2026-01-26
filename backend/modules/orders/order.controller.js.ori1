@@ -1,0 +1,214 @@
+const service = require("./order.service")
+
+exports.create = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const user = req.user
+
+    const order = await service.createOrder(db, user)
+    res.json(order)
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
+
+exports.addItem = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const orderId = req.params.id
+    const { service_id, qty } = req.body
+
+    const item = await service.addItem(db, orderId, service_id, qty || 1)
+    res.json(item)
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
+
+exports.getAll = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const user = req.user
+
+    const orders = await service.getOrdersByBranch(db, user)
+    res.json(orders)
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
+
+exports.close = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const orderId = req.params.id
+
+    const closed = await service.closeOrder(db, orderId)
+    res.json(closed)
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
+//exports.createFromPos = async (req, res) => {
+//  try {
+//  const db = req.app.get("db")  //  🔴 INI YANG HILANG
+//  const { items, payment_method, total } = req.body
+//  const user_id = req.user.id
+
+//  const order = await db.one(
+//    `INSERT INTO orders (user_id, total, payment_method)
+//     VALUES ($1,$2,$3) RETURNING id`,
+//    [user_id, total, payment_method]
+//  )
+
+//  for (const i of items) {
+//    await db.none(
+//      `INSERT INTO order_items
+//       (order_id, service_id, qty, price)
+//       VALUES ($1,$2,$3,$4)`,
+//      [order.id, i.id, i.qty, i.base_price]
+//    )
+//  }
+
+//  res.json({ success: true, order_id: order.id })
+//  } catch (err) {
+//    res.status(400).json({ message: err.message })
+//  }
+//}
+//exports.createFromPos = async (req, res) => {
+//  try {
+//    const db = req.app.get("db")   // ✅ WAJIB
+//    const user = req.user
+//    const { items, payment_method, total } = req.body
+//    const user_id = req.user.id
+
+//    const orderRes = await db.query(
+//      `INSERT INTO orders (branch_id, cashier_id, total, payment_method, status)
+//       VALUES ($1,$2,$3,$4,'PAID')
+//       RETURNING *`,
+//      [user.branch_id, user.id, total, payment_method]
+//    )
+
+//    const order = orderRes.rows[0]
+
+//    for (const i of items) {
+//      await db.query(
+//        `INSERT INTO order_items
+//         (order_id, service_id, qty, price)
+//         VALUES ($1,$2,$3,$4)`,
+//        [order.id, i.id, i.qty, i.base_price]
+//      )
+//    }
+
+//    res.json({ success: true, order })
+//  } catch (err) {
+//    console.error(err)
+//    res.status(400).json({ message: err.message })
+//  }
+//}
+//exports.createFromPos = async (req, res) => {
+//  try {
+//    const db = req.app.get("db")
+//    const user = req.user
+
+//    if (!user.branch_id) {
+//      return res.status(400).json({ message: "User belum terikat ke branch" })
+//    }
+
+//    const { items, payment_method, total } = req.body
+
+//    const { rows } = await db.query(
+//      `INSERT INTO orders
+//        (branch_id, user_id, total, payment_method, status)
+//       VALUES ($1, $2, $3, $4, 'PAID')
+//       RETURNING id`,
+//      [
+//        user.branch_id,
+//        user.id,
+//        total || 0,
+//        payment_method || "CASH"
+ //     ]
+   // )
+
+//    const orderId = rows[0].id
+
+//    for (const i of items) {
+//      await db.query(
+//        `INSERT INTO order_items
+//         (order_id, service_id, qty, price)
+//         VALUES ($1, $2, $3, $4)`,
+//        [orderId, i.id, i.qty, i.base_price]
+//      )
+//    }
+
+//    res.json({ success: true, order_id: orderId })
+ // } catch (err) {
+   // console.error(err)
+   // res.status(500).json({ message: err.message })
+//  }
+//}
+//exports.cancel = async (req, res) => {
+//  try {
+//    const db = req.app.get("db")
+//    const orderId = req.params.id
+
+//    await db.query(
+//      `DELETE FROM order_items WHERE order_id=$1`,
+//      [orderId]
+//    )
+
+//    await db.query(
+//      `DELETE FROM orders WHERE id=$1`,
+//      [orderId]
+//    )
+
+//    res.json({ success: true })
+//  } catch (err) {
+//    res.status(400).json({ message: err.message })
+//  }
+//}
+exports.cancel = async (req, res) => {
+  const db = req.app.get("db")
+  const { id } = req.params
+
+  await db.query(
+    "UPDATE orders SET status='CANCELLED' WHERE id=$1",
+    [id]
+  )
+
+  res.json({ success: true })
+}
+
+
+exports.createFromPos = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const user = req.user
+    const { items, payment_method } = req.body
+
+    if (!user.branch_id) {
+      return res.status(400).json({ message: "User belum terikat ke branch" })
+    }
+
+    const { rows } = await db.query(
+      `INSERT INTO orders (branch_id, cashier_id, status, payment_method)
+       VALUES ($1,$2,'PAID',$3)
+       RETURNING id`,
+      [user.branch_id, user.id, payment_method]
+    )
+
+    const orderId = rows[0].id
+
+    for (const i of items) {
+      await db.query(
+        `INSERT INTO order_items
+         (order_id, service_id, qty, price)
+         VALUES ($1,$2,$3,$4)`,
+        [orderId, i.id, i.qty, i.price]
+      )
+    }
+
+    res.json({ success: true, order_id: orderId })
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}

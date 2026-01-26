@@ -1,0 +1,51 @@
+<template>
+  <PosLayout>
+    <div class="pos-body">
+      <div class="left">
+        <PosServiceList />
+      </div>
+
+      <div class="right">
+        <PosCart />
+      </div>
+    </div>
+  </PosLayout>
+</template>
+
+<script setup>
+import PosLayout from "./PosLayout.vue"
+import PosServiceList from "./PosServiceList.vue"
+import PosCart from "./PosCart.vue"
+</script>
+
+<style scoped>
+.pos-body {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 420px;
+}
+
+/* LEFT = SERVICES */
+.left {
+  padding: 16px;
+  overflow-y: auto;
+}
+
+/* RIGHT = CART */
+.right {
+  border-left: 1px solid #222;
+  background: #0e0e0e;
+}
+
+/* ?? RESPONSIVE */
+@media (max-width: 900px) {
+  .pos-body {
+    grid-template-columns: 1fr;
+  }
+
+  .right {
+    border-left: none;
+    border-top: 1px solid #222;
+  }
+}
+</style>

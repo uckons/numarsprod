@@ -5,12 +5,15 @@ import Login from "../views/Login.vue"
 import SuperAdminDashboard from "../views/superadmin/SuperAdminDashboard.vue"
 import OwnerDashboard from "../views/owner/OwnerDashboard.vue"
 import ManagerDashboard from "../views/manager/ManagerDashboard.vue"
-import KasirDashboard from "../views/kasir/KasirDashboard.vue"
+import PosLayout from "@/views/pos/PosLayout.vue"
+import KasirDashboard from "@/views/kasir/KasirDashboard.vue"
 import TerapisDashboard from "../views/terapis/TerapisDashboard.vue"
 //import SuperAdminDashboard from "../views/superadmin/SuperAdminDashboard.vue"
 import Users from "../views/superadmin/Users.vue"
 import AuditLogs from "../views/superadmin/AuditLogs.vue"
-
+import Services from "@/views/superadmin/Services.vue"
+import Branches from "@/views/superadmin/Branches.vue"
+import PosCashier from "@/views/pos/PosCashier.vue"
 const routes = [
   { path: "/login", component: Login },
 
@@ -37,8 +40,25 @@ const routes = [
   {
     path: "/kasir",
     component: KasirDashboard,
-    meta: { auth: true, roles: ["Kasir"] }
+    meta: { auth: true, roles: ["Kasir"] },
+    //children: [
+    //{
+    //  path: "",
+    //  component: KasirDashboard
+   // }
+  //]
   },
+//{
+//  path: "/kasir/pos",
+//  component: PosCashier,
+//  meta: { auth: true, roles: ["Kasir"] }
+//}
+{
+  path: "/kasir/pos",
+  name: "KasirPOS",
+  component: () => import("@/views/pos/PosView.vue"),
+  meta: { requiresAuth: true, transition: "slide-pos" }
+},
 //AUDIT
 {
   path: "/superadmin/audit-logs",

@@ -1,0 +1,105 @@
+<template>
+  <PosLayout>
+    <div class="header">
+      <h2>POS – Kasir</h2>
+      <button class="btn-primary" @click="createOrder">
+        + New Order
+      </button>
+    </div>
+
+    <div class="content">
+      <PosServiceList
+        :branchId="branchId"
+        @add="addItem"
+      />
+  <PosTimerGrid />
+  <!-- component POS lainnya tetap -->
+<PosCart
+  :order="order"
+  :items="items"
+  @updated="syncOrder"
+  @checkout="openCheckout"
+/>
+    </div>
+
+    <PosCheckout
+      v-if="showCheckout"
+      :order="order"
+      @close="showCheckout = false"
+      @paid="finish"
+    />
+  </PosLayout>
+</template>
+
+<script setup>
+import { ref } from "vue"
+import api from "@/services/api"
+
+import PosLayout from "./PosLayout.vue" 
+import PosServiceList from "./PosServiceList.vue" 
+import PosTimerGrid from "./PosTimerGrid.vue" 
+import PosCart from "./PosCart.vue"
+import PosCheckout from "./PosCheckout.vue"
+import PosTimerGrid from "./components/PosTimerGrid.vue"
+
+const order = ref(null)
+const items = ref([])
+const showCheckout = ref(false)
+const branchId = ref(1)
+
+const createOrder = async () => {
+  const res = await api.post("/pos/orders", {
+    branch_id: branchId.value
+  })
+  order.value = res.data
+  items.value = []
+}
+
+const addItem = async (service) => {
+  await api.post(`/pos/orders/${order.value.id}/items`, {
+    service_id: service.id,
+    qty: 1
+  })
+  const detail = await api.get(`/pos/orders/${order.value.id}`)
+  order.value = detail.data
+  items.value = detail.data.items
+}
+
+const syncOrder = (data) => {
+  order.value = data
+  items.value = data.items
+}
+const openCheckout = () => {
+  showCheckout.value = true
+}
+const showCheckout = ref(false)
+
+const openCheckout = () => {
+  showCheckout.value = true
+}
+
+const finish = () => {
+  showCheckout.value = false
+  order.value = null
+  items.value = []
+}
+const checkout = async ({ method }) => {
+  await api.post("/orders/pos", {
+    items: cart.value,
+    payment_method: method,
+    total: total.value
+  })
+
+  cart.value = []
+  showCheckout.value = false
+}
+
+</script>
+
+<style scoped>
+.content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+}
+</style>

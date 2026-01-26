@@ -1,0 +1,41 @@
+<template>
+   <div style="color:white;font-size:30px;padding:40px">
+    KASIR DASHBOARD RENDER OK
+  </div>
+    <div class="pos-body">
+     <div class="left">
+        <!-- 🔥 TIMER GRID -->
+        <PosTimerGrid />
+        <!-- 🔥 SERVICE GRID -->
+      <PosServiceList />
+     </div>
+
+    <div class="right">
+      <PosCart />
+    </div>
+   </div>
+</template>
+
+<script setup>
+import PosServiceList from "@/views/pos/PosServiceList.vue"
+import PosCart from "@/views/pos/PosCart.vue"
+import PosTimerGrid from "@/views/pos/PosTimerGrid.vue"
+</script>
+
+<style scoped>
+.pos-body {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  height: 100%;
+}
+.left {
+  flex: 3;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.right {
+  flex: 1;
+  border-left: 1px solid #222;
+}
+</style>

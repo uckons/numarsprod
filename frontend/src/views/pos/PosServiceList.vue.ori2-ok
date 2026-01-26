@@ -1,0 +1,42 @@
+<template>
+  <div class="service-grid">
+    <div
+      v-for="s in services"
+      :key="s.id"
+      class="service-card"
+      @click="$emit('add', s)"
+    >
+      <h4>{{ s.name }}</h4>
+      <p>{{ s.type }}</p>
+      <strong>Rp {{ s.base_price }}</strong>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { onMounted, ref } from "vue"
+import api from "@/services/api"
+
+const services = ref([])
+
+onMounted(async () => {
+  services.value = (await api.get("/services")).data
+})
+</script>
+
+<style scoped>
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px,1fr));
+  gap: 12px;
+}
+.service-card {
+  background: #111;
+  border: 1px solid #333;
+  padding: 12px;
+  cursor: pointer;
+}
+.service-card:hover {
+  background: #1a1a1a;
+}
+</style>

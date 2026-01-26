@@ -1,0 +1,11 @@
+const startTimer = () => {
+  const t = timers.value.find(t => t.slot === selectedSlot.value)
+
+  const now = Date.now()
+  t.active = true
+  t.start_time = now
+  t.planned_end_time = now + duration * 60000
+  t.therapist_name = therapist
+  t.room_no = room
+  t.service_type = type
+}

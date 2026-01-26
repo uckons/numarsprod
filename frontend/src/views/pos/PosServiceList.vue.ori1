@@ -1,0 +1,149 @@
+<template>
+  <div class="service-panel">
+    <!-- FILTER -->
+    <div class="filter">
+      <button
+        v-for="c in categories"
+        :key="c"
+        :class="{ active: category === c }"
+        @click="category = c"
+      >
+        {{ c }}
+      </button>
+    </div>
+
+    <!-- LIST -->
+    <div class="services">
+      <div
+        v-for="s in filtered"
+        :key="s.id"
+        class="service-card"
+        @click="add(s)"
+      >
+        <h4>{{ s.name }}</h4>
+
+        <p class="meta">
+          {{ s.duration_minutes }} menit
+        </p>
+
+        <div class="price">
+          Rp {{ format(s.base_price) }}
+        </div>
+      </div>
+
+      <div v-if="!filtered.length" class="empty">
+        No services available
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted } from "vue"
+import api from "@/services/api"
+
+const services = ref([])
+const category = ref("ALL")
+
+const categories = ["ALL", "SPA", "LC", "FNB", "KARAOKE"]
+
+onMounted(async () => {
+  const res = await api.get("/services")
+  services.value = res.data.data || res.data
+})
+
+const filtered = computed(() => {
+  if (category.value === "ALL") return services.value
+  return services.value.filter(s => s.type === category.value)
+})
+
+const add = (service) => {
+  window.dispatchEvent(
+    new CustomEvent("add-to-cart", { detail: service })
+  )
+}
+
+const format = (v) =>
+  Number(v || 0).toLocaleString("id-ID")
+</script>
+
+<style scoped>
+.service-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #0b0b0b;
+}
+
+/* FILTER */
+.filter {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  border-bottom: 1px solid #222;
+}
+
+.filter button {
+  background: #111;
+  border: 1px solid #222;
+  color: #aaa;
+  padding: 8px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.filter button.active,
+.filter button:hover {
+  background: #c9a24d;
+  color: black;
+  border-color: #c9a24d;
+}
+
+/* SERVICES */
+.services {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.service-card {
+  background: linear-gradient(145deg, #0e0e0e, #151515);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+  cursor: pointer;
+  transition: all .25s ease;
+}
+
+.service-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+
+.service-card h4 {
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.meta {
+  font-size: 12px;
+  color: #888;
+}
+
+.price {
+  margin-top: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #c9a24d;
+}
+
+.empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: #777;
+  padding: 40px;
+}
+</style>

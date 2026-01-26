@@ -1,0 +1,35 @@
+<template>
+  <div class="cart">
+    <h3>Cart</h3>
+
+    <div v-if="!items.length">Kosong</div>
+
+    <div v-for="i in items" :key="i.id" class="row">
+      {{ i.name }} x {{ i.qty }}
+      <span>Rp {{ i.base_price * i.qty }}</span>
+    </div>
+
+    <button @click="$emit('checkout')" :disabled="!items.length">
+      Checkout
+    </button>
+  </div>
+</template>
+
+<script setup>
+defineProps({ items: Array })
+defineEmits(["checkout"])
+</script>
+
+<style scoped>
+.cart {
+  padding: 16px;
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+}
+button {
+  width: 100%;
+  margin-top: 16px;
+}
+</style>

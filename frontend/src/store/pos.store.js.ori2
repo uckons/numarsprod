@@ -1,0 +1,55 @@
+import { defineStore } from "pinia"
+import api from "@/services/api"
+
+export const usePosStore = defineStore("pos", {
+  state: () => ({
+    orderId: null,
+    items: []
+  }),
+
+  actions: {
+    async createOrder() {
+      const res = await api.post("/orders")
+      this.orderId = res.data.id
+    },
+
+ //   add(service) {
+ //     const item = this.items.find(i => i.id === service.id)
+//      if (item) {
+ //       item.qty++
+//      } else {
+ //       this.items.push({
+//          ...service,
+ //         qty: 1
+ //       })
+ //     }
+//    },
+
+ add(service) {
+      console.log("STORE ADD =>", service) // ?? DEBUG
+
+      const item = this.items.find(i => i.id === service.id)
+      if (item) {
+        item.qty++
+      } else {
+        this.items.push({
+          id: service.id,
+          name: service.name,
+          price: service.price,
+          qty: 1
+        })
+      }
+//    }
+//  }
+}),
+
+    remove(id) {
+      this.items = this.items.filter(i => i.id !== id)
+    },
+
+    clear() {
+      this.items = []
+      this.orderId = null
+    }
+  }
+})

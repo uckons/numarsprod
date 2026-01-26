@@ -1,0 +1,216 @@
+<template>
+  <div class="kasir-dashboard">
+    <!-- TOP BAR -->
+        <header class="topbar">
+      <div class="brand">
+        <h1>NUMARS POS</h1>
+        <span class="branch">{{ auth.user.branch_name || "Outlet" }}</span>
+      </div>
+
+      <div class="user">
+        <span class="name">{{ auth.user.name }}</span>
+        <button class="logout" @click="logout">Logout</button>
+      </div>
+    </header>
+
+    <!-- QUICK STATS -->
+    <section class="stats">
+      <div class="card">
+        <p>Order Aktif</p>
+        <h2>{{ stats.activeOrders }}</h2>
+      </div>
+      <div class="card">
+        <p>Omset Hari Ini</p>
+        <h2>Rp {{ format(stats.todayRevenue) }}</h2>
+      </div>
+      <div class="card">
+        <p>Terapis Aktif</p>
+        <h2>{{ stats.activeTherapists }}</h2>
+      </div>
+    </section>
+
+    <!-- MAIN ACTION -->
+      <section class="actions">
+      <router-link to="/kasir/pos" class="action primary">
+        ➕ Buat Order Baru
+      </router-link>
+
+      <router-link to="/kasir/orders" class="action">
+        📋 Daftar Order
+      </router-link>
+
+      <router-link to="/kasir/payments" class="action">
+        💳 Pembayaran
+      </router-link>
+    </section>
+
+    <!-- POS SYSTEM (POPUP / FULLSCREEN) -->
+    <PosLayout 
+      v-if="showPos"
+      :timers="timers"
+      @close="showPos=false" />
+      <PosCashier />
+
+    
+    <!-- TIMER GRID (AMAN) -->
+    <section class="timers">
+      <h3>Timer Terapis Aktif</h3>
+      <pre style="color:yellow">
+{{ timers }}
+</pre>
+      <div v-if="timers.length === 0" class="empty">
+        Tidak ada timer berjalan
+      </div>
+
+      <div class="timer-grid">
+        <TimeCard v-for="t in timers" :key="t.id" :timer="t" />
+      </div>
+    </section>
+  </div>
+</template>
+
+
+<script setup>
+import { onMounted, ref } from "vue"
+import { useRouter } from "vue-router"
+import { useAuthStore } from "../../store/auth.store"
+import TimeCard from "@/components/TimeCard.vue"
+
+const router = useRouter()
+const auth = useAuthStore()
+const showPos = ref(false)
+const stats = ref({
+  activeOrders: 0,
+  todayRevenue: 0,
+  activeTherapists: 0
+})
+
+const timers = ref([])
+
+const format = n =>
+  new Intl.NumberFormat("id-ID").format(n || 0)
+
+const logout = () => {
+  auth.logout()
+  router.push("/login")
+}
+
+const loadDashboard = async () => {
+  const headers = {
+    Authorization: `Bearer ${auth.token}`
+  }
+
+  const s = await fetch("/api/dashboard/kasir", { headers })
+  stats.value = await s.json()
+
+  const t = await fetch("/api/timers/active", { headers })
+  timers.value = await t.json()
+}
+
+onMounted(loadDashboard)
+</script>
+
+<style scoped>
+.kasir-dashboard {
+  min-height: 100vh;
+  background: #0e0e0e;
+  color: #fff;
+  padding: 16px;
+}
+
+/* TOPBAR */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #c9a24d;
+  padding-bottom: 12px;
+}
+
+.brand h1 {
+  color: #c9a24d;
+  margin: 0;
+}
+
+.branch {
+  font-size: 12px;
+  color: #aaa;
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logout {
+  background: transparent;
+  border: 1px solid #c9a24d;
+  color: #c9a24d;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+/* STATS */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.card {
+  background: #111;
+  border: 1px solid #333;
+  padding: 16px;
+  text-align: center;
+}
+
+.card p {
+  color: #aaa;
+  margin-bottom: 6px;
+}
+
+.card h2 {
+  color: #c9a24d;
+}
+
+/* ACTIONS */
+.actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.action {
+  background: #111;
+  border: 1px solid #c9a24d;
+  padding: 16px;
+  text-align: center;
+  color: #fff;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.action.primary {
+  background: #c9a24d;
+  color: #000;
+}
+
+/* TIMERS */
+.timers h3 {
+  margin-bottom: 12px;
+}
+
+.timer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.empty {
+  color: #777;
+  font-style: italic;
+}
+</style>

@@ -30,8 +30,18 @@ exports.createBranch = async (req, res) => {
   res.json(await s.createBranch(req.body))
 }
 
+//exports.orders = async (req, res) => {
+//  res.json(await s.orders())
+//}
+
 exports.orders = async (req, res) => {
-  res.json(await s.orders())
+  try {
+    const db = req.app.get("db")
+    const data = await service.orders(db)
+    res.json(data)
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
 }
 
 exports.timers = async (req, res) => {
@@ -46,4 +56,16 @@ exports.forceLogout = async(req,res)=>{
 }
 exports.auditLogs = async (req, res) => {
   res.json(await s.auditLogs(req.query))
+}
+const service = require("./superadmin.service")
+
+exports.orders = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const data = await service.orders(db)
+    res.json(data)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: err.message })
+  }
 }

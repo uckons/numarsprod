@@ -1,0 +1,175 @@
+<template>
+  <div class="timer-card" :class="colorClass">
+    <!-- HEADER -->
+    <div class="header">
+      <div>
+        <h3 class="name">{{ therapistName }}</h3>
+        <p class="order">Order #{{ orderId }}</p>
+      </div>
+      <span class="status">{{ statusText }}</span>
+    </div>
+
+    <!-- TIME -->
+    <div class="time">
+      ⏱ {{ formattedTime }}
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="actions">
+      <button
+        v-if="!paused"
+        class="btn pause"
+        @click="$emit('pause', timerId)"
+      >
+        Pause
+      </button>
+
+      <button
+        v-else
+        class="btn resume"
+        @click="$emit('resume', timerId)"
+      >
+        Resume
+      </button>
+
+      <button
+        class="btn extend"
+        @click="$emit('extend', timerId, 10)"
+      >
+        +10 Menit
+      </button>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed } from "vue"
+
+const props = defineProps({ timer: Object })
+
+const now = Date.now()
+
+const remainingMs = computed(() => {
+  return new Date(props.timer.planned_end_time).getTime() - Date.now()
+})
+
+const percent = computed(() => {
+  const total =
+    new Date(props.timer.planned_end_time) -
+    new Date(props.timer.start_time)
+
+  return Math.max(0, remainingMs.value / total)
+})
+
+const color = computed(() => {
+  if (percent.value > 0.5) return "green"
+  if (percent.value > 0.2) return "yellow"
+  return "red"
+})
+</script>
+
+<style scoped>
+/* =====================
+   BASE
+===================== */
+.timer-card {
+  background: #0e0e0e;
+  border: 2px solid #333;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+  color: #fff;
+  transition: all 0.3s ease;
+}
+
+/* =====================
+   HEADER
+===================== */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.order {
+  margin: 0;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.status {
+  font-size: 12px;
+  font-weight: bold;
+  color: #c9a24d;
+}
+
+/* =====================
+   TIME
+===================== */
+.time {
+  margin: 14px 0;
+  font-size: 28px;
+  font-weight: bold;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+/* =====================
+   ACTIONS
+===================== */
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  flex: 1;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: bold;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+
+.pause {
+  background: #e67e22;
+  color: #fff;
+}
+
+.resume {
+  background: #27ae60;
+  color: #fff;
+}
+
+.extend {
+  background: #c9a24d;
+  color: #000;
+}
+
+/* =====================
+   COLOR STATES
+===================== */
+.green {
+  border-color: #2ecc71;
+}
+
+.yellow {
+  border-color: #f1c40f;
+}
+
+.red {
+  border-color: #e74c3c;
+}
+
+.paused {
+  border-color: #7f8c8d;
+  opacity: 0.6;
+}
+</style>

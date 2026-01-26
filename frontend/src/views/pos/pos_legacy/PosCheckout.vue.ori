@@ -1,0 +1,189 @@
+<template>
+  <div class="overlay">
+    <div class="modal">
+      <h3>Payment</h3>
+
+      <!-- TOTAL -->
+      <div class="total">
+        Rp {{ format(order.total_amount) }}
+      </div>
+
+      <!-- METHOD -->
+      <div class="methods">
+        <button
+          :class="{ active: method === 'CASH' }"
+          @click="method = 'CASH'"
+        >
+          CASH
+        </button>
+        <button
+          :class="{ active: method === 'QRIS' }"
+          @click="method = 'QRIS'"
+        >
+          QRIS
+        </button>
+      </div>
+
+      <!-- CASH INPUT -->
+      <div v-if="method === 'CASH'" class="cash">
+        <label>Cash Received</label>
+        <input
+          type="number"
+          v-model.number="cash"
+          placeholder="0"
+        />
+
+        <div class="change">
+          Change:
+          <strong>
+            Rp {{ format(change) }}
+          </strong>
+        </div>
+      </div>
+
+      <!-- ACTION -->
+      <div class="actions">
+        <button class="btn-outline" @click="$emit('close')">
+          Cancel
+        </button>
+        <button
+          class="btn-primary"
+          :disabled="disabled"
+          @click="pay"
+        >
+          Pay
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed } from "vue"
+import api from "@/services/api"
+
+const props = defineProps({
+  order: Object
+})
+
+const emit = defineEmits(["paid", "close"])
+
+const method = ref("CASH")
+const cash = ref(0)
+const loading = ref(false)
+
+const change = computed(() => {
+  if (method.value !== "CASH") return 0
+  return Math.max(
+    cash.value - props.order.total_amount,
+    0
+  )
+})
+
+const disabled = computed(() => {
+  if (loading.value) return true
+  if (method.value === "CASH") {
+    return cash.value < props.order.total_amount
+  }
+  return false
+})
+
+const pay = async () => {
+  loading.value = true
+  try {
+    await api.post(
+      `/pos/orders/${props.order.id}/pay`,
+      {
+        method: method.value,
+        cash_received:
+          method.value === "CASH" ? cash.value : null
+      }
+    )
+
+    emit("paid")
+  } catch (e) {
+    alert(
+      e.response?.data?.message ||
+      "Payment failed"
+    )
+  } finally {
+    loading.value = false
+  }
+}
+
+const format = (v) =>
+  Number(v || 0).toLocaleString("id-ID")
+</script>
+
+<style scoped>
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 200;
+}
+
+.modal {
+  width: 360px;
+  background: #0f0f0f;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.total {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 700;
+  margin: 16px 0;
+}
+
+.methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.methods button {
+  padding: 14px;
+  border-radius: 12px;
+  background: #222;
+  color: #aaa;
+  font-weight: 600;
+}
+
+.methods button.active {
+  background: #c9a24d;
+  color: #000;
+}
+
+.cash {
+  margin-top: 16px;
+}
+
+.cash input {
+  width: 100%;
+  padding: 12px;
+  background: #000;
+  border: 1px solid #222;
+  color: #fff;
+  border-radius: 10px;
+}
+
+.change {
+  margin-top: 8px;
+  color: #2ecc71;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.actions button {
+  flex: 1;
+}
+</style>

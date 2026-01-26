@@ -1,0 +1,44 @@
+<template>
+  <PosLayout>
+    <div class="pos-body">
+      <!-- LEFT SIDE -->
+      <div class="left">
+        <!-- TIMER GRID -->
+        <PosTimerGrid />
+
+        <!-- SERVICE LIST -->
+        <PosServiceList />
+      </div>
+
+      <!-- RIGHT SIDE -->
+      <div class="right">
+        <PosCart />
+      </div>
+    </div>
+  </PosLayout>
+</template>
+
+<script setup>
+import PosLayout from "@/views/pos/PosLayout.vue"
+import PosServiceList from "@/views/pos/PosServiceList.vue"
+import PosCart from "@/views/pos/PosCart.vue"
+import PosTimerGrid from "@/views/pos/PosTimerGrid.vue"
+</script>
+
+<style scoped>
+.pos-body {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  height: 100%;
+}
+
+.left {
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.right {
+  border-left: 1px solid #222;
+  background: #0b0b0b;
+}
+</style>

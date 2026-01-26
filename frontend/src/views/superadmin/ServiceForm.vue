@@ -6,15 +6,6 @@
         <h3>{{ edit ? "Edit Service" : "Add New Service" }}</h3>
         <button class="close" @click="closeForm">X</button>
       </div>
-<!-- SUCCESS POPUP -->
-<div v-if="showSuccess" class="success-popup">
-  <h3>Success</h3>
-  <p>Service has been saved successfully</p>
-
-  <button class="btn-primary" @click="confirmSuccess">
-    OK
-  </button>
-</div>
 
       <!-- BODY -->
       <form class="modal-body" @submit.prevent="save">
@@ -53,12 +44,12 @@
         <div class="row">
           <div class="form-group">
             <label>Duration (minutes)</label>
-            <input type="number" v-model="form.duration_minutes" />
+            <input type="number" v-model.number="form.duration_minutes" />
           </div>
 
           <div class="form-group">
             <label>Base Price</label>
-            <input type="number" v-model="form.base_price" />
+            <input type="number" v-model.number="form.base_price" />
           </div>
         </div>
 
@@ -74,10 +65,10 @@
       </form>
     </div>
 
-    <!-- SUCCESS POPUP -->
-    <div v-if="success" class="success-popup">
-      <div class="success-box">
-        <h4>Success</h4>
+    <!-- SUCCESS POPUP (satu popup, overlay fixed supaya selalu centered) -->
+    <div v-if="success" class="success-overlay" @click.self="confirmSuccess">
+      <div class="success-box" role="dialog" aria-modal="true" aria-labelledby="successTitle">
+        <h4 id="successTitle">Success</h4>
         <p>Service berhasil disimpan</p>
         <button class="btn-primary" @click="confirmSuccess">OK</button>
       </div>
@@ -106,13 +97,19 @@ const form = ref({
 const branches = ref([])
 const loading = ref(false)
 const success = ref(false)
+
 /* INIT */
 onMounted(async () => {
-  const res = await api.get("/branches")
-  branches.value = res.data.data || res.data
+  try {
+    const res = await api.get("/branches")
+    branches.value = res.data.data || res.data
+  } catch (err) {
+    // fallback atau notify user
+    branches.value = []
+  }
 
   if (!props.edit) {
-    form.value.branch_id = 1 // default Pondok Indah
+    form.value.branch_id = 1 // default Pondok Indah (pastikan id 1 valid)
   }
 
   if (props.edit && props.data) {
@@ -140,8 +137,7 @@ const save = async () => {
     }
 
     success.value = true
-   /* emit("saved") */
-    } catch (e) {
+  } catch (e) {
     alert("Failed to save service")
   } finally {
     loading.value = false
@@ -156,7 +152,7 @@ const confirmSuccess = () => {
 </script>
 
 <style scoped>
-/* overlay & modal tetap */
+/* overlay & modal */
 .overlay {
   position: fixed;
   inset: 0;
@@ -172,56 +168,27 @@ const confirmSuccess = () => {
   background: var(--bg-card);
   border-radius: var(--radius);
   box-shadow: var(--shadow-strong);
+  z-index: 150;
 }
 
-/* SUCCESS POPUP */
-.success-popup {
+/* SUCCESS POPUP (overlay di atas modal, selalu centered) */
+.success-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,.6);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: 300;
 }
 
 .success-box {
-  background: #111;
-  border-radius: 14px;
-  padding: 24px;
-  text-align: center;
-  box-shadow: 0 20px 60px rgba(0,0,0,.6);
-}
-
-.success-popup {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-}
-
-.success-popup > div,
-.success-popup {
   background: linear-gradient(145deg, #0e0e0e, #151515);
   padding: 24px;
   border-radius: 16px;
   text-align: center;
-  width: 300px;
+  width: 320px;
   box-shadow: 0 20px 60px rgba(0,0,0,.6);
-}
-
-.success-popup h3 {
-  margin-bottom: 8px;
-  color: #2ecc71;
-}
-
-.success-popup p {
-  color: #aaa;
-  font-size: 13px;
-  margin-bottom: 16px;
 }
 
 .success-box h4 {
@@ -229,4 +196,63 @@ const confirmSuccess = () => {
   margin-bottom: 8px;
 }
 
+.success-box p {
+  color: #aaa;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.modal-body {
+  padding: 16px;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+input, select {
+  background: #000;
+  border: 1px solid var(--border-soft);
+  color: white;
+  padding: 8px;
+  border-radius: var(--radius);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.btn-primary {
+  background: var(--gold);
+  color: black;
+}
+.btn-outline {
+  background: none;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+}
+/* Tombol dan layout lainnya tetap */
 </style>

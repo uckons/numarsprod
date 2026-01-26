@@ -1,85 +1,104 @@
-const { addMinutes } = require("date-fns")
+exports.startTimer = async (db, order_id, therapist_id, room_id) => {
+  const dur = await db.query(`
+    SELECT COALESCE(SUM(duration_minutes), 60) AS duration
+    FROM order_items
+    WHERE order_id = $1
+  `, [order_id])
 
-exports.startTimers = async (db, orderId, therapistIds, durationMinutes) => {
-  // Pastikan order PAID
-  const orderRes = await db.query(
-    `SELECT status FROM orders WHERE id=$1`,
-    [orderId]
-  )
+  const duration = dur.rows[0].duration
 
-  if (!orderRes.rows.length || orderRes.rows[0].status !== "PAID") {
-    throw new Error("Order harus PAID untuk start timer")
-  }
+  const { rows } = await db.query(`
+    INSERT INTO timers
+    (therapist_id, room_id, start_time, end_time)
+    VALUES
+    ($1, $2, $3, NOW(), NOW() + INTERVAL '1 minute' * $4)
+    RETURNING *
+  `, [order_id, therapist_id, room_id, duration])
 
-  const start = new Date()
-  const duration = durationMinutes || 60
-  const end = addMinutes(start, duration)
-
-  const timers = []
-
-  for (const therapistId of therapistIds) {
-    const { rows } = await db.query(
-      `INSERT INTO timers
-       (order_id, therapist_id, start_time, end_time, paused)
-       VALUES ($1,$2,$3,$4,false)
-       RETURNING *`,
-      [orderId, therapistId, start, end]
-    )
-    timers.push(rows[0])
-  }
-
-  return timers
-}
-
-exports.pauseTimer = async (db, timerId) => {
-  const { rows } = await db.query(
-    `UPDATE timers SET paused=true
-     WHERE id=$1 RETURNING *`,
-    [timerId]
-  )
   return rows[0]
 }
 
-exports.resumeTimer = async (db, timerId) => {
-  const { rows } = await db.query(
-    `UPDATE timers SET paused=false
-     WHERE id=$1 RETURNING *`,
-    [timerId]
-  )
-  return rows[0]
-}
+//exports.getActiveTimers = async (db, branch_id) => {
+//  const { rows } = await db.query(`
+//    SELECT
+//      t.id,
+//      t.start_time,
+//      t.planned_end_time,
+//      th.name AS therapist,
+//      r.name AS room,
+//      s.name AS service
+      //EXTRACT(EPOCH FROM (t.planned_end_time - NOW())) AS remaining_seconds
+//    FROM timers t
+//    LEFT JOIN therapists th ON th.id = t.therapist_id
+//    LEFT JOIN rooms r ON r.id = t.room_id
+//    WHERE t.branch_id = $1
+//      AND t.planned_end_time > NOW()
+//    ORDER BY t.start_time ASC
+//  `, [branch_id])
 
-exports.extendTimer = async (db, timerId, minutes) => {
-  const { rows } = await db.query(
-    `UPDATE timers
-     SET end_time = end_time + interval '${minutes} minutes'
-     WHERE id=$1 RETURNING *`,
-    [timerId]
-  )
-  return rows[0]
-}
+//  return rows
+//}
 
-exports.getActiveTimers = async (db, user) => {
-  // Owner / Supervisor lihat semua per cabang
-  if (["Owner", "Supervisor"].includes(user.role)) {
-    const { rows } = await db.query(
-      `SELECT t.*, th.name AS therapist_name
-       FROM timers t
-       JOIN therapists th ON th.id=t.therapist_id
-       JOIN orders o ON o.id=t.order_id
-       WHERE o.branch_id=$1 AND t.end_time > NOW()`,
-      [user.branch_id]
-    )
-    return rows
-  }
+//exports.getActiveTimers = async (db, branch_id) => {
+//  const { rows } = await db.query(`
+//    SELECT
+//      t.id,
+//      t.start_time,
+//     t.planned_end_time,
+//      t.paused,
+//      u.name AS therapist,
+//      r.name AS room,
+//      s.name AS service
+//    FROM timers t
+//    JOIN therapists u ON u.id = t.therapist_id
+//    JOIN services s ON s.id = t.service_id
+ //   LEFT JOIN rooms r ON r.id = t.room_id
+//    WHERE t.end_time IS NULL
+//      AND t.branch_id = $1
+//    ORDER BY t.start_time ASC
+//  `, [branch_id])
 
-  // Terapis hanya lihat dirinya
+//  return rows
+//}
+exports.getActiveTimers = async (db, branchId) => {
   const { rows } = await db.query(
-    `SELECT t.*, th.name AS therapist_name
-     FROM timers t
-     JOIN therapists th ON th.id=t.therapist_id
-     WHERE t.therapist_id=$1 AND t.end_time > NOW()`,
-    [user.id]
+    `
+    SELECT
+      t.id,
+      t.order_id,
+      t.service_id,
+      s.name AS service_name,
+      t.start_time,
+      t.planned_end_time
+    FROM timers t
+    JOIN services s ON s.id = t.service_id
+    WHERE
+ -- t.status = 'RUNNING'
+        t.end_time IS NULL 
+     AND t.branch_id = $1
+    ORDER BY t.start_time ASC
+    `,
+    [branchId]
   )
+
   return rows
+}
+
+
+exports.stopTimer = async (db, id) => {
+  const { rows } = await db.query(
+    `
+    UPDATE timers
+    SET status = 'FINISHED', end_time = NOW()
+    WHERE id = $1
+    RETURNING *
+    `,
+    [id]
+  )
+
+  if (!rows.length) {
+    throw new Error("Timer not found")
+  }
+
+  return rows[0]
 }

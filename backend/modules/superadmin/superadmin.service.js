@@ -49,14 +49,51 @@ exports.createBranch = async ({ name }) => {
   return db.query("INSERT INTO branches(name) VALUES($1)", [name])
 }
 
+//exports.orders = async () => {
+//  return (await db.query(`
+//    SELECT id, total, category, created_at
+//    FROM orders
+//    ORDER BY created_at DESC
+//    LIMIT 50
+//  `)).rows
+//}
+//exports.orders = async (db) => {
+//  const rows = await db.query(`
+//    SELECT
+//      COUNT(DISTINCT o.id) AS total_orders,
+
+//      COUNT(DISTINCT o.id) FILTER (WHERE s.type = 'SPA') AS spa,
+//      COUNT(DISTINCT o.id) FILTER (WHERE s.type = 'LC') AS lc,
+//      COUNT(DISTINCT o.id) FILTER (WHERE s.type = 'FNB') AS fnb,
+//      COUNT(DISTINCT o.id) FILTER (WHERE s.type = 'KARAOKE') AS karaoke
+
+//    FROM orders o
+//    LEFT JOIN order_items oi ON oi.order_id = o.id
+//    LEFT JOIN services s ON s.id = oi.service_id
+//    WHERE DATE(o.created_at) = CURRENT_DATE
+//  `)
+//
+//  return rows.rows[0]
+//}
 exports.orders = async () => {
-  return (await db.query(`
-    SELECT id, total, category, created_at
-    FROM orders
-    ORDER BY created_at DESC
-    LIMIT 50
-  `)).rows
+  const { rows } = await db.query(`
+    SELECT
+      o.id,
+      COALESCE(SUM(oi.price), 0) AS total,
+      o.created_at,
+      STRING_AGG(s.type::text, ', ') AS category
+    FROM orders o
+    LEFT JOIN order_items oi ON oi.order_id = o.id
+    LEFT JOIN services s ON s.id = oi.service_id
+    GROUP BY o.id, o.created_at
+    ORDER BY o.created_at DESC
+    LIMIT 500
+  `)
+
+  return rows
 }
+
+
 
 exports.timers = async () => {
   return (await db.query(`

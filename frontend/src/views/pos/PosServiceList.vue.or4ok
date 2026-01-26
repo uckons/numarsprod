@@ -1,0 +1,251 @@
+<template>
+  <div class="service-page">
+    <!-- FILTER -->
+    <div class="filters">
+      <button
+        v-for="c in categories"
+        :key="c"
+        :class="{ active: activeCategory === c }"
+        @click="activeCategory = c"
+      >
+        {{ c }}
+      </button>
+    </div>
+
+    <!-- GRID -->
+    <div class="service-grid">
+      <div
+        v-for="s in filteredServices"
+        :key="s.id"
+        class="service-card"
+        @click="select(s)"
+      >
+        <h4 class="service-name">{{ s.name }}</h4>
+
+        <div class="meta">
+          <span class="badge">{{ s.type }}</span>
+          <span v-if="s.duration_minutes" class="duration">
+             ⏱ {{ s.duration_minutes }} min
+          </span>
+        </div>
+
+        <div class="price">
+          Rp {{ format(s.base_price) }}
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted } from "vue"
+import api from "@/services/api"
+import { usePosStore } from "@/store/pos.store"
+const pos = usePosStore()
+//const emit = defineEmits(["select"])
+
+const services = ref([])
+const activeCategory = ref("ALL")
+
+const categories = [
+  "ALL",
+  "SPA",
+  "LC",
+  "FNB",
+  "KARAOKE"
+]
+
+onMounted(async () => {
+  const res = await api.get("/services", {
+    params: { is_active: true }
+  })
+  services.value = res.data.data || res.data
+})
+
+const addToCart = (service) => {
+  console.log("CLICK SERVICE =>", service) // ?? DEBUG
+  pos.add({
+    id: service.id,
+    name: service.name,
+    price: Number(service.base_price),
+    qty: 1
+  })
+}
+
+const clickService = (s) => {
+  console.log("CLICK SERVICE =>", s)
+  pos.addService(s)
+  console.log("ITEMS NOW =>", pos.items)
+}
+const filteredServices = computed(() => {
+  if (activeCategory.value === "ALL") {
+    return services.value
+  }
+  return services.value.filter(
+    s => s.type === activeCategory.value
+  )
+})
+
+//const select = (service) => {
+//  emit("select", service)
+// }
+//const select = (service) => {
+//  pos.add(service)
+//}
+//const addToCart = (service) => {
+//  console.log("CLICK SERVICE:", service)
+//  pos.add(service)
+//}
+//const selectService = (s) => {
+//  console.log("CLICK SERVICE =>", s)
+//  pos.addService(s)
+//}
+const select = async (service) => {
+  console.log("CLICK SERVICE =>", service)
+
+//  if (!pos.orderId) {
+//    await pos.createOrder()
+//  }
+
+  pos.addService(service)
+}
+const format = (v) =>
+  Number(v || 0).toLocaleString("id-ID")
+</script>
+
+<style scoped>
+.service-page {
+  padding: 12px;
+  height: 100%;
+}
+
+/* ======================
+   FILTER / CATEGORY
+====================== */
+.filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.filters button {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid #222;
+  background: #111;
+  color: #aaa;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filters button.active {
+  background: #c9a24d;
+  color: #000;
+  border-color: #c9a24d;
+}
+
+/* ======================
+   GRID
+====================== */
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+/* ======================
+   CARD
+====================== */
+.service-card {
+  background: #0e0e0e;
+  border: 1px solid #222;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+
+.service-card:hover {
+  border-color: #c9a24d;
+  transform: translateY(-2px);
+}
+
+/* ======================
+   TITLE
+====================== */
+.service-card h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: .2px;
+}
+
+/* ======================
+   META
+====================== */
+.meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #888;
+}
+
+.badge {
+  background: rgba(201,162,77,.18);
+  color: #c9a24d;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ======================
+   PRICE
+====================== */
+.price {
+  margin-top: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #2ecc71;
+  letter-spacing: .3px;
+}
+
+/* ======================
+   EMPTY STATE
+====================== */
+.empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  font-size: 14px;
+  color: #666;
+}
+
+/* ======================
+   MOBILE TWEAK
+====================== */
+@media (max-width: 600px) {
+  .service-card {
+    padding: 12px;
+  }
+
+  .service-card h4 {
+    font-size: 14px;
+  }
+
+  .price {
+    font-size: 15px;
+  }
+}
+
+</style>
+

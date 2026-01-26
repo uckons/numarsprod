@@ -6,7 +6,6 @@ import "./theme/black-gold.css"
 import "./assets/theme.css"
 
 const app = createApp(App)
-createApp(App)
-  .use(createPinia())
-  .use(router)
-  .mount("#app")
+app.use(createPinia())
+app.use(router)
+app.mount("#app")

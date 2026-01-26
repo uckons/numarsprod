@@ -1,0 +1,218 @@
+<template>
+  <div class="page">
+    <!-- HEADER -->
+    <div class="header">
+      <div>
+        <h2>Orders</h2>
+        <p class="subtitle">Summary & latest transactions</p>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats">
+      <div class="stat-card">
+        <p>Total Orders Today</p>
+        <h3>{{ stats.total }}</h3>
+      </div>
+
+      <div class="stat-card spa">
+        <p>SPA</p>
+        <h3>{{ stats.spa }}</h3>
+      </div>
+
+      <div class="stat-card lc">
+        <p>LC</p>
+        <h3>{{ stats.lc }}</h3>
+      </div>
+
+      <div class="stat-card fnb">
+        <p>FNB</p>
+        <h3>{{ stats.fnb }}</h3>
+      </div>
+
+      <div class="stat-card karaoke">
+        <p>Karaoke</p>
+        <h3>{{ stats.karaoke }}</h3>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card table-card">
+      <h3 class="table-title">Latest Orders</h3>
+
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Category</th>
+            <th>Total</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr v-if="!orders.length">
+            <td colspan="4" class="empty">No orders found</td>
+          </tr>
+
+          <tr
+            v-for="o in orders"
+            :key="o.id"
+            class="row-hover"
+          >
+            <td>#{{ o.id }}</td>
+            <td>
+              <span class="badge">{{ o.category }}</span>
+            </td>
+            <td class="price">Rp {{ format(o.total) }}</td>
+            <td>{{ new Date(o.created_at).toLocaleString() }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import api from "@/services/api"
+
+const orders = ref([])
+
+const stats = ref({
+  total: 0,
+  spa: 0,
+  lc: 0,
+  fnb: 0,
+  karaoke: 0
+})
+
+onMounted(async () => {
+  const res = await api.get("/superadmin/orders")
+  orders.value = res.data || []
+
+  // HITUNG STATS HARI INI
+  const today = new Date().toDateString()
+
+  orders.value.forEach(o => {
+    if (new Date(o.created_at).toDateString() === today) {
+      stats.value.total++
+      const key = o.category?.toLowerCase()
+      if (stats.value[key] !== undefined) {
+        stats.value[key]++
+      }
+    }
+  })
+})
+
+const format = (v) =>
+  Number(v || 0).toLocaleString("id-ID")
+</script>
+
+<style scoped>
+/* PAGE */
+.page {
+  padding: 24px;
+}
+
+/* HEADER */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* STATS */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.stat-card {
+  background: linear-gradient(145deg, #0e0e0e, #151515);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  transition: all .25s ease;
+}
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+
+.stat-card p {
+  font-size: 13px;
+  color: #999;
+}
+.stat-card h3 {
+  margin-top: 8px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.stat-card.spa h3 { color: #c9a24d }
+.stat-card.lc h3 { color: #3498db }
+.stat-card.fnb h3 { color: #2ecc71 }
+.stat-card.karaoke h3 { color: #e67e22 }
+
+/* CARD */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 20px;
+  box-shadow: var(--shadow-soft);
+}
+
+.table-title {
+  margin-bottom: 12px;
+}
+
+/* TABLE */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  padding: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+td {
+  padding: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.row-hover:hover {
+  background: rgba(201,162,77,.05);
+}
+
+.price {
+  font-weight: 600;
+}
+
+/* BADGE */
+.badge {
+  background: rgba(201,162,77,.2);
+  color: var(--gold);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+/* EMPTY */
+.empty {
+  text-align: center;
+  padding: 30px;
+  color: var(--text-muted);
+}
+</style>

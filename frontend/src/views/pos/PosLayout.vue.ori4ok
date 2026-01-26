@@ -1,0 +1,60 @@
+<template>
+  <div class="pos-overlay">
+    <div class="pos-container">
+      <button class="close" @click="$emit('close')">✕</button>
+      <slot />
+    </div>
+  </div>
+</template>
+
+<script setup>
+defineEmits(["close"])
+</script>
+
+<style scoped>
+.pos-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.85);
+  z-index: 999;
+  display: flex;
+}
+
+.pos-container {
+  flex: 1;
+  background: #0b0b0b;
+  color: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.close {
+  position: absolute;
+  top: 14px;
+  right: 20px;
+  background: #c0392b;
+  border: none;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.pos-layout {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.pos-main {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* MOBILE SAFE */
+@media (max-width: 600px) {
+  .pos-header h2 {
+    font-size: 16px;
+  }
+}
+
+</style>

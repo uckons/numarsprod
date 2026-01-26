@@ -1,0 +1,151 @@
+<template>
+  <div class="timer-grid">
+    <div
+      v-for="t in timers"
+      :key="t.id"
+      class="timer-card"
+      :class="statusClass(t.remaining)"
+    >
+      <div class="header">
+        <span class="room">{{ t.room_name }}</span>
+        <span class="time">{{ formatTime(t.remaining) }}</span>
+      </div>
+
+      <h3 class="therapist">{{ t.therapist_name }}</h3>
+      <p class="service">{{ t.service_name }}</p>
+
+      <div class="footer">
+        <span class="status">{{ statusText(t.remaining) }}</span>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, onUnmounted } from "vue"
+import api from "@/services/api"
+
+const timers = ref([])
+let interval = null
+
+/* =========================
+   LOAD TIMER DATA
+========================= */
+const loadTimers = async () => {
+  const res = await api.get("/pos/timers")
+  timers.value = (res.data || []).slice(0, 12)
+}
+
+/* =========================
+   COUNTDOWN
+========================= */
+const tick = () => {
+  timers.value.forEach(t => {
+    if (t.remaining > 0) {
+      t.remaining--
+    }
+  })
+}
+
+/* =========================
+   LIFECYCLE
+========================= */
+onMounted(async () => {
+  await loadTimers()
+  interval = setInterval(tick, 1000)
+})
+
+onUnmounted(() => {
+  clearInterval(interval)
+})
+
+/* =========================
+   HELPERS
+========================= */
+const formatTime = (sec) => {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return `${m}:${s.toString().padStart(2, "0")}`
+}
+
+const statusClass = (sec) => {
+  if (sec <= 600) return "danger"     // 10 menit
+  if (sec <= 1800) return "warning"   // 30 menit
+  return "success"                    // > 60 menit
+}
+
+const statusText = (sec) => {
+  if (sec <= 600) return "Almost Done"
+  if (sec <= 1800) return "Running"
+  return "In Progress"
+}
+</script>
+
+<style scoped>
+.timer-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 20px;
+}
+
+/* CARD */
+.timer-card {
+  background: linear-gradient(145deg, #0e0e0e, #151515);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  transition: all .25s ease;
+}
+
+.timer-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+
+/* HEADER */
+.header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #aaa;
+}
+
+.time {
+  font-weight: 600;
+}
+
+/* BODY */
+.therapist {
+  margin-top: 10px;
+  font-size: 18px;
+}
+
+.service {
+  font-size: 13px;
+  color: #999;
+}
+
+/* FOOTER */
+.footer {
+  margin-top: 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+/* STATUS COLOR */
+.success {
+  border-left: 4px solid #2ecc71;
+}
+.warning {
+  border-left: 4px solid #f1c40f;
+}
+.danger {
+  border-left: 4px solid #e74c3c;
+}
+
+.success .time { color: #2ecc71 }
+.warning .time { color: #f1c40f }
+.danger .time { color: #e74c3c }
+</style>

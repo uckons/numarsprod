@@ -1,0 +1,56 @@
+import { ref, onMounted, onUnmounted } from "vue"
+import api from "@/services/api"
+
+export function useIdleLock() {
+  const locked = ref(false)
+  let idleTimeout = 15 * 60 * 1000
+  let timer = null
+
+  const resetTimer = () => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => {
+      locked.value = true
+    }, idleTimeout)
+  }
+
+  const attachListeners = () => {
+    window.addEventListener("mousemove", resetTimer)
+    window.addEventListener("keydown", resetTimer)
+    window.addEventListener("click", resetTimer)
+  }
+
+  onMounted(() => {
+    // pasang listener segera supaya activity terdeteksi
+    attachListeners()
+    resetTimer()
+
+    // load setting asinkron, tapi jangan blokir listener
+    ;(async () => {
+      try {
+        const res = await api.get("/settings/security")
+        if (res?.data?.idle_timeout_minutes) {
+          idleTimeout = res.data.idle_timeout_minutes * 60 * 1000
+          resetTimer()
+        }
+      } catch (err) {
+        // fallback ke default jika request gagal
+        // console.warn("Failed to load idle timeout setting", err)
+      }
+    })()
+  })
+
+  onUnmounted(() => {
+    window.removeEventListener("mousemove", resetTimer)
+    window.removeEventListener("keydown", resetTimer)
+    window.removeEventListener("click", resetTimer)
+    if (timer) clearTimeout(timer)
+  })
+
+  return {
+    locked,
+    unlock: () => {
+      locked.value = false
+      resetTimer()
+    },
+  }
+}

@@ -1,0 +1,305 @@
+<template>
+<div 
+  class="timer-card"
+  :class="[colorClass, { empty: isEmpty, warning: isWarning }]"
+>
+  <!-- EMPTY SLOT -->
+  <template v-if="isEmpty">
+    <div class="empty-slot">
+      <h3>Slot {{ timer.slot }}</h3>
+      <p>Kosong</p>
+
+      <button
+        class="btn start"
+        @click="$emit('start', timer.slot)"
+      >
+        + Start
+      </button>
+    </div>
+  </template>
+
+  <!-- ACTIVE TIMER (KODE LAMA KAMU) -->
+  <template v-else>
+    <!-- HEADER -->
+    <div class="header">
+      <div>
+        <h3 class="name">{{ therapistName }}</h3>
+        <p class="order">Order #{{ orderId }}</p>
+      </div>
+      <span class="status">{{ statusText }}</span>
+    </div>
+
+    <!-- TIME -->
+    <div class="time">
+      ⏱ {{ formattedTime }}
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="actions">
+      <button
+  v-if="!timer.active"
+  class="btn start"
+  @click="$emit('start', timer.slot)"
+>
+  + Start
+</button>
+
+      <button
+        v-if="!paused"
+        class="btn pause"
+        @click="$emit('pause', timerId)"
+      >
+        Pause
+      </button>
+
+      <button
+        v-else
+        class="btn resume"
+        @click="$emit('resume', timerId)"
+      >
+        Resume
+      </button>
+
+      <button
+        class="btn extend"
+        @click="$emit('extend', timerId, 10)"
+      >
+        +10 Menit
+      </button>
+    </div>
+
+  </template>
+</div>
+</template>
+
+<script setup>
+import { computed } from "vue"
+
+
+const props = defineProps({
+  timer: {
+    type: Object,
+    required: true
+  }
+})
+const isEmpty = computed(() => !props.timer.active)
+
+const remainingMs = computed(() => {
+  return new Date(props.timer.planned_end_time).getTime() - Date.now()
+})
+
+const formattedTime = computed(() => {
+  const ms = Math.max(0, remainingMs.value)
+  const totalSec = Math.floor(ms / 1000)
+  const m = Math.floor(totalSec / 60)
+  const s = totalSec % 60
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+})
+
+const percent = computed(() => {
+  const total =
+    new Date(props.timer.planned_end_time) -
+    new Date(props.timer.start_time)
+  return total > 0 ? remainingMs.value / total : 0
+})
+
+const colorClass = computed(() => {
+  if (props.timer.paused) return "paused"
+  if (percent.value > 0.5) return "green"
+  if (percent.value > 0.2) return "yellow"
+  return "red"
+})
+
+const statusText = computed(() => {
+  if (props.timer.paused) return "PAUSED"
+  if (remainingMs.value <= 0) return "FINISHED"
+  return "RUNNING"
+})
+
+const therapistName = computed(() =>
+  props.timer.therapist_name || "Terapis"
+)
+
+const orderId = computed(() => props.timer.order_id)
+const isWarning = computed(() =>
+  remainingMs.value <= 10 * 60 * 1000 &&
+  remainingMs.value > 0
+)
+
+
+
+</script>
+
+
+<style scoped>
+.timer-card {
+  min-height: 180px;
+  background: #0e0e0e;
+  border: 2px solid #222;
+  border-radius: 16px;
+  padding: 16px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  transition: border .2s ease, transform .15s ease;
+}
+
+.timer-card:hover {
+  transform: translateY(-2px);
+}
+
+/* ======================
+   HEADER
+====================== */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+
+.order {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #888;
+}
+
+.status {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  color: #c9a24d;
+}
+
+/* ======================
+   TIME
+====================== */
+.time {
+  text-align: center;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #fff;
+}
+
+/* ======================
+   ACTIONS
+====================== */
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+/* ACTION COLORS */
+.pause {
+  background: #e67e22;
+  color: #fff;
+}
+
+.resume {
+  background: #27ae60;
+  color: #fff;
+}
+
+.extend {
+  background: #c9a24d;
+  color: #000;
+}
+
+/* ======================
+   COLOR STATES
+====================== */
+.green {
+  border-color: #2ecc71;
+}
+
+.yellow {
+  border-color: #f1c40f;
+}
+
+.red {
+  border-color: #e74c3c;
+}
+
+.paused {
+  border-color: #7f8c8d;
+  opacity: .7;
+}
+
+/* ======================
+   MOBILE
+====================== */
+@media (max-width: 480px) {
+  .time {
+    font-size: 30px;
+  }
+
+  .name {
+    font-size: 15px;
+  }
+}
+/* ======================
+   EMPTY SLOT
+====================== */
+.empty {
+  border-style: dashed;
+  border-color: #333;
+  opacity: 0.65;
+}
+
+.empty-slot {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+}
+
+.empty-slot h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #aaa;
+}
+
+.empty-slot p {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.start {
+  width: 80%;
+  padding: 10px 0;
+  font-size: 13px;
+}
+.warning {
+  box-shadow: 0 0 18px rgba(241,196,15,.6);
+  animation: pulse 1.2s infinite;
+}
+
+
+</style>

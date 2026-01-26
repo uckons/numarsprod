@@ -1,10 +1,8 @@
-const router = require("express").Router()
-const c = require("./dashboard.controller")
+const express = require("express")
+const router = express.Router()
 const auth = require("../../middlewares/auth.middleware")
-const rbac = require("../../middlewares/rbac.middleware")
+const controller = require("./dashboard.controller")
 
-// OWNER DASHBOARD
-router.get("/owner/summary", auth, rbac(["Owner"]), c.ownerSummary)
-router.get("/owner/daily", auth, rbac(["Owner"]), c.ownerDaily)
+router.get("/kasir", auth, controller.kasir)
 
 module.exports = router

@@ -1,0 +1,128 @@
+<template>
+  <div class="pos-page">
+    <header class="top">
+      <h2>POS Kasir</h2>
+      <button @click="$router.back()">? Kembali</button>
+    </header>
+
+    <div class="content">
+      <div class="left">
+        <h3>Daftar Service</h3>
+
+        <div class="services">
+          <button
+            v-for="s in services"
+            :key="s.id"
+            @click="add(s)"
+          >
+            {{ s.name }}<br>
+            Rp {{ format(s.base_price) }}
+          </button>
+        </div>
+      </div>
+
+      <div class="right">
+        <h3>Order</h3>
+
+        <div v-if="cart.length === 0">Belum ada item</div>
+
+        <div v-for="i in cart" :key="i.id">
+          {{ i.name }} x {{ i.qty }}
+        </div>
+
+        <hr>
+
+        <strong>Total: Rp {{ format(total) }}</strong>
+
+        <button class="pay" @click="checkout">
+          Bayar
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed } from "vue"
+import api from "@/services/api"
+
+const services = ref([])
+const cart = ref([])
+
+onMounted(async () => {
+  const res = await api.get("/services")
+  services.value = res.data.data || res.data
+})
+
+const add = (s) => {
+  const item = cart.value.find(i => i.id === s.id)
+  if (item) item.qty++
+  else cart.value.push({ ...s, qty: 1 })
+}
+
+const total = computed(() =>
+  cart.value.reduce((t, i) => t + i.base_price * i.qty, 0)
+)
+
+const checkout = async () => {
+  await api.post("/orders/pos", {
+    items: cart.value,
+    payment_method: "CASH",
+    total: total.value
+  })
+
+  alert("Order berhasil")
+  cart.value = []
+}
+
+const format = v =>
+  new Intl.NumberFormat("id-ID").format(v || 0)
+</script>
+
+<style scoped>
+.pos-page {
+  height: 100vh;
+  background: #0e0e0e;
+  color: white;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  border-bottom: 1px solid #333;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  height: calc(100vh - 56px);
+}
+
+.left, .right {
+  padding: 16px;
+}
+
+.services {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px,1fr));
+  gap: 10px;
+}
+
+.services button {
+  background: #111;
+  border: 1px solid #c9a24d;
+  color: white;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.pay {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  background: #c9a24d;
+  color: black;
+  font-weight: bold;
+}
+</style>

@@ -1,35 +1,48 @@
-//const service = require("./printer.service")
+const printerService = require("./printer.service")
 
-//exports.printOrder = async (req, res) => {
-//  const { order_id, printer } = req.body
-//
-//  try {
- //   await service.printReceipt({ order_id, printer })
- //   res.json({ message: "Print success" })
- // } catch (err) {
- //   console.error(err)
- //   res.status(500).json({ message: "Print failed" })
- // }
-//}
-const service = require("./printer.service")
-
-exports.reprint = async (req, res) => {
+exports.printOrder = async (req, res) => {
   try {
-    const { order_id } = req.params
+    const db = req.app.get("db")
+    const { order_id } = req.body
 
-    await service.printOrder(order_id, {
-      reprint: true,
-      user: req.user
-    })
+    if (!order_id) {
+      return res.status(400).json({ message: "order_id required" })
+    }
 
-    res.json({
-      success: true,
-      message: "Struk berhasil dicetak ulang"
-    })
+    // 🔹 ambil order
+    const orderRes = await db.query(
+      `
+      SELECT id, total
+      FROM orders
+      WHERE id = $1
+      `,
+      [order_id]
+    )
+
+    if (!orderRes.rows.length) {
+      return res.status(404).json({ message: "Order not found" })
+    }
+
+    const order = orderRes.rows[0]
+
+    // 🔹 ambil items
+    const itemsRes = await db.query(
+      `
+      SELECT service_name, qty, subtotal
+      FROM order_items
+      WHERE order_id = $1
+      `,
+      [order_id]
+    )
+
+    order.items = itemsRes.rows
+
+    // 🔹 PRINT
+    await printerService.printOrder(order)
+
+    res.json({ success: true })
   } catch (err) {
-    console.error(err)
-    res.status(500).json({
-      message: "Gagal reprint struk"
-    })
+    console.error("PRINT ERROR:", err)
+    res.status(500).json({ message: err.message })
   }
 }

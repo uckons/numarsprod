@@ -13,7 +13,7 @@
     </div>
 
     <!-- STATS (AMAN, TIDAK RUSAK LAYOUT) -->
-    <div class="service-stats">
+    <!--<div class="service-stats">
       <div class="stat-box">
         <div class="val">{{ total }}</div>
         <div class="lbl">Total</div>
@@ -26,7 +26,30 @@
         <div class="val">{{ disabled }}</div>
         <div class="lbl">Disabled</div>
       </div>
-    </div>
+    </div> -->
+<!-- STATS (COPY DARI USERS) -->
+<div class="stats">
+  <div class="stat-card">
+    <p>Total Service</p>
+    <h3>{{ total }}</h3>
+  </div>
+
+  <div class="stat-card active">
+    <p>Active</p>
+    <h3>{{ active }}</h3>
+  </div>
+
+  <div class="stat-card disabled">
+    <p>Disabled</p>
+    <h3>{{ disabled }}</h3>
+  </div>
+
+  <!-- <div class="stat-card new">
+    <p>New This Month</p>
+    <h3>+{{ stats.new_month }}</h3>
+  </div> -->
+</div>
+<!-- STATS (COPY DARI USERS) -->
 
     <!-- FILTER -->
     <div class="filters">
@@ -51,6 +74,16 @@
         Search
       </button>
     </div>
+    <!-- BULK BAR COPY DARI USERS-->
+    <transition name="fade">
+      <div v-if="selectedIds.length" class="bulk-bar">
+        <span>{{ selectedIds.length }} selected</span>
+        <div>
+          <button class="warn" @click="bulkToggle">Toggle Active</button>
+          <button class="danger" @click="bulkDelete">Delete</button>
+        </div>
+      </div>
+    </transition>
 
     <!-- TABLE -->
     <div class="card table-card">
@@ -310,7 +343,7 @@ const format = (v) =>
 }
 
 /* TABLE */
-table {
+/* table {
   width: 100%;
   border-collapse: collapse;
 }
@@ -326,7 +359,28 @@ td {
 }
 .row-hover:hover {
   background: rgba(201,162,77,.05) !important;
+} */
+/* TABLE DARI USERS */
+/* TABLE */
+table { width:100%; border-collapse:collapse }
+th {
+  color:#888;
+  font-size:12px;
+  padding:12px;
+  text-align:left;
 }
+td {
+  padding:12px;
+  border-top:1px solid #222;
+}
+.row {
+  transition:background .25s ease, transform .15s ease;
+}
+.row:hover {
+  background:rgba(255,255,255,.04);
+  transform:translateY(-1px);
+}
+
 .name { font-weight: 600 }
 .price { font-weight: 600 }
 
@@ -384,15 +438,100 @@ button:hover {
 }
 
 /* PAGINATION */
-.pagination-bar {
+/* .pagination-bar {
   display: flex;
   justify-content: space-between;
   margin-top: 14px;
+} */
+
+/* PAGINATION DARI USERS*/
+.pagination-bar {
+  display:flex;
+  justify-content:center;
+  gap:12px;
+  margin-top:16px;
 }
+
 
 .empty {
   text-align: center;
   padding: 30px;
   color: var(--text-muted);
 }
+/* TEMPLATE DARI USERS.VUE */
+/* TRANSITION */
+.fade-enter-active,
+.fade-leave-active {
+  transition:opacity .2s ease, transform .2s ease;
+}
+.fade-enter-from {
+  opacity:0;
+  transform:translateY(6px);
+}
+.fade-leave-to {
+  opacity:0;
+  transform:translateY(-6px);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.stat-card {
+  background: linear-gradient(145deg, #0e0e0e, #151515);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  transition: all .25s ease;
+  cursor: default;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+
+.stat-card p {
+  font-size: 13px;
+  color: #999;
+}
+
+.stat-card h3 {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.stat-card.active h3 {
+  color: #2ecc71;
+}
+
+.stat-card.disabled h3 {
+  color: #e74c3c;
+}
+
+.stat-card.new h3 {
+  color: #c9a24d;
+}
+/* ROW HOVER */
+tbody tr {
+  transition: 
+    background 0.25s ease,
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+tbody tr:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(201,162,77,0.08),
+    rgba(201,162,77,0.02)
+  );
+  transform: translateX(4px);
+  box-shadow: inset 4px 0 0 var(--gold);
+}
+
 </style>

@@ -1,0 +1,72 @@
+<template>
+  <div class="service-list">
+    <div
+      v-for="s in services"
+      :key="s.id"
+      class="service-card"
+      @click="addToCart(s)"
+    >
+      <div class="name">{{ s.name }}</div>
+      <div class="price">Rp {{ format(s.base_price) }}</div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import api from "@/services/api"
+import { usePosStore } from "@/store/pos.store" // ?? WAJIB PATH INI
+
+const pos = usePosStore() // ?? STORE YANG SAMA DENGAN CART
+const services = ref([])
+
+onMounted(async () => {
+  const res = await api.get("/services", {
+    params: { is_active: true }
+  })
+  services.value = res.data.data || res.data
+})
+
+const addToCart = (service) => {
+  console.log("CLICK SERVICE =>", service) // ?? DEBUG
+  pos.add({
+    id: service.id,
+    name: service.name,
+    price: service.base_price
+  })
+}
+
+const format = (v) =>
+  Number(v || 0).toLocaleString("id-ID")
+</script>
+
+<style scoped>
+.service-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.service-card {
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 10px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+
+.service-card:hover {
+  border-color: #c9a24d;
+  transform: translateY(-2px);
+}
+
+.name {
+  font-weight: 600;
+}
+
+.price {
+  margin-top: 6px;
+  color: #c9a24d;
+}
+</style>

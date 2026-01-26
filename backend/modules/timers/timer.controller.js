@@ -1,61 +1,221 @@
-const db = require("../../config/db")
+const service = require("./timer.service")
 
-exports.startTimersByOrder = async (req, res) => {
-  const { order_id, therapist_ids = [], duration = 60 } = req.body
-  const { getIO } = require("../../sockets/io")
+exports.start = async (req, res) => {
+  try {
+    const db = req.app.get("db")
 
-  // validasi order
-  const order = await db.query(
-    "SELECT id, status FROM orders WHERE id=$1",
-    [order_id]
-  )
+    const {
+      order_id,
+      service_id,
+      therapist_id,
+      room_id
+    } = req.body
 
-  if (order.rows.length === 0) {
-    return res.status(404).json({ message: "Order not found" })
-  }
+    if (!order_id || !service_id || !therapist_id || !room_id) {
+      return res.status(400).json({ message: "Incomplete data" })
+    }
 
-  if (order.rows[0].status !== "PAID") {
-    return res.status(400).json({ message: "Order not paid" })
-  }
-
-  const start = new Date()
-  const end = new Date(start.getTime() + duration * 60000)
-
-  const timers = []
-
-  for (const therapist_id of therapist_ids) {
-    const { rows } = await db.query(
-      `INSERT INTO timers (order_id, therapist_id, start_time, end_time)
-       VALUES ($1,$2,$3,$4)
-       RETURNING *`,
-      [order_id, therapist_id, start, end]
+    const timer = await service.startTimer(
+      db,
+      order_id,
+      service_id,
+      therapist_id,
+      room_id
     )
-    timers.push(rows[0])
-  }
 
+    res.json(timer)
+  } catch (err) {
+    console.error(err)
+    res.status(400).json({ message: err.message })
+  }
+}
+
+//exports.getActive = async (req, res) => {
+//  try {
+//    const db = req.app.get("db")
+//    const branch_id = req.user.branch_id
+
+//    const timers = await service.getActiveTimers(db, branch_id)
+//    res.json(timers)
+//  } catch (err) {
+//    res.status(400).json({ message: err.message })
+//  }
+//}
+//exports.getActive = async (req, res) => {
+// const db = req.app.get("db")
+//  const branchId = req.user.branch_id
+
+//  const timers = await service.getActiveTimers(db, branchId)
+//  res.json(timers)
+//}
+exports.getActive = async (req, res) => {
+  const db = req.app.get("db")
+  const timers = await service.getActiveTimers(db, req.user.branch_id)
   res.json(timers)
 }
-exports.pauseTimer = async (req, res) => {
-  const { id } = req.params
-  await db.query("UPDATE timers SET paused=true WHERE id=$1", [id])
-  res.json({ message: "Timer paused" })
+
+
+exports.startTimer = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const { order_id, therapist_id, service_id, room_id, duration_minutes } = req.body
+    const user = req.user
+
+    if (!order_id || !therapist_id || !service_id || !duration_minutes) {
+      return res.status(400).json({ message: "Data timer tidak lengkap" })
+    }
+
+    const start = new Date()
+    const plannedEnd = new Date(start.getTime() + duration_minutes * 60000)
+
+    const { rows } = await db.query(
+      `INSERT INTO timers
+       (order_id, therapist_id, service_id, room_id, start_time, planned_end_time, paused, branch_id)
+       VALUES ($1,$2,$3,$4,$5,$6,false,$7)
+       RETURNING *`,
+      [
+        order_id,
+        therapist_id,
+        service_id,
+        room_id || null,
+        start,
+        plannedEnd,
+        user.branch_id
+      ]
+    )
+
+    res.json(rows[0])
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: err.message })
+  }
 }
 
-exports.resumeTimer = async (req, res) => {
-  const { id } = req.params
-  await db.query("UPDATE timers SET paused=false WHERE id=$1", [id])
-  res.json({ message: "Timer resumed" })
+
+
+
+exports.stop = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const id = req.params.id
+
+    const timer = await service.stopTimer(db, id)
+    res.json(timer)
+  } catch (err) {
+    console.error(err)
+    res.status(400).json({ message: err.message })
+  }
 }
-exports.extendTimer = async (req, res) => {
-  const { id } = req.params
-  const { minutes } = req.body
+exports.create = async (req, res) => {
+  const db = req.app.get("db")
+  const { order_id, service_id, duration_minutes } = req.body
+  const branch_id = req.user.branch_id
+
+  const start = new Date()
+  const end = new Date(start.getTime() + duration_minutes * 60000)
 
   await db.query(
-    `UPDATE timers
-     SET end_time = end_time + INTERVAL '${minutes} minutes'
-     WHERE id=$1`,
-    [id]
+    `
+    INSERT INTO timers
+      (order_id, service_id, branch_id, start_time, planned_end_time)
+    VALUES
+      ($1,$2,$3,$4,$5)
+    `,
+    [order_id, service_id, branch_id, start, end]
   )
 
-  res.json({ message: "Timer extended" })
+  res.json({ success: true })
 }
+
+exports.startManual = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const user = req.user
+    const { order_id, service_id } = req.body
+
+    const { rows } = await db.query(
+      `SELECT duration_minutes FROM services WHERE id=$1`,
+      [service_id]
+    )
+
+    if (!rows.length || !rows[0].duration_minutes) {
+      return res.status(400).json({ message: "Service tidak punya durasi" })
+    }
+
+    await db.query(
+      `
+      INSERT INTO timers
+        (order_id, service_id, branch_id, start_time, planned_end_time)
+      VALUES
+        ($1,$2,$3, now(),
+         now() + ($4 || ' minutes')::interval)
+      `,
+      [
+        order_id,
+        service_id,
+        user.branch_id,
+        `${rows[0].duration_minutes} minutes`
+      ]
+    )
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.createFromOrder = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const { orderId } = req.params
+    const user = req.user
+
+    // ambil item order yg punya durasi
+    const itemsRes = await db.query(
+      `
+      SELECT oi.service_id, s.duration_minutes
+      FROM order_items oi
+      JOIN services s ON s.id = oi.service_id
+      WHERE oi.order_id = $1
+        AND s.duration_minutes IS NOT NULL
+      `,
+      [orderId]
+    )
+
+    if (!itemsRes.rows.length) {
+      return res.json({ success: true, created: 0 })
+    }
+
+    let created = 0
+
+    for (const i of itemsRes.rows) {
+      const start = new Date()
+      const end = new Date(start.getTime() + i.duration_minutes * 60000)
+
+      await db.query(
+        `
+        INSERT INTO timers
+          (order_id, service_id, branch_id, start_time, planned_end_time)
+        VALUES
+          ($1,$2,$3,$4,$5)
+        `,
+        [
+          orderId,
+          i.service_id,
+          user.branch_id,
+          start,
+          end
+        ]
+      )
+
+      created++
+    }
+
+    res.json({ success: true, created })
+  } catch (err) {
+    console.error("CREATE TIMER ERROR:", err)
+    res.status(500).json({ message: err.message })
+  }
+}
+

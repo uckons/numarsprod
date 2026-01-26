@@ -1,0 +1,251 @@
+<template>
+  <div class="cart">
+    <!-- HEADER -->
+    <div class="cart-header">
+      <h3>Current Order</h3>
+      <span class="count">{{ items.length }} items</span>
+    </div>
+
+    <!-- ITEMS -->
+    <div class="cart-body">
+      <div v-if="!items.length" class="empty">
+        No items selected
+      </div>
+
+      <div
+        v-for="item in items"
+        :key="item.id"
+        class="cart-item"
+      >
+        <div class="info">
+          <strong>{{ item.name }}</strong>
+          <small>{{ item.duration_minutes }} min</small>
+        </div>
+
+        <div class="qty">
+          <button @click="decrease(item)">−</button>
+          <span>{{ item.qty }}</span>
+          <button @click="increase(item)">+</button>
+        </div>
+
+        <div class="price">
+          Rp {{ format(item.base_price * item.qty) }}
+        </div>
+
+        <button class="remove" @click="remove(item)">
+          ×
+        </button>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="cart-footer">
+      <div class="summary">
+        <span>Subtotal</span>
+        <strong>Rp {{ format(subtotal) }}</strong>
+      </div>
+
+      <button
+        class="btn-checkout"
+        :disabled="!items.length"
+        @click="$emit('checkout')"
+      >
+        Checkout
+      </button>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed } from "vue"
+
+const props = defineProps({
+  items: {
+    type: Array,
+    required: true
+  }
+})
+
+const emit = defineEmits([
+  "update",
+  "remove",
+  "checkout"
+])
+
+const increase = (item) => {
+  emit("update", { ...item, qty: item.qty + 1 })
+}
+
+const decrease = (item) => {
+  if (item.qty > 1) {
+    emit("update", { ...item, qty: item.qty - 1 })
+  } else {
+    remove(item)
+  }
+}
+
+const remove = (item) => {
+  emit("remove", item)
+}
+
+const subtotal = computed(() =>
+  props.items.reduce(
+    (sum, i) => sum + i.base_price * i.qty,
+    0
+  )
+)
+
+const format = (v) =>
+  Number(v || 0).toLocaleString("id-ID")
+</script>
+
+<style scoped>
+.cart {
+  width: 340px;
+  height: 100%;
+  background: linear-gradient(145deg, #0e0e0e, #151515);
+  border-left: 1px solid #222;
+  display: flex;
+  flex-direction: column;
+}
+
+/* HEADER */
+.cart-header {
+  padding: 16px;
+  border-bottom: 1px solid #222;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cart-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.count {
+  font-size: 12px;
+  color: #888;
+}
+
+/* BODY */
+.cart-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.cart-item {
+  background: #0b0b0b;
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 10px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  position: relative;
+  transition: all .2s ease;
+}
+
+.cart-item:hover {
+  background: #111;
+}
+
+.info strong {
+  font-size: 14px;
+}
+
+.info small {
+  display: block;
+  font-size: 11px;
+  color: #777;
+}
+
+/* QTY */
+.qty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qty button {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: #222;
+  color: white;
+  cursor: pointer;
+}
+
+.qty button:hover {
+  background: #c9a24d;
+  color: black;
+}
+
+/* PRICE */
+.price {
+  grid-column: 1 / -1;
+  text-align: right;
+  font-weight: 600;
+  color: #2ecc71;
+}
+
+/* REMOVE */
+.remove {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: none;
+  background: none;
+  color: #777;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.remove:hover {
+  color: #e74c3c;
+}
+
+/* EMPTY */
+.empty {
+  text-align: center;
+  color: #666;
+  padding: 40px 10px;
+}
+
+/* FOOTER */
+.cart-footer {
+  padding: 16px;
+  border-top: 1px solid #222;
+}
+
+.summary {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  font-size: 15px;
+}
+
+.btn-checkout {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  border: none;
+  font-size: 16px;
+  font-weight: 700;
+  background: #c9a24d;
+  color: black;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+.btn-checkout:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+.btn-checkout:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+</style>

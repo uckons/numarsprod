@@ -1,0 +1,90 @@
+<template>
+  <div class="pos-layout">
+    <!-- HEADER -->
+    <header class="pos-header">
+      <h2>NUMARS POS</h2>
+
+      <div class="right">
+        <span>{{ user.name }}</span>
+        <button class="close" @click="$emit('close')">✕</button>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <main class="pos-main">
+      <slot />
+    </main>
+  </div>
+</template>
+
+<script setup>
+import { useAuthStore } from "@/store/auth.store"
+import { useRouter } from "vue-router"
+
+const auth = useAuthStore()
+const router = useRouter()
+const user = auth.user
+
+const logout = () => {
+  auth.logout()
+  router.push("/login")
+}
+</script>
+
+<style scoped>
+.pos-layout {
+  position: fixed;
+  inset: 0;
+  background: #0b0b0b;
+  display: flex;
+  flex-direction: column;
+  z-index: 999;
+}
+
+/* HEADER */
+.pos-header {
+  height: 52px;
+  padding: 0 14px;
+  background: #111;
+  border-bottom: 1px solid #222;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pos-header h2 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .4px;
+}
+
+.close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: #fff;
+}
+.pos-main {
+  flex: 1;
+  overflow: hidden;
+}
+.pos-header .right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+button {
+  background: #c0392b;
+  border: none;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+
+/* MAIN */
+.pos-main {
+  flex: 1;
+  overflow: hidden;
+}
+</style>
