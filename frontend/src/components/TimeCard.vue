@@ -27,7 +27,7 @@
 
     <!-- TIME -->
     <div class="time">
-      ? {{ displayTime }}
+      {{ displayTime }}
     </div>
 
     <!-- ACTIONS -->
@@ -38,7 +38,7 @@
         class="start"
         @click="$emit('start', timer.slot)"
       >
-        ? Start
+        Start
       </button>
 
       <!-- PAUSE / RESUME -->
