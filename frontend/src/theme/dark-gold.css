@@ -1,32 +1,42 @@
-/* Dark-Gold Theme - Uses centralized design tokens from variables.css */
-
-/* Theme-specific overrides if needed */
 :root {
-  /* Override specific values for dark-gold theme if different from main variables */
+  --bg-main: #0e0e0e;
   --bg-sidebar: #0b0b0b;
-  --gold-soft-alt: #e3c36a;
+  --bg-card: #141414;
+
+  --gold: #c9a24d;
+  --gold-soft: #e3c36a;
+
+  --text-main: #ffffff;
+  --text-muted: #9a9a9a;
+
+  --border-soft: #242424;
+  --radius: 14px;
+  --shadow-soft: 0 10px 30px rgba(0,0,0,.45);
+
+  --danger: #c0392b;
+  --success: #27ae60;
+  --warn: #f39c12;
 }
 
 body {
   background: var(--bg-main);
   color: var(--text-main);
-  font-family: var(--font-main);
+  font-family: "Inter", system-ui, sans-serif;
 }
 
 h1, h2, h3 {
   font-family: "Playfair Display", serif;
   color: var(--gold);
 }
-
 /* SKELETON */
 .skeleton-row {
   height: 38px;
-  border-radius: var(--radius-xs);
+  border-radius: 8px;
   background: linear-gradient(
     90deg,
-    var(--bg-dark) 25%,
-    var(--border-soft) 37%,
-    var(--bg-dark) 63%
+    #1a1a1a 25%,
+    #2a2a2a 37%,
+    #1a1a1a 63%
   );
   background-size: 400% 100%;
   animation: shimmer 1.4s ease infinite;
@@ -40,21 +50,18 @@ h1, h2, h3 {
 /* FADE TRANSITION */
 .fade-enter-active,
 .fade-leave-active {
-  transition: all var(--transition-slow) ease;
+  transition: all 0.25s ease;
 }
-
 .fade-enter-from {
   opacity: 0;
   transform: translateY(6px);
 }
-
 .fade-leave-to {
   opacity: 0;
   transform: translateY(-6px);
 }
-
 .fade-row {
-  animation: fadeIn var(--transition-slow) ease;
+  animation: fadeIn 0.25s ease;
 }
 
 @keyframes fadeIn {
