@@ -50,18 +50,82 @@ const format = v => v.toLocaleString()
 </script>
 
 <style scoped>
+.page {
+  padding: var(--space-xl);
+  background: var(--bg-main);
+  min-height: 100vh;
+  color: var(--text-main);
+}
+
+h2 {
+  color: var(--gold);
+  margin-bottom: var(--space-2xl);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 16px;
+  gap: var(--space-lg);
 }
+
 .card {
-  background: #111;
-  padding: 16px;
-  border: 1px solid #c9a24d;
+  background: var(--bg-card);
+  padding: var(--space-lg);
+  border: 1px solid var(--gold);
   cursor: pointer;
+  border-radius: var(--radius);
+  transition: all var(--transition-fast);
 }
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-soft);
+  border-color: var(--gold);
+}
+
+.card h3 {
+  color: var(--text-main);
+  margin-bottom: var(--space-sm);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.card p {
+  color: var(--text-muted);
+  margin: var(--space-xs) 0;
+  font-size: var(--font-size-sm);
+}
+
 .low {
-  color: #e74c3c;
+  color: var(--danger);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .page {
+    padding: var(--space-lg);
+  }
+  
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--space-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: var(--space-md);
+  }
+  
+  h2 {
+    font-size: var(--font-size-xl);
+  }
+  
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>
