@@ -1,30 +1,23 @@
 <template>
-  <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] modal-backdrop">
-    <div class="w-[440px] bg-bg-card rounded-lg shadow-2xl z-[150] modal">
+  <div class="overlay">
+    <div class="modal">
       <!-- HEADER -->
-      <div class="flex justify-between items-center p-4 border-b border-gray-800">
-        <h3 class="text-lg font-semibold m-0">{{ edit ? "Edit Service" : "Add New Service" }}</h3>
-        <button class="bg-transparent border-none text-xl text-gray-500 cursor-pointer hover:text-white transition-colors" @click="closeForm">X</button>
+      <div class="modal-header">
+        <h3>{{ edit ? "Edit Service" : "Add New Service" }}</h3>
+        <button class="close" @click="closeForm">X</button>
       </div>
 
       <!-- BODY -->
-      <form class="p-4" @submit.prevent="save">
-        <div class="flex flex-col mb-3">
-          <label class="text-xs text-gray-500 mb-1">Name</label>
-          <input 
-            v-model="form.name" 
-            placeholder="Service name" 
-            class="bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors"
-          />
+      <form class="modal-body" @submit.prevent="save">
+        <div class="form-group">
+          <label>Name</label>
+          <input v-model="form.name" placeholder="Service name" />
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div class="flex flex-col mb-3">
-            <label class="text-xs text-gray-500 mb-1">Type</label>
-            <select 
-              v-model="form.type" 
-              class="bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors cursor-pointer"
-            >
+        <div class="row">
+          <div class="form-group">
+            <label>Type</label>
+            <select v-model="form.type">
               <option disabled value="">Select</option>
               <option>SPA</option>
               <option>LC</option>
@@ -33,12 +26,9 @@
             </select>
           </div>
 
-          <div class="flex flex-col mb-3">
-            <label class="text-xs text-gray-500 mb-1">Branch</label>
-            <select 
-              v-model="form.branch_id" 
-              class="bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors cursor-pointer"
-            >
+          <div class="form-group">
+            <label>Branch</label>
+            <select v-model="form.branch_id">
               <option disabled value="">Select Branch</option>
               <option
                 v-for="b in branches"
@@ -51,56 +41,36 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div class="flex flex-col mb-3">
-            <label class="text-xs text-gray-500 mb-1">Duration (minutes)</label>
-            <input 
-              type="number" 
-              v-model.number="form.duration_minutes" 
-              class="bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors"
-            />
+        <div class="row">
+          <div class="form-group">
+            <label>Duration (minutes)</label>
+            <input type="number" v-model.number="form.duration_minutes" />
           </div>
 
-          <div class="flex flex-col mb-3">
-            <label class="text-xs text-gray-500 mb-1">Base Price</label>
-            <input 
-              type="number" 
-              v-model.number="form.base_price" 
-              class="bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors"
-            />
+          <div class="form-group">
+            <label>Base Price</label>
+            <input type="number" v-model.number="form.base_price" />
           </div>
         </div>
 
         <!-- FOOTER -->
-        <div class="flex justify-end gap-3 pt-4 border-t border-gray-800">
-          <button 
-            type="button" 
-            class="bg-transparent border border-gold text-gold px-4 py-2 rounded cursor-pointer hover:bg-gold hover:text-black transition-all" 
-            @click="closeForm"
-          >
+        <div class="modal-footer">
+          <button type="button" class="btn-outline" @click="closeForm">
             Cancel
           </button>
-          <button 
-            type="submit" 
-            class="bg-gold text-black px-4 py-2 rounded cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed" 
-            :disabled="loading"
-          >
+          <button type="submit" class="btn-primary" :disabled="loading">
             {{ loading ? "Saving..." : "Save" }}
           </button>
         </div>
       </form>
     </div>
 
-    <!-- SUCCESS POPUP -->
-    <div 
-      v-if="success" 
-      class="fixed inset-0 bg-black/60 flex items-center justify-center z-[300]" 
-      @click.self="confirmSuccess"
-    >
-      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] p-6 rounded-2xl text-center w-80 shadow-3xl" role="dialog" aria-modal="true" aria-labelledby="successTitle">
-        <h4 id="successTitle" class="text-success text-xl mb-2">Success</h4>
-        <p class="text-gray-400 text-sm mb-4">Service berhasil disimpan</p>
-        <button class="bg-gold text-black px-4 py-2 rounded cursor-pointer hover:opacity-90 transition-opacity" @click="confirmSuccess">OK</button>
+    <!-- SUCCESS POPUP (satu popup, overlay fixed supaya selalu centered) -->
+    <div v-if="success" class="success-overlay" @click.self="confirmSuccess">
+      <div class="success-box" role="dialog" aria-modal="true" aria-labelledby="successTitle">
+        <h4 id="successTitle">Success</h4>
+        <p>Service berhasil disimpan</p>
+        <button class="btn-primary" @click="confirmSuccess">OK</button>
       </div>
     </div>
   </div>
@@ -180,3 +150,109 @@ const confirmSuccess = () => {
   emit("close")
 }
 </script>
+
+<style scoped>
+/* overlay & modal */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  width: 440px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-strong);
+  z-index: 150;
+}
+
+/* SUCCESS POPUP (overlay di atas modal, selalu centered) */
+.success-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+
+.success-box {
+  background: linear-gradient(145deg, #0e0e0e, #151515);
+  padding: 24px;
+  border-radius: 16px;
+  text-align: center;
+  width: 320px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+
+.success-box h4 {
+  color: #2ecc71;
+  margin-bottom: 8px;
+}
+
+.success-box p {
+  color: #aaa;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.modal-body {
+  padding: 16px;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+input, select {
+  background: #000;
+  border: 1px solid var(--border-soft);
+  color: white;
+  padding: 8px;
+  border-radius: var(--radius);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.btn-primary {
+  background: var(--gold);
+  color: black;
+}
+.btn-outline {
+  background: none;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+}
+/* Tombol dan layout lainnya tetap */
+</style>

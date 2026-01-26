@@ -1,254 +1,197 @@
 /* =========================
-   NUMARS POS — TAILWIND v4 THEME
+   NUMARS POS — GLOBAL THEME
    ========================= */
 
-@import "tailwindcss";
+:root {
+  --font-main: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Arial, sans-serif;
+  /* COLORS */
+  --bg-main: #0e0e0e;
+  --bg-card: #151515;
+  --bg-soft: #1c1c1c;
 
-/* Custom Theme Configuration using CSS Variables (Tailwind v4 style) */
-@theme {
-  /* Colors */
-  --color-gold: #c9a24d;
-  --color-gold-soft: rgb(201 162 77 / 0.15);
-  
-  --color-bg-main: #0e0e0e;
-  --color-bg-card: #151515;
-  --color-bg-soft: #1c1c1c;
-  
-  --color-text-main: #ffffff;
-  --color-text-muted: #9a9a9a;
-  
-  --color-success: #2ecc71;
-  --color-danger: #e74c3c;
-  --color-warn: #f39c12;
-  
-  --color-border-soft: #2a2a2a;
-  
-  /* Border Radius */
-  --radius-default: 10px;
-  --radius-lg: 14px;
-  
-  /* Shadows */
-  --shadow-soft: 0 8px 24px rgb(0 0 0 / 0.35);
-  --shadow-hover: 0 14px 40px rgb(0 0 0 / 0.55);
-  
-  /* Font Family */
-  --font-family-main: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-  
-  /* Letter Spacing */
-  --letter-spacing-tight: -0.01em;
+  --gold: #c9a24d;
+  --gold-soft: rgba(201,162,77,.15);
+
+  --text-main: #ffffff;
+  --text-muted: #9a9a9a;
+
+  --success: #2ecc71;
+  --danger: #e74c3c;
+  --warn: #f39c12;
+
+  --border-soft: #2a2a2a;
+
+  /* UI */
+  --radius: 14px;
+  --radius-sm: 10px;
+
+  --shadow-soft: 0 8px 24px rgba(0,0,0,.35);
+  --shadow-hover: 0 14px 40px rgba(0,0,0,.55);
 }
 
-@layer base {
-  body {
-    background-color: var(--color-bg-main);
-    color: var(--color-text-main);
-    font-family: var(--font-family-main);
-    font-size: 14px;
-    line-height: 1.5;
-    letter-spacing: var(--letter-spacing-tight);
-    margin: 0;
-  }
-
-  h1, h2, h3 {
-    margin: 0;
-    font-weight: 600;
-  }
-
-  p {
-    margin: 0;
-    color: var(--color-text-muted);
-  }
-
-  input, select, textarea {
-    font-family: var(--font-family-main);
-  }
+/* RESET */
+* {
+  box-sizing: border-box;
 }
 
-@layer components {
-  /* CARD */
-  .card {
-    background: var(--color-bg-card);
-    border-radius: var(--radius-lg);
-    padding: 16px;
-    box-shadow: var(--shadow-soft);
-    border: 1px solid var(--color-border-soft);
-  }
-
-  /* BUTTONS */
-  .btn-primary {
-    background: var(--color-gold);
-    color: #000;
-    font-weight: 600;
-    padding: 8px 14px;
-    border-radius: var(--radius-default);
-    cursor: pointer;
-    transition: transform 0.2s;
-    border: none;
-  }
-  
-  .btn-primary:hover {
-    transform: translateY(-1px);
-  }
-
-  .btn-outline {
-    background: transparent;
-    border: 1px solid var(--color-gold);
-    color: var(--color-gold);
-    padding: 8px 14px;
-    border-radius: var(--radius-default);
-    cursor: pointer;
-    transition: transform 0.2s;
-  }
-  
-  .btn-outline:hover {
-    transform: translateY(-1px);
-  }
-
-  .btn-danger {
-    background: var(--color-danger);
-    color: #fff;
-    padding: 8px 14px;
-    border-radius: var(--radius-default);
-    cursor: pointer;
-    transition: transform 0.2s;
-    border: none;
-  }
-  
-  .btn-danger:hover {
-    transform: translateY(-1px);
-  }
-
-  .btn-warn {
-    background: var(--color-warn);
-    color: #000;
-    padding: 8px 14px;
-    border-radius: var(--radius-default);
-    cursor: pointer;
-    transition: transform 0.2s;
-    border: none;
-  }
-  
-  .btn-warn:hover {
-    transform: translateY(-1px);
-  }
-
-  /* NAV LINKS (for DashboardLayout) */
-  nav a {
-    display: block;
-    padding: 10px;
-    border-radius: var(--radius-default);
-    color: var(--color-text-main);
-    text-decoration: none;
-    margin-bottom: 6px;
-    transition: all 0.2s;
-  }
-  
-  nav a:hover {
-    background: rgb(201 162 77 / 0.08);
-  }
-  
-  nav a.router-link-active {
-    background: var(--color-gold-soft);
-    color: var(--color-gold);
-  }
-
-  /* INPUT */
-  input:not([type="checkbox"]):not([type="radio"]), 
-  select {
-    background: var(--color-bg-soft);
-    border: 1px solid var(--color-border-soft);
-    border-radius: var(--radius-default);
-    padding: 8px 10px;
-    color: white;
-  }
-  
-  input:not([type="checkbox"]):not([type="radio"]):focus,
-  select:focus {
-    outline: none;
-    border-color: var(--color-gold);
-  }
-
-  /* BADGE */
-  .badge {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 999px;
-    font-size: 12px;
-  }
-
-  .badge.gold {
-    background: var(--color-gold-soft);
-    color: var(--color-gold);
-  }
-
-  .badge.success {
-    background: rgb(46 204 113 / 0.2);
-    color: var(--color-success);
-  }
-
-  .badge.danger {
-    background: rgb(231 76 60 / 0.2);
-    color: var(--color-danger);
-  }
-
-  /* MODAL */
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgb(0 0 0 / 0.65);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 50;
-  }
-
-  .modal {
-    background: var(--color-bg-card);
-    border-radius: var(--radius-lg);
-    padding: 20px;
-    width: 420px;
-    box-shadow: var(--shadow-hover);
-  }
+body {
+  margin: 0;
+  background: var(--bg-main);
+  color: var(--text-main);
+  font-family: var(--font-main);
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
 }
 
-@layer utilities {
-  /* FADE ANIMATION */
-  .fade {
-    animation: fade 0.25s ease;
-  }
+/* =========================
+   GLOBAL ELEMENTS
+   ========================= */
 
-  @keyframes fade {
-    from { 
-      opacity: 0; 
-      transform: translateY(6px); 
-    }
-    to { 
-      opacity: 1; 
-      transform: translateY(0); 
-    }
-  }
+h1, h2, h3 {
+  margin: 0;
+  font-weight: 600;
+}
 
-  /* POS SLIDE */
-  .slide-pos-enter-active,
-  .slide-pos-leave-active {
-    transition: all 0.25s ease;
-  }
+p {
+  margin: 0;
+  color: var(--text-muted);
+}
 
-  .slide-pos-enter-from,
-  .slide-pos-leave-to {
-    transform: translateX(100%);
-    opacity: 0;
-  }
+/* CARD */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow-soft);
+  border: 1px solid var(--border-soft);
+}
 
-  /* VUE TRANSITIONS */
-  .fade-enter-active,
-  .fade-leave-active {
-    transition: opacity 0.15s;
-  }
+/* BUTTON */
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  border: none;
+  padding: 8px 14px;
+  transition: .2s;
+}
 
-  .fade-enter-from,
-  .fade-leave-to {
-    opacity: 0;
-  }
+button:hover {
+  transform: translateY(-1px);
+}
+
+.btn-primary {
+  background: var(--gold);
+  color: #000;
+  font-weight: 600;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-warn {
+  background: var(--warn);
+  color: #000;
+}
+
+/* INPUT */
+input, select {
+  background: var(--bg-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  color: white;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+/* BADGE */
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.badge.gold {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+.badge.success {
+  background: rgba(46,204,113,.2);
+  color: var(--success);
+}
+
+.badge.danger {
+  background: rgba(231,76,60,.2);
+  color: var(--danger);
+}
+
+/* MODAL */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: 420px;
+  box-shadow: var(--shadow-hover);
+}
+
+/* TRANSITION */
+.fade {
+  animation: fade .25s ease;
+}
+
+@keyframes fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+/* POS SLIDE */
+.slide-pos-enter-active,
+.slide-pos-leave-active {
+  transition: all 0.25s ease;
+}
+
+.slide-pos-enter-from {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+.slide-pos-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+/* fallback */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity .15s;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 

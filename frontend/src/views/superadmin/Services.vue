@@ -1,57 +1,68 @@
 <template>
-  <div class="p-6">
+  <div class="page">
     <!-- HEADER -->
-    <div class="flex justify-between items-center mb-4">
+    <div class="header">
       <div>
-        <h2 class="text-2xl font-bold">Services</h2>
-        <p class="text-gray-500 text-sm">Manage SPA / LC / FNB / Karaoke services</p>
+        <h2>Services</h2>
+        <p class="subtitle">Manage SPA / LC / FNB / Karaoke services</p>
       </div>
 
-      <button class="bg-gold text-black px-4 py-2 rounded cursor-pointer hover:opacity-90 transition-opacity" @click="openAdd">
+      <button class="btn-primary" @click="openAdd">
         + Add Service
       </button>
     </div>
 
-    <!-- STATS -->
-    <div class="grid grid-cols-3 gap-4 mt-4">
-      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-5 shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl cursor-default">
-        <p class="text-sm text-gray-400">Total Service</p>
-        <h3 class="mt-2 text-3xl font-bold">{{ total }}</h3>
+    <!-- STATS (AMAN, TIDAK RUSAK LAYOUT) -->
+    <!--<div class="service-stats">
+      <div class="stat-box">
+        <div class="val">{{ total }}</div>
+        <div class="lbl">Total</div>
       </div>
+      <div class="stat-box active">
+        <div class="val">{{ active }}</div>
+        <div class="lbl">Active</div>
+      </div>
+      <div class="stat-box disabled">
+        <div class="val">{{ disabled }}</div>
+        <div class="lbl">Disabled</div>
+      </div>
+    </div> -->
+<!-- STATS (COPY DARI USERS) -->
+<div class="stats">
+  <div class="stat-card">
+    <p>Total Service</p>
+    <h3>{{ total }}</h3>
+  </div>
 
-      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-5 shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl cursor-default">
-        <p class="text-sm text-gray-400">Active</p>
-        <h3 class="mt-2 text-3xl font-bold text-success">{{ active }}</h3>
-      </div>
+  <div class="stat-card active">
+    <p>Active</p>
+    <h3>{{ active }}</h3>
+  </div>
 
-      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-5 shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl cursor-default">
-        <p class="text-sm text-gray-400">Disabled</p>
-        <h3 class="mt-2 text-3xl font-bold text-danger">{{ disabled }}</h3>
-      </div>
-    </div>
+  <div class="stat-card disabled">
+    <p>Disabled</p>
+    <h3>{{ disabled }}</h3>
+  </div>
+
+  <!-- <div class="stat-card new">
+    <p>New This Month</p>
+    <h3>+{{ stats.new_month }}</h3>
+  </div> -->
+</div>
+<!-- STATS (COPY DARI USERS) -->
 
     <!-- FILTER -->
-    <div class="flex gap-3 mt-4">
-      <input 
-        v-model="keyword" 
-        placeholder="Search service..." 
-        class="flex-1 bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors"
-      />
+    <div class="filters">
+      <input v-model="keyword" placeholder="Search service..." class="input" />
 
-      <select 
-        v-model="selectedBranch" 
-        class="bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors cursor-pointer"
-      >
+      <select v-model="selectedBranch" class="select">
         <option value="">All Branches</option>
         <option v-for="b in branches" :key="b.id" :value="b.id">
           {{ b.name }}
         </option>
       </select>
 
-      <select 
-        v-model="selectedType" 
-        class="bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors cursor-pointer"
-      >
+      <select v-model="selectedType" class="select">
         <option value="">All Types</option>
         <option value="SPA">SPA</option>
         <option value="LC">LC</option>
@@ -59,84 +70,85 @@
         <option value="KARAOKE">KARAOKE</option>
       </select>
 
-      <button 
-        class="bg-transparent border border-gold text-gold px-4 py-2 rounded hover:bg-gold hover:text-black transition-all cursor-pointer" 
-        @click="loadServices(1)"
-      >
+      <button class="btn-search" @click="loadServices(1)">
         Search
       </button>
     </div>
+    <!-- BULK BAR COPY DARI USERS-->
+    <transition name="fade">
+      <div v-if="selectedIds.length" class="bulk-bar">
+        <span>{{ selectedIds.length }} selected</span>
+        <div>
+          <button class="warn" @click="bulkToggle">Toggle Active</button>
+          <button class="danger" @click="bulkDelete">Delete</button>
+        </div>
+      </div>
+    </transition>
 
     <!-- TABLE -->
-    <div class="bg-bg-card rounded-lg p-4 mt-4 shadow-lg">
-      <table class="w-full border-collapse">
+    <div class="card table-card">
+      <table>
         <thead>
           <tr>
-            <th class="text-gray-500 text-xs p-3 text-left">Name</th>
-            <th class="text-gray-500 text-xs p-3 text-left">Branch</th>
-            <th class="text-gray-500 text-xs p-3 text-left">Type</th>
-            <th class="text-gray-500 text-xs p-3 text-left">Duration</th>
-            <th class="text-gray-500 text-xs p-3 text-left">Price</th>
-            <th class="text-gray-500 text-xs p-3 text-left">Status</th>
-            <th class="text-gray-500 text-xs p-3 text-left" width="220">Actions</th>
+            <th>Name</th>
+            <th>Branch</th>
+            <th>Type</th>
+            <th>Duration</th>
+            <th>Price</th>
+            <th>Status</th>
+            <th width="220">Actions</th>
           </tr>
         </thead>
 
         <tbody>
           <tr v-if="loading">
-            <td colspan="7" class="text-center p-8 text-gray-500">Loading...</td>
+            <td colspan="7" class="empty">Loading...</td>
           </tr>
 
           <tr v-else-if="!services.length">
-            <td colspan="7" class="text-center p-8 text-gray-500">No services found</td>
+            <td colspan="7" class="empty">No services found</td>
           </tr>
 
           <tr
             v-for="s in services"
             :key="s.id"
-            class="transition-all duration-300 hover:bg-gradient-to-r hover:from-gold/10 hover:to-gold/5 hover:translate-x-1 hover:shadow-[inset_4px_0_0_var(--gold)]"
+            class="row-hover"
           >
-            <td class="p-3 border-t border-gray-900 font-semibold">{{ s.name }}</td>
+            <td class="name">{{ s.name }}</td>
 
-            <!-- BRANCH BADGE -->
-            <td class="p-3 border-t border-gray-900">
-              <span class="px-3 py-1 rounded-xl text-xs bg-white/10">
+            <!-- BRANCH BADGE (FIXED) -->
+            <td>
+              <span class="badge branch">
                 {{ s.branch_name || s.branch?.name || '—' }}
               </span>
             </td>
 
-            <td class="p-3 border-t border-gray-900">
-              <span class="px-3 py-1 rounded-xl text-xs bg-gold/20 text-gold">{{ s.type }}</span>
+            <td>
+              <span class="badge type">{{ s.type }}</span>
             </td>
 
-            <td class="p-3 border-t border-gray-900">
+            <td>
               {{ s.duration_minutes ? s.duration_minutes + " min" : "-" }}
             </td>
 
-            <td class="p-3 border-t border-gray-900 font-semibold">
+            <td class="price">
               Rp {{ format(s.base_price) }}
             </td>
 
-            <td class="p-3 border-t border-gray-900">
+            <td>
               <span
-                class="px-3 py-1 rounded-xl text-xs"
-                :class="s.is_active ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'"
+                class="badge"
+                :class="s.is_active ? 'success' : 'danger'"
               >
                 {{ s.is_active ? "ACTIVE" : "DISABLED" }}
               </span>
             </td>
 
-            <td class="p-3 border-t border-gray-900">
-              <button 
-                @click="edit(s)" 
-                class="mr-2 border-none px-3 py-2 rounded cursor-pointer transition-all hover:-translate-y-0.5 bg-gray-800 hover:bg-gray-700"
-              >
-                Edit
-              </button>
+            <td class="actions">
+              <button @click="edit(s)">Edit</button>
               <button
-                :class="s.is_active ? 'bg-danger/20 text-danger hover:bg-danger/30' : 'bg-success/20 text-success hover:bg-success/30'"
+                :class="s.is_active ? 'danger' : 'success'"
                 @click="toggle(s)"
-                class="border-none px-3 py-2 rounded cursor-pointer transition-all hover:-translate-y-0.5"
               >
                 {{ s.is_active ? "Disable" : "Enable" }}
               </button>
@@ -146,36 +158,20 @@
       </table>
 
       <!-- PAGINATION -->
-      <div class="flex justify-center gap-3 mt-4">
-        <div class="flex items-center gap-2">
+      <div class="pagination-bar">
+        <div>
           Show
-          <select 
-            v-model="perPage" 
-            @change="loadServices(1)" 
-            class="bg-black border border-gray-800 text-white p-1 rounded cursor-pointer"
-          >
+          <select v-model="perPage" @change="loadServices(1)">
             <option :value="30">30</option>
             <option :value="50">50</option>
             <option :value="100">100</option>
           </select>
         </div>
 
-        <div class="flex items-center gap-2">
-          <button 
-            @click="loadServices(page-1)" 
-            :disabled="page===1" 
-            class="px-3 py-1 bg-gray-800 rounded cursor-pointer hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Prev
-          </button>
-          <span>Page {{ page }}</span>
-          <button 
-            @click="loadServices(page+1)" 
-            :disabled="services.length < perPage" 
-            class="px-3 py-1 bg-gray-800 rounded cursor-pointer hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Next
-          </button>
+        <div>
+          <button @click="loadServices(page-1)" :disabled="page===1">Prev</button>
+          Page {{ page }}
+          <button @click="loadServices(page+1)" :disabled="services.length < perPage">Next</button>
         </div>
       </div>
     </div>
@@ -292,3 +288,250 @@ const disabled = computed(() => total.value - active.value)
 const format = (v) =>
   Number(v || 0).toLocaleString("id-ID")
 </script>
+
+<style scoped>
+.page {
+  padding: 24px;
+}
+
+/* HEADER */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.subtitle {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* STATS */
+.service-stats {
+  display: flex;
+  gap: 12px;
+  margin: 14px 0;
+}
+.stat-box {
+  background: var(--bg-card);
+  padding: 12px 16px;
+  border-radius: var(--radius);
+}
+.stat-box .val {
+  font-size: 20px;
+  font-weight: 700;
+}
+.stat-box .lbl {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.stat-box.active { border-left: 3px solid #2ecc71 }
+.stat-box.disabled { border-left: 3px solid #e74c3c }
+
+/* CARD */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 16px;
+  box-shadow: var(--shadow-soft);
+}
+
+/* FILTER */
+.filters {
+  display: flex;
+  gap: 12px;
+}
+
+/* TABLE */
+/* table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th {
+  color: var(--text-muted);
+  text-align: left;
+  padding: 12px;
+  font-size: 13px;
+}
+td {
+  padding: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+.row-hover:hover {
+  background: rgba(201,162,77,.05) !important;
+} */
+/* TABLE DARI USERS */
+/* TABLE */
+table { width:100%; border-collapse:collapse }
+th {
+  color:#888;
+  font-size:12px;
+  padding:12px;
+  text-align:left;
+}
+td {
+  padding:12px;
+  border-top:1px solid #222;
+}
+.row {
+  transition:background .25s ease, transform .15s ease;
+}
+.row:hover {
+  background:rgba(255,255,255,.04);
+  transform:translateY(-1px);
+}
+
+.name { font-weight: 600 }
+.price { font-weight: 600 }
+
+/* BADGE */
+.badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+.branch {
+  background: rgba(255,255,255,.08);
+}
+.success {
+  background: rgba(39,174,96,.2);
+  color: #2ecc71;
+}
+.danger {
+  background: rgba(192,57,43,.2);
+  color: #e74c3c;
+}
+.type {
+  background: rgba(201,162,77,.2);
+  color: var(--gold);
+}
+
+/* BUTTON */
+button {
+  border: none;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: .15s;
+}
+button:hover {
+  transform: translateY(-1px);
+}
+.btn-primary {
+  background: var(--gold);
+  color: black;
+}
+.actions button {
+  margin-right: 6px;
+}
+
+.btn-search {
+  background: transparent;
+  border: 1px solid #c9a24d;
+  color: #c9a24d;
+  padding: 8px 14px;
+  border-radius: 10px;
+}
+.btn-search:hover {
+  background: #c9a24d;
+  color: #000;
+}
+
+/* PAGINATION */
+/* .pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 14px;
+} */
+
+/* PAGINATION DARI USERS*/
+.pagination-bar {
+  display:flex;
+  justify-content:center;
+  gap:12px;
+  margin-top:16px;
+}
+
+
+.empty {
+  text-align: center;
+  padding: 30px;
+  color: var(--text-muted);
+}
+/* TEMPLATE DARI USERS.VUE */
+/* TRANSITION */
+.fade-enter-active,
+.fade-leave-active {
+  transition:opacity .2s ease, transform .2s ease;
+}
+.fade-enter-from {
+  opacity:0;
+  transform:translateY(6px);
+}
+.fade-leave-to {
+  opacity:0;
+  transform:translateY(-6px);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.stat-card {
+  background: linear-gradient(145deg, #0e0e0e, #151515);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  transition: all .25s ease;
+  cursor: default;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+
+.stat-card p {
+  font-size: 13px;
+  color: #999;
+}
+
+.stat-card h3 {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.stat-card.active h3 {
+  color: #2ecc71;
+}
+
+.stat-card.disabled h3 {
+  color: #e74c3c;
+}
+
+.stat-card.new h3 {
+  color: #c9a24d;
+}
+/* ROW HOVER */
+tbody tr {
+  transition: 
+    background 0.25s ease,
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+tbody tr:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(201,162,77,0.08),
+    rgba(201,162,77,0.02)
+  );
+  transform: translateX(4px);
+  box-shadow: inset 4px 0 0 var(--gold);
+}
+
+</style>

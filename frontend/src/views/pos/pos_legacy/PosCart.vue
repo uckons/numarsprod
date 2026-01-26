@@ -25,7 +25,7 @@
 
         <div class="right">
           <strong>Rp {{ format(i.subtotal) }}</strong>
-          <button class="remove" @click="remove(i)">Ã—</button>
+          <button class="remove" @click="remove(i)">×</button>
         </div>
       </div>
 

@@ -1,10 +1,10 @@
 <template>
-  <div class="p-6">
+  <div class="page">
     <!-- HEADER -->
-    <div class="flex justify-between">
+    <div class="header">
       <div>
         <h2>User Management</h2>
-        <p class="text-[#888]">SuperAdmin Control Panel</p>
+        <p class="subtitle">SuperAdmin Control Panel</p>
       </div>
 
       <button class="btn-primary" @click="openAdd">
@@ -13,7 +13,7 @@
     </div>
 
     <!-- FILTER -->
-    <div class="flex gap-3 my-4">
+    <div class="filter">
       <input v-model="q" placeholder="Search username..." />
       <select v-model="role">
         <option value="">All Roles</option>
@@ -25,7 +25,7 @@
     </div>
 
     <!-- USERS GRID -->
-    <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+    <div class="grid">
       <UserSkeleton v-if="loading" v-for="i in 6" :key="i" />
 
       <UserCard
@@ -38,7 +38,7 @@
         @toggle="toggle"
       />
 
-      <p v-if="!loading && !users.length" class="col-span-full text-center text-[#777]">
+      <p v-if="!loading && !users.length" class="empty">
         No users found
       </p>
     </div>
@@ -117,3 +117,27 @@ const bulkDelete = async () => {
   load()
 }
 </script>
+
+<style scoped>
+.page { padding: 24px; }
+.header { display:flex; justify-content:space-between; }
+.subtitle { color:#888; }
+
+.filter {
+  display:flex;
+  gap:12px;
+  margin:16px 0;
+}
+
+.grid {
+  display:grid;
+  grid-template-columns: repeat(auto-fill,minmax(260px,1fr));
+  gap:16px;
+}
+
+.empty {
+  grid-column: 1 / -1;
+  text-align:center;
+  color:#777;
+}
+</style>

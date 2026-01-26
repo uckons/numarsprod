@@ -1,128 +1,95 @@
 <template>
-  <div class="p-5 md:p-6">
+  <div class="page">
     <!-- HEADER -->
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+    <div class="header">
       <div>
-        <h2 class="text-2xl font-bold text-white">Orders</h2>
-        <p class="text-sm text-gray-400 mt-1">Summary & latest transactions</p>
+        <h2>Orders</h2>
+        <p class="subtitle">Summary & latest transactions</p>
       </div>
     </div>
 
     <!-- STATS -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-4">
-      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-4 md:p-5 shadow-[0_12px_40px_rgba(0,0,0,0.45)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
-        <p class="text-xs md:text-sm text-gray-400">Total Orders Today</p>
-        <h3 class="mt-2 text-2xl md:text-3xl font-bold text-white">{{ stats.total }}</h3>
+    <div class="stats">
+      <div class="stat-card">
+        <p>Total Orders Today</p>
+        <h3>{{ stats.total }}</h3>
       </div>
 
-      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-4 md:p-5 shadow-[0_12px_40px_rgba(0,0,0,0.45)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
-        <p class="text-xs md:text-sm text-gray-400">SPA</p>
-        <h3 class="mt-2 text-2xl md:text-3xl font-bold text-gold">{{ stats.spa }}</h3>
+      <div class="stat-card spa">
+        <p>SPA</p>
+        <h3>{{ stats.spa }}</h3>
       </div>
 
-      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-4 md:p-5 shadow-[0_12px_40px_rgba(0,0,0,0.45)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
-        <p class="text-xs md:text-sm text-gray-400">LC</p>
-        <h3 class="mt-2 text-2xl md:text-3xl font-bold text-[#3498db]">{{ stats.lc }}</h3>
+      <div class="stat-card lc">
+        <p>LC</p>
+        <h3>{{ stats.lc }}</h3>
       </div>
 
-      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-4 md:p-5 shadow-[0_12px_40px_rgba(0,0,0,0.45)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
-        <p class="text-xs md:text-sm text-gray-400">FNB</p>
-        <h3 class="mt-2 text-2xl md:text-3xl font-bold text-success">{{ stats.fnb }}</h3>
+      <div class="stat-card fnb">
+        <p>FNB</p>
+        <h3>{{ stats.fnb }}</h3>
       </div>
 
-      <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-4 md:p-5 shadow-[0_12px_40px_rgba(0,0,0,0.45)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.6)] col-span-2 sm:col-span-1">
-        <p class="text-xs md:text-sm text-gray-400">Karaoke</p>
-        <h3 class="mt-2 text-2xl md:text-3xl font-bold text-[#e67e22]">{{ stats.karaoke }}</h3>
+      <div class="stat-card karaoke">
+        <p>Karaoke</p>
+        <h3>{{ stats.karaoke }}</h3>
       </div>
     </div>
+<!-- FILTER -->
+    <div class="card filter-card">
+      <div class="filters">
+        <input type="date" v-model="dateFrom" />
+        <input type="date" v-model="dateTo" />
 
-    <!-- FILTER -->
-    <div class="bg-bg-card rounded-xl p-4 shadow-lg mt-5">
-      <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-        <input 
-          type="date" 
-          v-model="dateFrom" 
-          class="flex-1 bg-black border border-gray-700 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold/50 transition-all"
-        />
-        <input 
-          type="date" 
-          v-model="dateTo" 
-          class="flex-1 bg-black border border-gray-700 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold/50 transition-all"
-        />
-
-        <select 
-          v-model="perPage"
-          class="flex-1 sm:flex-initial bg-black border border-gray-700 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold/50 transition-all"
-        >
+        <select v-model="perPage">
           <option v-for="n in [100,200,300,400,500]" :key="n" :value="n">
             {{ n }} / page
           </option>
         </select>
 
-        <button 
-          class="px-5 py-2 border border-gold text-gold rounded-lg hover:bg-gold hover:text-black transition-all duration-200 font-medium"
-          @click="applyFilter"
-        >
+        <button class="btn-outline" @click="applyFilter">
           Apply
         </button>
       </div>
     </div>
-
     <!-- TABLE -->
-    <div class="bg-bg-card rounded-xl p-4 shadow-lg mt-5">
-      <h3 class="text-lg font-semibold text-white mb-3">Latest Orders</h3>
+    <div class="card table-card">
+      <h3 class="table-title">Latest Orders</h3>
 
-      <div class="overflow-x-auto">
-        <table class="w-full border-collapse min-w-[500px]">
-          <thead>
-            <tr>
-              <th class="text-left text-gray-400 text-sm p-3">ID</th>
-              <th class="text-left text-gray-400 text-sm p-3">Category</th>
-              <th class="text-left text-gray-400 text-sm p-3">Total</th>
-              <th class="text-left text-gray-400 text-sm p-3">Time</th>
-            </tr>
-          </thead>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Category</th>
+            <th>Total</th>
+            <th>Time</th>
+          </tr>
+        </thead>
 
-          <tbody>
-            <tr v-if="!orders.length">
-              <td colspan="4" class="text-center py-8 text-gray-500">No orders found</td>
-            </tr>
+        <tbody>
+          <tr v-if="!orders.length">
+            <td colspan="4" class="empty">No orders found</td>
+          </tr>
 
-            <tr
-              v-for="o in orders"
-              :key="o.id"
-              class="group transition-all duration-300 hover:bg-gradient-to-r hover:from-gold/5 hover:to-gold/0 hover:translate-x-1 hover:shadow-[inset_4px_0_0_theme(colors.gold)]"
-            >
-              <td class="p-3 border-t border-gray-800">#{{ o.id }}</td>
-              <td class="p-3 border-t border-gray-800">
-                <span class="inline-block bg-gold/20 text-gold px-2.5 py-1 rounded-xl text-xs font-medium">
-                  {{ o.categories }}
-                </span>
-              </td>
-              <td class="p-3 border-t border-gray-800 font-semibold">Rp {{ format(o.total) }}</td>
-              <td class="p-3 border-t border-gray-800 text-sm text-gray-300">{{ new Date(o.created_at).toLocaleString() }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- PAGINATION -->
-      <div class="flex flex-col sm:flex-row justify-between items-center gap-3 mt-4 pt-4 border-t border-gray-800">
-        <button 
-          @click="page--" 
-          :disabled="page === 1"
-          class="w-full sm:w-auto px-5 py-2 border border-gold text-gold rounded-lg transition-all duration-200 hover:bg-gold hover:text-black disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gold"
-        >
-          Prev
-        </button>
-        <span class="text-sm text-gray-400">Page {{ page }} / {{ totalPages }}</span>
-        <button 
-          @click="page++" 
-          :disabled="page === totalPages"
-          class="w-full sm:w-auto px-5 py-2 border border-gold text-gold rounded-lg transition-all duration-200 hover:bg-gold hover:text-black disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gold"
-        >
-          Next
-        </button>
+          <tr
+            v-for="o in orders"
+            :key="o.id"
+            class="row-hover"
+          >
+            <td>#{{ o.id }}</td>
+            <td>
+              <span class="badge">{{ o.categories }}</span>
+            </td>
+            <td class="price">Rp {{ format(o.total) }}</td>
+            <td>{{ new Date(o.created_at).toLocaleString() }}</td>
+          </tr>
+        </tbody>
+      </table>
+<!-- PAGINATION -->
+      <div class="pagination">
+        <button @click="page--" :disabled="page === 1">Prev</button>
+        <span>Page {{ page }} / {{ totalPages }}</span>
+        <button @click="page++" :disabled="page === totalPages">Next</button>
       </div>
     </div>
   </div>
@@ -192,3 +159,162 @@ const pagedOrders = computed(() => {
 
 const format = v => Number(v || 0).toLocaleString("id-ID")
 </script>
+<style scoped>
+/* PAGE */
+.page {
+  padding: 24px;
+}
+
+/* HEADER */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* STATS */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.stat-card {
+  background: linear-gradient(145deg, #0e0e0e, #151515);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  transition: all .25s ease;
+}
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+
+.stat-card p {
+  font-size: 13px;
+  color: #999;
+}
+.stat-card h3 {
+  margin-top: 8px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.stat-card.spa h3 { color: #c9a24d }
+.stat-card.lc h3 { color: #3498db }
+.stat-card.fnb h3 { color: #2ecc71 }
+.stat-card.karaoke h3 { color: #e67e22 }
+
+/* CARD */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 20px;
+  box-shadow: var(--shadow-soft);
+}
+
+.table-title {
+  margin-bottom: 12px;
+}
+
+/* TABLE */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  text-align: left;
+  padding: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+td {
+  padding: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.row-hover:hover {
+  background: rgba(201,162,77,.05);
+}
+
+.price {
+  font-weight: 600;
+}
+
+/* BADGE */
+.badge {
+  background: rgba(201,162,77,.2);
+  color: var(--gold);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+/* EMPTY */
+.empty {
+  text-align: center;
+  padding: 30px;
+  color: var(--text-muted);
+}
+.filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.filters input,
+.filters select {
+  background: #000;
+  border: 1px solid var(--border-soft);
+  color: white;
+  padding: 8px;
+  border-radius: var(--radius);
+}
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.pagination button {
+  background: none;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  padding: 6px 14px;
+  border-radius: var(--radius);
+}
+
+.pagination button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+/* ROW HOVER */
+tbody tr {
+  transition: 
+    background 0.25s ease,
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+tbody tr:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(201,162,77,0.08),
+    rgba(201,162,77,0.02)
+  );
+  transform: translateX(4px);
+  box-shadow: inset 4px 0 0 var(--gold);
+}
+
+</style>

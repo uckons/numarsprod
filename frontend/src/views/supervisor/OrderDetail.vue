@@ -1,20 +1,18 @@
 <template>
-  <div class="min-h-screen p-5 md:p-8 bg-bg-main">
-    <h2 class="text-2xl md:text-3xl font-bold text-gold mb-6">Order #{{ order.id }}</h2>
+  <div class="order-detail">
+    <h2>Order #{{ order.id }}</h2>
 
-    <div class="bg-bg-card border border-gray-700 rounded-lg p-4 md:p-6 space-y-3">
-      <p class="text-base md:text-lg">Status: <b class="text-gold">{{ order.status }}</b></p>
-      <p class="text-base md:text-lg">Total: <span class="font-semibold">Rp {{ format(order.total_amount) }}</span></p>
+    <p>Status: <b>{{ order.status }}</b></p>
+    <p>Total: Rp {{ format(order.total_amount) }}</p>
 
-      <!-- 🔴 REVERT BUTTON -->
-      <button
-        v-if="canRevert"
-        class="bg-danger hover:bg-red-600 text-white font-medium px-4 py-2.5 rounded-lg mt-4 cursor-pointer transition-colors duration-200"
-        @click="revertPayment"
-      >
-        Revert Payment
-      </button>
-    </div>
+    <!-- 🔴 REVERT BUTTON -->
+    <button
+      v-if="canRevert"
+      class="danger"
+      @click="revertPayment"
+    >
+      Revert Payment
+    </button>
   </div>
 </template>
 
@@ -67,6 +65,21 @@ const revertPayment = async () => {
 }
 </script>
 
+<style scoped>
+.order-detail {
+  padding: 20px;
+}
+
+.danger {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  margin-top: 16px;
+  cursor: pointer;
+}
+</style>
 <button @click="printStruk">
   🖨 Print Struk
 </button>
