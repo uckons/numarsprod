@@ -174,69 +174,133 @@ onMounted(() => {
 
 <style scoped>
 .kasir-pos {
-  padding: 20px;
-  background: #0e0e0e;
+  padding: var(--space-xl);
+  background: var(--bg-main);
   min-height: 100vh;
-  color: #fff;
+  color: var(--text-main);
 }
 
 h1 {
-  color: #c9a24d;
-  margin-bottom: 16px;
+  color: var(--gold);
+  margin-bottom: var(--space-lg);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
 }
 
 .card {
-  background: #111;
-  border: 1px solid #333;
-  padding: 16px;
-  margin-bottom: 16px;
-  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+  border-radius: var(--radius);
+}
+
+.card h3 {
+  color: var(--text-main);
+  margin-bottom: var(--space-md);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
 }
 
 select {
   width: 100%;
-  padding: 10px;
-  background: #000;
-  color: #fff;
-  border: 1px solid #444;
-  margin-top: 8px;
+  padding: var(--space-md);
+  background: var(--bg-main);
+  color: var(--text-main);
+  border: 1px solid var(--border-light);
+  margin-top: var(--space-sm);
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-sm);
+  transition: border-color var(--transition-fast);
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--gold);
 }
 
 .checkbox-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 8px;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
 }
 
 label {
-  font-size: 14px;
+  font-size: var(--font-size-sm);
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  cursor: pointer;
+}
+
+input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--gold);
 }
 
 .pay-btn {
   width: 100%;
-  margin-top: 12px;
-  padding: 12px;
-  background: #c9a24d;
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background: var(--gold);
   color: #000;
-  font-weight: bold;
+  font-weight: var(--font-weight-bold);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  font-size: var(--font-size-sm);
+  transition: all var(--transition-fast);
+}
+
+.pay-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-soft);
 }
 
 .pay-btn:disabled {
   opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .error {
-  color: #e74c3c;
-  margin-top: 10px;
+  color: var(--danger);
+  margin-top: var(--space-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
 }
 
 .success {
-  color: #2ecc71;
-  margin-top: 10px;
+  color: var(--success);
+  margin-top: var(--space-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .kasir-pos {
+    padding: var(--space-lg);
+  }
+  
+  h1 {
+    font-size: var(--font-size-xl);
+  }
+  
+  .card {
+    padding: var(--space-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .kasir-pos {
+    padding: var(--space-md);
+  }
+  
+  .checkbox-list {
+    flex-direction: column;
+  }
 }
 </style>
 <button @click="printStruk">

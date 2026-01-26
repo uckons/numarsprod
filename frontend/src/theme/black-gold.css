@@ -1,29 +1,36 @@
+/* Black-Gold Theme - Uses centralized design tokens */
 body {
-  background: #0e0e0e;
-  color: #c9a24d;
-  font-family: Inter, sans-serif;
+  background: var(--bg-main);
+  color: var(--gold);
+  font-family: var(--font-main);
 }
 
 button {
-  background: #c9a24d;
+  background: var(--gold);
   color: #000;
   border: none;
-  padding: 12px;
-  font-weight: bold;
+  padding: var(--space-md);
+  font-weight: var(--font-weight-bold);
+  border-radius: var(--radius-xs);
 }
 
-.green { color: #2ecc71 }
-.yellow { color: #f1c40f }
-.red { color: #e74c3c }
-:root {
-  --bg: #0e0e0e;
-  --gold: #C9A24D;
+.green { 
+  color: var(--success);
+}
+
+.yellow { 
+  color: var(--warning);
+}
+
+.red { 
+  color: var(--danger);
 }
 
 button {
-  transition: all .2s ease;
+  transition: all var(--transition-base) ease;
 }
 
 button:hover {
-  opacity: .85;
+  opacity: 0.85;
+  transform: translateY(-1px);
 }

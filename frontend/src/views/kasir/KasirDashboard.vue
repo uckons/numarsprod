@@ -235,10 +235,10 @@ watch(
 <style scoped>
 .kasir-dashboard {
   min-height: 100vh;
-  background: #0e0e0e;
-  color: #fff;
-  padding: 16px;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg-main);
+  color: var(--text-main);
+  padding: var(--space-lg);
+  font-family: var(--font-main);
 }
 
 /* ======================
@@ -248,44 +248,44 @@ watch(
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 14px;
-  border-bottom: 1px solid #222;
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border-medium);
 }
 
 .brand h1 {
   margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: .5px;
-  color: #c9a24d;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.5px;
+  color: var(--gold);
 }
 
 .branch {
   display: block;
   margin-top: 2px;
-  font-size: 12px;
-  color: #888;
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
 }
 
 .user {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .user .name {
   font-size: 13px;
-  color: #aaa;
+  color: var(--text-secondary);
 }
 
 .logout {
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 8px;
-  background: #c0392b;
-  border: 1px solid #333;
-  color: white;
+  padding: 6px var(--space-md);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-xs);
+  background: var(--danger-dark);
+  border: 1px solid var(--border-light);
+  color: var(--text-main);
   cursor: pointer;
 }
 
@@ -295,30 +295,30 @@ watch(
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 14px;
+  gap: var(--space-md);
   margin: 22px 0;
 }
 
 .card {
-  background: #111;
-  border: 1px solid #222;
-  border-radius: 14px;
-  padding: 18px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius);
+  padding: 18px var(--space-lg);
   text-align: center;
 }
 
 .card p {
   margin: 0 0 6px;
-  font-size: 12px;
-  color: #888;
-  letter-spacing: .3px;
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  letter-spacing: 0.3px;
 }
 
 .card h2 {
   margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-  color: #c9a24d;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--gold);
 }
 
 /* ======================
@@ -327,7 +327,7 @@ watch(
 .actions {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 14px;
+  gap: var(--space-md);
   margin-bottom: 26px;
 }
 
@@ -336,47 +336,46 @@ watch(
   align-items: center;
   justify-content: center;
   height: 54px;
-  border-radius: 14px;
-  font-size: 14px;
-  font-weight: 600;
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   text-decoration: none;
-  background: #111;
-  border: 1px solid #222;
-  color: #fff;
-  transition: all .15s ease;
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  color: var(--text-main);
+  transition: all var(--transition-fast) ease;
 }
 
 .action:hover {
-  border-color: #c9a24d;
+  border-color: var(--gold);
   transform: translateY(-2px);
 }
 
 .action.primary {
-  background: #c9a24d;
+  background: var(--gold);
   color: #000;
-  border-color: #c9a24d;
+  border-color: var(--gold);
 }
 
 /* ======================
    TIMERS
 ====================== */
 .timers h3 {
-  margin: 0 0 14px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #fff;
+  margin: 0 0 var(--space-md);
+  font-size: var(--space-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-main);
 }
 
 .timer-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
+  gap: var(--space-lg);
   align-items: stretch;
 }
 
-
 .empty {
-  color: #666;
+  color: var(--text-disabled);
   font-size: 13px;
   font-style: italic;
 }
@@ -391,24 +390,54 @@ watch(
 }
 
 .left {
-  padding: 16px;
+  padding: var(--space-lg);
   overflow-y: auto;
 }
 
 .right {
-  border-left: 1px solid #222;
+  border-left: 1px solid var(--border-medium);
 }
 
 /* ======================
-   MOBILE
+   MOBILE-FIRST RESPONSIVE
 ====================== */
+
+/* Mobile base styles are default above */
+
+/* Tablet and up (768px+) */
+@media (min-width: 768px) {
+  .kasir-dashboard {
+    padding: var(--space-2xl);
+  }
+  
+  .stats {
+    gap: var(--space-lg);
+  }
+  
+  .actions {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Desktop (1024px+) */
+@media (min-width: 1024px) {
+  .timer-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+/* Legacy mobile overrides for smaller screens */
 @media (max-width: 768px) {
   .brand h1 {
-    font-size: 18px;
+    font-size: var(--font-size-lg);
   }
 
   .card h2 {
     font-size: 22px;
+  }
+  
+  .actions {
+    grid-template-columns: 1fr;
   }
 
   .pos-body {
@@ -417,9 +446,22 @@ watch(
 
   .right {
     border-left: none;
-    border-top: 1px solid #222;
+    border-top: 1px solid var(--border-medium);
   }
 }
 
-
+/* Extra small screens (480px and below) */
+@media (max-width: 480px) {
+  .kasir-dashboard {
+    padding: var(--space-md);
+  }
+  
+  .stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .timer-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
