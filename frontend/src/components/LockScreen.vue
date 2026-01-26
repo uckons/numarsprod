@@ -1,6 +1,6 @@
 <template>
-  <div class="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-[9999]">
-    <div class="w-80 bg-[#111] border border-gold p-6 rounded-xl text-center">
+  <div class="lock">
+    <div class="card">
       <h2>Session Locked</h2>
       <p>Enter password to continue</p>
 
@@ -43,3 +43,23 @@ const unlock = async () => {
   }
 }
 </script>
+
+<style scoped>
+.lock {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.card {
+  width: 320px;
+  background: #111;
+  border: 1px solid #C9A24D;
+  padding: 24px;
+  border-radius: 12px;
+  text-align: center;
+}
+</style>

@@ -1,55 +1,51 @@
 <template>
-  <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] modal-backdrop">
-    <div class="w-[420px] max-h-[85vh] bg-bg-card rounded-lg shadow-2xl animate-[pop_0.2s_ease] flex flex-col modal">
+  <div class="overlay">
+    <div class="modal">
       <!-- HEADER -->
-      <div class="flex justify-between items-center p-4 border-b border-gray-800">
-        <h3 class="text-lg font-semibold m-0">{{ edit ? "Edit User" : "Add New User" }}</h3>
-        <button class="bg-transparent border-none text-xl text-gray-500 cursor-pointer hover:text-white transition-colors" @click="$emit('close')">×</button>
+      <div class="modal-header">
+        <h3>{{ edit ? "Edit User" : "Add New User" }}</h3>
+        <button class="close" @click="$emit('close')">×</button>
       </div>
 
       <!-- BODY -->
-      <div class="p-4 overflow-y-auto max-h-[calc(85vh-120px)]">
-        <div class="flex flex-col mb-3">
-          <label class="text-xs text-gray-500 mb-1">Full Name</label>
-          <input
-            v-model="form.name"
-            placeholder="Full name"
-            class="bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors"
-          />
-        </div>
-        <div class="flex flex-col mb-3">
-          <label class="text-xs text-gray-500 mb-1">Phone</label>
-          <input
-            v-model="form.phone"
-            placeholder="08xxxxxxxxxx"
-            class="bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors"
-          />
-        </div>
+      <div class="modal-body">
+        <div class="form-group">
+  <label>Full Name</label>
+  <input
+    v-model="form.name"
+    placeholder="Full name"
+  />
+</div>
+<div class="form-group">
+  <label>Phone</label>
+  <input
+    v-model="form.phone"
+    placeholder="08xxxxxxxxxx"
+  />
+</div>
 
-        <div class="flex flex-col mb-3">
-          <label class="text-xs text-gray-500 mb-1">Username</label>
+        <div class="form-group">
+          <label>Username</label>
           <input
             v-model="form.username"
             :disabled="edit"
             placeholder="username"
-            class="bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </div>
 
-        <div class="flex flex-col mb-3" v-if="!edit">
-          <label class="text-xs text-gray-500 mb-1">Password</label>
+        <div class="form-group" v-if="!edit">
+          <label>Password</label>
           <input
             type="password"
             v-model="form.password"
             placeholder="Default: 123456"
-            class="bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors"
           />
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div class="flex flex-col mb-3">
-            <label class="text-xs text-gray-500 mb-1">Role</label>
-            <select v-model="form.role_id" class="bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors cursor-pointer">
+        <div class="row">
+          <div class="form-group">
+            <label>Role</label>
+            <select v-model="form.role_id">
               <option disabled value="">Select Role</option>
               <option
                 v-for="r in roles"
@@ -61,9 +57,9 @@
             </select>
           </div>
 
-          <div class="flex flex-col mb-3">
-            <label class="text-xs text-gray-500 mb-1">Branch</label>
-            <select v-model="form.branch_id" class="bg-black border border-gray-800 text-white p-2 rounded focus:outline-none focus:border-gold transition-colors cursor-pointer">
+          <div class="form-group">
+            <label>Branch</label>
+            <select v-model="form.branch_id">
               <option value="">All / None</option>
               <option
                 v-for="b in branches"
@@ -78,11 +74,11 @@
       </div>
 
       <!-- FOOTER -->
-      <div class="flex justify-end gap-3 p-4 border-t border-gray-800">
-        <button class="bg-transparent border border-gold text-gold px-4 py-2 rounded cursor-pointer hover:bg-gold hover:text-black transition-all" @click="$emit('close')">
+      <div class="modal-footer">
+        <button class="btn-outline" @click="$emit('close')">
           Cancel
         </button>
-        <button class="bg-gold text-black px-4 py-2 rounded cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed" @click="save" :disabled="loading">
+        <button class="btn-primary" @click="save" :disabled="loading">
           {{ loading ? "Saving..." : "Save" }}
         </button>
       </div>
@@ -173,3 +169,104 @@ const save = async () => {
 }
 
 </script>
+
+<style scoped>
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  width: 420px;
+  max-height: 85vh;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-strong);
+  animation: pop .2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes pop {
+  from { transform: scale(.95); opacity: 0 }
+  to { transform: scale(1); opacity: 1 }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.modal-header h3 {
+  margin: 0;
+}
+
+.close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 16px;
+  overflow-y: auto;
+  max-height: calc(85vh - 120px);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+
+label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+input, select {
+  background: #000;
+  border: 1px solid var(--border-soft);
+  color: white;
+  padding: 8px;
+  border-radius: var(--radius);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.btn-primary {
+  background: var(--gold);
+  color: black;
+  padding: 8px 14px;
+}
+
+.btn-outline {
+  background: none;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  padding: 8px 14px;
+}
+</style>

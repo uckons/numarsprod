@@ -1,80 +1,79 @@
 <template>
-  <div class="p-6">
+  <div class="page">
 
     <!-- HEADER -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div class="header">
       <div>
-        <h2 class="text-2xl font-bold text-white">User Management</h2>
-        <p class="text-gray-400 text-sm mt-1">Manage system users & access</p>
+        <h2>User Management</h2>
+        <p class="subtitle">Manage system users & access</p>
       </div>
-      <button class="bg-gold text-black font-semibold px-4 py-2 rounded-lg hover:brightness-110 active:scale-95 transition-all duration-150" @click="openAdd">+ Add User</button>
+      <button class="btn-primary" @click="openAdd">+ Add User</button>
     </div>
     <!-- STATS -->
-<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-  <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-5 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-250">
-    <p class="text-sm text-gray-400">Total Users</p>
-    <h3 class="text-3xl font-bold mt-2 text-white">{{ stats.total }}</h3>
+<div class="stats">
+  <div class="stat-card">
+    <p>Total Users</p>
+    <h3>{{ stats.total }}</h3>
   </div>
 
-  <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-5 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-250">
-    <p class="text-sm text-gray-400">Active</p>
-    <h3 class="text-3xl font-bold mt-2 text-success">{{ stats.active }}</h3>
+  <div class="stat-card active">
+    <p>Active</p>
+    <h3>{{ stats.active }}</h3>
   </div>
 
-  <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-5 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-250">
-    <p class="text-sm text-gray-400">Disabled</p>
-    <h3 class="text-3xl font-bold mt-2 text-danger">{{ stats.disabled }}</h3>
+  <div class="stat-card disabled">
+    <p>Disabled</p>
+    <h3>{{ stats.disabled }}</h3>
   </div>
 
-  <div class="bg-gradient-to-br from-[#0e0e0e] to-[#151515] rounded-2xl p-5 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-250">
-    <p class="text-sm text-gray-400">New This Month</p>
-    <h3 class="text-3xl font-bold mt-2 text-gold">+{{ stats.new_month }}</h3>
+  <div class="stat-card new">
+    <p>New This Month</p>
+    <h3>+{{ stats.new_month }}</h3>
   </div>
 </div>
 
     <!-- FILTER -->
-    <div class="bg-bg-card rounded-xl p-4 mt-4 shadow-lg flex flex-col sm:flex-row gap-3">
-      <input v-model="q" placeholder="Search username..." class="flex-1 bg-black border border-gray-700 text-white px-3 py-2 rounded-lg focus:outline-none focus:border-gold transition-colors" />
-      <select v-model="role" class="flex-1 sm:flex-none bg-black border border-gray-700 text-white px-3 py-2 rounded-lg focus:outline-none focus:border-gold transition-colors">
+    <div class="card filter">
+      <input v-model="q" placeholder="Search username..." />
+      <select v-model="role">
         <option value="">All Roles</option>
         <option v-for="r in roles" :key="r" :value="r">{{ r }}</option>
       </select>
-      <button class="bg-transparent border border-gold text-gold px-4 py-2 rounded-lg hover:brightness-110 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed" @click="load" :disabled="loading">
+      <button class="btn-outline" @click="load" :disabled="loading">
         {{ loading ? "Loading..." : "Search" }}
       </button>
     </div>
 
     <!-- BULK BAR -->
     <transition name="fade">
-      <div v-if="selectedIds.length" class="mt-3 p-3 bg-gold/10 border border-gold rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <span class="text-white">{{ selectedIds.length }} selected</span>
-        <div class="flex gap-2 flex-wrap">
-          <button class="bg-warn text-white px-3 py-2 rounded-lg hover:brightness-110 active:scale-95 transition-all duration-150" @click="bulkToggle">Toggle Active</button>
-          <button class="bg-danger text-white px-3 py-2 rounded-lg hover:brightness-110 active:scale-95 transition-all duration-150" @click="bulkDelete">Delete</button>
+      <div v-if="selectedIds.length" class="bulk-bar">
+        <span>{{ selectedIds.length }} selected</span>
+        <div>
+          <button class="warn" @click="bulkToggle">Toggle Active</button>
+          <button class="danger" @click="bulkDelete">Delete</button>
         </div>
       </div>
     </transition>
 
     <!-- TABLE -->
-    <div class="bg-bg-card rounded-xl p-4 mt-4 shadow-lg overflow-x-auto">
-      <table class="w-full border-collapse">
+    <div class="card table-card">
+      <table>
         <thead>
   <tr>
-    <th class="w-10 text-gray-400 text-xs px-3 py-3 text-left">
+    <th width="40">
       <input
         type="checkbox"
         v-model="selectAll"
         @change="toggleAll"
-        class="cursor-pointer accent-gold"
       />
     </th>
-    <th class="text-gray-400 text-xs px-3 py-3 text-left whitespace-nowrap">Full Name</th>
-    <th class="text-gray-400 text-xs px-3 py-3 text-left whitespace-nowrap">Username</th>
-    <th class="text-gray-400 text-xs px-3 py-3 text-left whitespace-nowrap">Phone</th>
-    <th class="text-gray-400 text-xs px-3 py-3 text-left whitespace-nowrap">Role</th>
-    <th class="text-gray-400 text-xs px-3 py-3 text-left whitespace-nowrap">Branch</th>
-    <th class="text-gray-400 text-xs px-3 py-3 text-left whitespace-nowrap">Status</th>
-    <th class="text-gray-400 text-xs px-3 py-3 text-left whitespace-nowrap min-w-[260px]">Actions</th>
+    <th>Full Name</th>
+    <th>Username</th>
+    <th>Phone</th>
+    <th>Role</th>
+    <th>Branch</th>
+    <th>Status</th>
+    <th width="260">Actions</th>
   </tr>
 </thead>
 
@@ -82,74 +81,70 @@
         <transition-group name="fade" tag="tbody">
           <!-- LOADING -->
           <tr v-if="loading" v-for="i in limit" :key="'sk'+i">
-            <td colspan="8" class="px-3 py-3 border-t border-gray-800">
-              <div class="h-3.5 rounded-lg bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 bg-[length:400%_100%] animate-[skeleton_1.4s_infinite]"></div>
-            </td>
+            <td colspan="6"><div class="skeleton"></div></td>
           </tr>
 
           <!-- EMPTY -->
           <tr v-else-if="!users.length" key="empty">
-            <td colspan="8" class="px-3 py-3 border-t border-gray-800 text-center text-gray-400">No users found</td>
+            <td colspan="6" class="empty">No users found</td>
           </tr>
 
           <!-- DATA -->
           <tr
   v-for="u in users"
   :key="u.id"
-  class="transition-all duration-250 hover:bg-gradient-to-r hover:from-gold/8 hover:to-gold/2 hover:translate-x-1 hover:shadow-[inset_4px_0_0_theme(colors.gold)]"
+  class="fade-row"
 >
   <!-- CHECKBOX -->
-  <td class="px-3 py-3 border-t border-gray-800">
+  <td>
     <input
       type="checkbox"
       :value="u.id"
       v-model="selectedIds"
-      class="cursor-pointer accent-gold"
     />
   </td>
 
   <!-- FULL NAME -->
-  <td class="px-3 py-3 border-t border-gray-800 font-semibold text-white whitespace-nowrap">
+  <td class="name">
     {{ u.name }}
   </td>
 
   <!-- USERNAME -->
-  <td class="px-3 py-3 border-t border-gray-800 font-medium text-white whitespace-nowrap">
+  <td class="username">
     {{ u.username }}
   </td>
 
   <!-- PHONE -->
-  <td class="px-3 py-3 border-t border-gray-800 text-gray-400 text-sm whitespace-nowrap">
+  <td class="phone">
     {{ u.phone }}
   </td>
 
   <!-- ROLE -->
-  <td class="px-3 py-3 border-t border-gray-800 whitespace-nowrap">
-    <span class="inline-block px-2.5 py-1 rounded-xl text-xs bg-gold/20 text-gold">{{ u.role }}</span>
+  <td>
+    <span class="badge role">{{ u.role }}</span>
   </td>
 
   <!-- BRANCH -->
-  <td class="px-3 py-3 border-t border-gray-800 text-white whitespace-nowrap">
+  <td>
     {{ u.branch || "-" }}
   </td>
 
   <!-- STATUS -->
-  <td class="px-3 py-3 border-t border-gray-800 whitespace-nowrap">
+  <td>
     <span
-      class="inline-block px-2.5 py-1 rounded-xl text-xs"
-      :class="u.is_active ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'"
+      class="badge"
+      :class="u.is_active ? 'success' : 'danger'"
     >
       {{ u.is_active ? "ACTIVE" : "DISABLED" }}
     </span>
   </td>
 
   <!-- ACTIONS -->
-  <td class="px-3 py-3 border-t border-gray-800 whitespace-nowrap">
-    <button class="bg-gray-700 text-white px-3 py-2 rounded-lg mr-1.5 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 transition-all duration-200" @click="edit(u)">Edit</button>
-    <button class="bg-warn text-white px-3 py-2 rounded-lg mr-1.5 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 transition-all duration-200" @click="reset(u)">Reset PW</button>
+  <td class="actions">
+    <button @click="edit(u)">Edit</button>
+    <button class="warn" @click="reset(u)">Reset PW</button>
     <button
-      class="px-3 py-2 rounded-lg hover:-translate-y-0.5 hover:shadow-lg active:scale-95 transition-all duration-200 text-white"
-      :class="u.is_active ? 'bg-danger' : 'bg-success'"
+      :class="u.is_active ? 'danger' : 'success'"
       @click="toggle(u)"
     >
       {{ u.is_active ? "Disable" : "Enable" }}
@@ -161,10 +156,10 @@
       </table>
 
       <!-- PAGINATION -->
-      <div class="flex justify-center items-center gap-3 mt-4">
-        <button class="bg-gray-700 text-white px-4 py-2 rounded-lg hover:brightness-110 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed" :disabled="page===1" @click="prev">Prev</button>
-        <span class="text-white">Page {{ page }}</span>
-        <button class="bg-gray-700 text-white px-4 py-2 rounded-lg hover:brightness-110 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed" :disabled="page*limit>=total" @click="next">Next</button>
+      <div class="pagination">
+        <button :disabled="page===1" @click="prev">Prev</button>
+        <span>Page {{ page }}</span>
+        <button :disabled="page*limit>=total" @click="next">Next</button>
       </div>
     </div>
 
@@ -291,23 +286,227 @@ const bulkDelete = async () => {
 </script>
 
 <style scoped>
-/* TRANSITIONS */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+.page { padding:24px }
+
+/* HEADER */
+.header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
 }
-.fade-enter-from {
-  opacity: 0;
-  transform: translateY(6px);
-}
-.fade-leave-to {
-  opacity: 0;
-  transform: translateY(-6px);
+.subtitle { color:#888; font-size:13px }
+
+/* CARD */
+.card {
+  background:#111;
+  border-radius:14px;
+  padding:16px;
+  margin-top:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,.4);
 }
 
-/* SKELETON ANIMATION */
-@keyframes skeleton {
-  0% { background-position: 100% 0; }
-  100% { background-position: 0 0; }
+/* FILTER */
+.filter { display:flex; gap:12px }
+.filter input,
+.filter select {
+  background:#000;
+  border:1px solid #333;
+  color:#fff;
+  padding:8px;
+  border-radius:10px;
 }
+
+/* BULK */
+.bulk-bar {
+  margin-top:12px;
+  padding:12px;
+  background:rgba(201,162,77,.1);
+  border:1px solid #c9a24d;
+  border-radius:12px;
+  display:flex;
+  justify-content:space-between;
+}
+
+/* TABLE */
+table { width:100%; border-collapse:collapse }
+th {
+  color:#888;
+  font-size:12px;
+  padding:12px;
+  text-align:left;
+}
+td {
+  padding:12px;
+  border-top:1px solid #222;
+}
+.row {
+  transition:background .25s ease, transform .15s ease;
+}
+.row:hover {
+  background:rgba(255,255,255,.04);
+  transform:translateY(-1px);
+}
+.username { font-weight:600 }
+
+/* BADGE */
+.badge {
+  padding:4px 10px;
+  border-radius:12px;
+  font-size:12px;
+}
+.success {
+  background:rgba(39,174,96,.2);
+  color:#2ecc71;
+}
+.danger {
+  background:rgba(192,57,43,.2);
+  color:#e74c3c;
+}
+.role {
+  background:rgba(201,162,77,.2);
+  color:#c9a24d;
+}
+
+/* BUTTON */
+button {
+  border:none;
+  padding:8px 12px;
+  border-radius:10px;
+  cursor:pointer;
+  transition:all .15s ease;
+}
+button:hover { filter:brightness(1.1) }
+button:active { transform:scale(.96) }
+
+.btn-primary { background:#c9a24d; color:#000 }
+.btn-outline { background:none; border:1px solid #c9a24d; color:#c9a24d }
+.warn { background:#f39c12 }
+.actions button { margin-right:6px }
+
+/* PAGINATION */
+.pagination {
+  display:flex;
+  justify-content:center;
+  gap:12px;
+  margin-top:16px;
+}
+
+/* SKELETON */
+.skeleton {
+  height:14px;
+  border-radius:8px;
+  background:linear-gradient(90deg,#222 25%,#333 37%,#222 63%);
+  background-size:400% 100%;
+  animation:skeleton 1.4s infinite;
+}
+@keyframes skeleton {
+  0%{background-position:100% 0}
+  100%{background-position:0 0}
+}
+
+/* TRANSITION */
+.fade-enter-active,
+.fade-leave-active {
+  transition:opacity .2s ease, transform .2s ease;
+}
+.fade-enter-from {
+  opacity:0;
+  transform:translateY(6px);
+}
+.fade-leave-to {
+  opacity:0;
+  transform:translateY(-6px);
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.stat-card {
+  background: linear-gradient(145deg, #0e0e0e, #151515);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  transition: all .25s ease;
+  cursor: default;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+
+.stat-card p {
+  font-size: 13px;
+  color: #999;
+}
+
+.stat-card h3 {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.stat-card.active h3 {
+  color: #2ecc71;
+}
+
+.stat-card.disabled h3 {
+  color: #e74c3c;
+}
+
+.stat-card.new h3 {
+  color: #c9a24d;
+}
+
+.name {
+  font-weight: 600;
+}
+.username {
+  font-weight: 500;
+}
+.phone {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+/* ROW HOVER */
+tbody tr {
+  transition: 
+    background 0.25s ease,
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+tbody tr:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(201,162,77,0.08),
+    rgba(201,162,77,0.02)
+  );
+  transform: translateX(4px);
+  box-shadow: inset 4px 0 0 var(--gold);
+}
+
+/* BUTTON HOVER */
+.actions button {
+  transition: 
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.actions button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0,0,0,.4);
+  opacity: .95;
+}
+
+/* CHECKBOX HOVER */
+input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--gold);
+}
+
 </style>

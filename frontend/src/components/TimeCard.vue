@@ -1,27 +1,21 @@
 <template>
-  <div class="bg-[#0f0f0f] border-2 rounded-2xl p-3.5 flex flex-col gap-2.5 transition-all duration-200"
-       :class="{
-         'border-success': timer.status === 'RUNNING',
-         'border-danger': timer.status === 'FINISHED',
-         'border-[#333]': timer.status === 'EMPTY',
-         'opacity-70': timer.paused
-       }">
+  <div class="timer-card" :class="statusClass">
     <!-- HEADER -->
-    <div class="flex justify-between items-start">
+    <div class="header">
       <div>
-        <h4 class="m-0 text-sm">{{ title }}</h4>
-        <small v-if="timer.order_id" class="text-text-muted text-[11px]">
+        <h4>{{ title }}</h4>
+        <small v-if="timer.order_id">
           Order #{{ timer.order_id }}
         </small>
       </div>
 
-      <span v-if="timer.service_type" class="bg-gold/20 text-gold text-[11px] px-2.5 py-1 rounded-xl">
+      <span class="badge" v-if="timer.service_type">
         {{ timer.service_type }}
       </span>
     </div>
 
     <!-- INFO -->
-    <div v-if="timer.status !== 'EMPTY'" class="text-xs text-[#bbb] leading-relaxed">
+    <div class="info" v-if="timer.status !== 'EMPTY'">
       <div>Terapis: <strong>{{ timer.therapist_name }}</strong></div>
       <div v-if="timer.service_type === 'SPA'">
         Room: <strong>{{ timer.room_no }}</strong>
@@ -32,16 +26,16 @@
     </div>
 
     <!-- TIME -->
-    <div class="text-center text-3xl font-extrabold tracking-wide">
+    <div class="time">
       {{ displayTime }}
     </div>
 
     <!-- ACTIONS -->
-    <div class="flex gap-1.5">
+    <div class="actions">
       <!-- START -->
       <button
         v-if="timer.status !== 'RUNNING'"
-        class="flex-1 py-2 rounded-[10px] border-0 text-xs font-bold cursor-pointer bg-gold text-black"
+        class="start"
         @click="$emit('start', timer.slot)"
       >
         Start
@@ -50,7 +44,7 @@
       <!-- PAUSE / RESUME -->
       <button
         v-if="timer.status === 'RUNNING' && !timer.paused"
-        class="flex-1 py-2 rounded-[10px] border-0 text-xs font-bold cursor-pointer bg-warn text-white"
+        class="pause"
         @click="$emit('pause', timer.slot)"
       >
         ? Pause
@@ -58,7 +52,7 @@
 
       <button
         v-if="timer.status === 'RUNNING' && timer.paused"
-        class="flex-1 py-2 rounded-[10px] border-0 text-xs font-bold cursor-pointer bg-success text-white"
+        class="resume"
         @click="$emit('resume', timer.slot)"
       >
         ? Resume
@@ -67,7 +61,7 @@
       <!-- EXTEND -->
       <button
         v-if="timer.status === 'RUNNING'"
-        class="flex-1 py-2 rounded-[10px] border-0 text-xs font-bold cursor-pointer bg-[#444] text-white"
+        class="extend"
         @click="$emit('extend', timer.slot, 10)"
       >
         +10m
@@ -111,3 +105,83 @@ const statusClass = computed(() => ({
   paused: props.timer.paused
 }))
 </script>
+
+<style scoped>
+.timer-card {
+  background: #0f0f0f;
+  border: 2px solid #222;
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all .2s ease;
+}
+
+/* STATES */
+.running { border-color: #2ecc71; }
+.finished { border-color: #e74c3c; }
+.empty { border-color: #333; }
+.paused { opacity: .7; }
+
+/* HEADER */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.header h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.header small {
+  color: #888;
+  font-size: 11px;
+}
+
+.badge {
+  background: rgba(201,162,77,.2);
+  color: #c9a24d;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+/* INFO */
+.info {
+  font-size: 12px;
+  color: #bbb;
+  line-height: 1.4;
+}
+
+/* TIME */
+.time {
+  text-align: center;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+/* ACTIONS */
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+button {
+  flex: 1;
+  padding: 8px 0;
+  border-radius: 10px;
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.start { background: #c9a24d; color: #000; }
+.pause { background: #e67e22; color: #fff; }
+.resume { background: #27ae60; color: #fff; }
+.extend { background: #444; color: #fff; }
+</style>

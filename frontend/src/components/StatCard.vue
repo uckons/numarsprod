@@ -1,7 +1,7 @@
 <template>
-  <div class="bg-bg-card p-5 rounded-2xl shadow-lg">
-    <p class="text-text-muted text-[13px]">{{ label }}</p>
-    <h2 class="mt-1.5 text-gold">{{ value }}</h2>
+  <div class="card">
+    <p class="label">{{ label }}</p>
+    <h2>{{ value }}</h2>
   </div>
 </template>
 
@@ -11,3 +11,20 @@ defineProps({
   value: [String, Number]
 })
 </script>
+
+<style scoped>
+.card {
+  background: var(--bg-card);
+  padding: 20px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+}
+.label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+h2 {
+  margin-top: 6px;
+  color: var(--gold);
+}
+</style>
