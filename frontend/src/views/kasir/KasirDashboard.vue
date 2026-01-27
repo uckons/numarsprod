@@ -98,21 +98,29 @@ const TIMER_SLOTS = 30
 const timers = ref(
   Array.from({ length: 30 }, (_, i) => ({
     slot: i + 1,
-    status: "EMPTY", // ?? PENTING
-
+    status: "EMPTY",
+    id: null,
     order_id: null,
-    service_type: null, // SPA | LC
+    service_name: null,
     therapist_name: null,
-    room_no: null,      // SPA
-    sofa_no: null,      // LC
-
+    room_name: null,
     start_time: null,
     planned_end_time: null,
+    remaining_seconds: null,
     paused: false,
     warned: false
   }))
 )
-const visibleTimers = computed(() => timers.value.slice(0, 12))
+const visibleTimers = computed(() => timers.value.filter(t => t.status === "RUNNING").slice(0, 12))
+
+// Countdown interval
+let countdownInterval = null
+let apiRefreshInterval = null
+let isSyncing = false
+
+// Refresh intervals in milliseconds
+const COUNTDOWN_INTERVAL = 1000    // 1 second
+const API_REFRESH_INTERVAL = 30000 // 30 seconds
 
 const format = n =>
   new Intl.NumberFormat("id-ID").format(n || 0)
@@ -187,39 +195,89 @@ const createManualTimer = async (data) => {
   }
 }
 const syncTimers = async () => {
-  const headers = {
-   Authorization: `Bearer ${auth.token}`
+  if (isSyncing) return // Prevent multiple simultaneous syncs
+  
+  try {
+    isSyncing = true
+    const response = await api.get("/timers/active", {
+      params: { branch_id: auth.user.branch_id }
+    })
+    const activeTimers = response.data
+    
+    // Reset all slots to EMPTY
+    timers.value.forEach(t => {
+      Object.assign(t, {
+        status: "EMPTY",
+        id: null,
+        order_id: null,
+        service_name: null,
+        therapist_name: null,
+        room_name: null,
+        start_time: null,
+        planned_end_time: null,
+        remaining_seconds: null,
+        paused: false,
+        warned: false
+      })
+    })
+    
+    // Populate slots with active timers
+    activeTimers.forEach((at, index) => {
+      if (index < timers.value.length) {
+        const slot = timers.value[index]
+        Object.assign(slot, {
+          status: "RUNNING",
+          id: at.id,
+          order_id: at.order_id,
+          service_name: at.service_name,
+          therapist_name: at.therapist_name,
+          room_name: at.room_name,
+          start_time: at.start_time,
+          planned_end_time: at.planned_end_time,
+          remaining_seconds: at.remaining_seconds,
+          paused: false
+        })
+      }
+    })
+  } catch (err) {
+    console.error("Failed to sync timers:", err)
+  } finally {
+    isSyncing = false
   }
-  const res = await fetch("/api/timers/active", { headers })
-  const activeTimers = await res.json()
-  // 🔥 RESET SLOT
-  timers.value.forEach(t => {
-    Object.assign(t, {
-      active: false,
-      warned: false,
-      order_id: null,
-      therapist_name: null,
-      start_time: null,
-      planned_end_time: null,
-      paused: false
-    })
-  })
-  activeTimers.forEach(at => {
-    const slot = timers.value.find(t => !t.active)
-    if (!slot) return
+}
 
-    Object.assign(slot, {
-      active: true,
-      order_id: at.order_id,
-      therapist_name: at.therapist_name,
-      start_time: at.start_time,
-      planned_end_time: at.planned_end_time
-    })
+// Update countdown every second
+const updateCountdown = () => {
+  timers.value.forEach(t => {
+    if (t.status === "RUNNING" && t.planned_end_time) {
+      const remaining = Math.floor((new Date(t.planned_end_time).getTime() - Date.now()) / 1000)
+      t.remaining_seconds = remaining
+      
+      // Handle timer completion
+      if (remaining <= 0 && !t.warned) {
+        t.warned = true
+        console.warn(`⏰ Timer selesai: ${t.therapist_name || "Terapis"}`)
+        // Re-sync to remove completed timers
+        syncTimers()
+      }
+    }
   })
 }
+
 onMounted(async () => {
   await loadDashboard()
   await syncTimers()
+  
+  // Start countdown interval (every 1 second)
+  countdownInterval = setInterval(updateCountdown, COUNTDOWN_INTERVAL)
+  
+  // Start API refresh interval (every 30 seconds)
+  apiRefreshInterval = setInterval(syncTimers, API_REFRESH_INTERVAL)
+})
+
+onUnmounted(() => {
+  if (countdownInterval) clearInterval(countdownInterval)
+  if (apiRefreshInterval) clearInterval(apiRefreshInterval)
 })
 
 watch(
