@@ -1,5 +1,5 @@
 <template>
-  <div class="timer-card" :class="statusClass">
+  <div class="timer-card" :class="statusClass" :style="{ backgroundColor: cardBackgroundColor }">
     <!-- HEADER -->
     <div class="header">
       <div>
@@ -9,19 +9,17 @@
         </small>
       </div>
 
-      <span class="badge" v-if="timer.service_type">
-        {{ timer.service_type }}
+      <span class="badge" v-if="timer.service_name">
+        {{ timer.service_name }}
       </span>
     </div>
 
     <!-- INFO -->
     <div class="info" v-if="timer.status !== 'EMPTY'">
-      <div>Terapis: <strong>{{ timer.therapist_name }}</strong></div>
-      <div v-if="timer.service_type === 'SPA'">
-        Room: <strong>{{ timer.room_no }}</strong>
-      </div>
-      <div v-if="timer.service_type === 'LC'">
-        Sofa: <strong>{{ timer.sofa_no }}</strong>
+      <div v-if="timer.service_name">Service: <strong>{{ timer.service_name }}</strong></div>
+      <div v-if="timer.therapist_name">Terapis: <strong>{{ timer.therapist_name }}</strong></div>
+      <div v-if="timer.room_name">
+        Room/Sofa: <strong>{{ timer.room_name }}</strong>
       </div>
     </div>
 
@@ -91,11 +89,24 @@ const remainingMs = computed(() => {
 })
 
 const displayTime = computed(() => {
-  if (props.timer.status !== "RUNNING") return "00:00"
+  if (props.timer.status !== "RUNNING") return "00:00:00"
   const ms = Math.max(0, remainingMs.value)
-  const m = Math.floor(ms / 60000)
+  const h = Math.floor(ms / 3600000)
+  const m = Math.floor((ms % 3600000) / 60000)
   const s = Math.floor((ms % 60000) / 1000)
-  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
+})
+
+const cardBackgroundColor = computed(() => {
+  if (props.timer.status !== "RUNNING") return "#0f0f0f"
+  
+  const remainingSeconds = Math.floor(remainingMs.value / 1000)
+  
+  if (remainingSeconds >= 3600) return "#10b981" // Green: >= 60 minutes
+  if (remainingSeconds <= 1800 && remainingSeconds >= 600) return "#eab308" // Yellow: <= 30 minutes
+  if (remainingSeconds < 600) return "#ef4444" // Red: < 10 minutes
+  
+  return "#64748b" // Gray: default
 })
 
 const statusClass = computed(() => ({
@@ -115,7 +126,7 @@ const statusClass = computed(() => ({
   display: flex;
   flex-direction: column;
   gap: 10px;
-  transition: all .2s ease;
+  transition: background-color .3s ease, all .2s ease;
 }
 
 /* STATES */

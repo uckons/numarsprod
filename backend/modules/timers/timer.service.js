@@ -68,12 +68,16 @@ exports.getActiveTimers = async (db, branchId) => {
       t.order_id,
       t.service_id,
       s.name AS service_name,
+      th.name AS therapist_name,
+      r.name AS room_name,
       t.start_time,
-      t.planned_end_time
+      t.planned_end_time,
+      EXTRACT(EPOCH FROM (t.planned_end_time - NOW()))::INTEGER AS remaining_seconds
     FROM timers t
     JOIN services s ON s.id = t.service_id
+    LEFT JOIN therapists th ON th.id = t.therapist_id
+    LEFT JOIN rooms r ON r.id = t.room_id
     WHERE
- -- t.status = 'RUNNING'
         t.end_time IS NULL 
      AND t.branch_id = $1
     ORDER BY t.start_time ASC
