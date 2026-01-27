@@ -5,33 +5,53 @@
 
       <!-- SERVICE TYPE -->
       <div class="field">
-        <label>Tipe Service</label>
-        <select v-model="serviceType">
-          <option value="SPA">SPA</option>
-          <option value="LC">LC</option>
+        <label>Pilih Service</label>
+        <select v-model="selectedServiceId" @change="onServiceChange" :disabled="loadingServices">
+          <option value="">-- Pilih Service --</option>
+          <option v-for="svc in services" :key="svc.id" :value="svc.id">
+            {{ svc.name }} ({{ svc.duration_minutes }} menit)
+          </option>
         </select>
+        <span v-if="loadingServices" class="loading-text">Memuat...</span>
       </div>
 
       <!-- THERAPIST -->
       <div class="field">
         <label>Nama Terapis</label>
-        <input v-model="therapist" placeholder="Nama terapis" />
+        <select v-model="selectedTherapistId" :disabled="loadingTherapists || !serviceType">
+          <option value="">-- Pilih Terapis --</option>
+          <option v-for="t in therapists" :key="t.id" :value="t.id">
+            {{ t.name }} {{ t.grade_name ? `(${t.grade_name})` : '' }}
+          </option>
+        </select>
+        <span v-if="loadingTherapists" class="loading-text">Memuat...</span>
       </div>
 
       <!-- ROOM / SOFA -->
-      <div class="field" v-if="serviceType === 'SPA'">
-        <label>Room</label>
-        <input v-model="room" placeholder="Room No" />
-      </div>
-
-      <div class="field" v-if="serviceType === 'LC'">
-        <label>Sofa</label>
-        <input v-model="sofa" placeholder="Sofa No" />
+      <div class="field" v-if="serviceType">
+        <label>{{ serviceType === 'SPA' ? 'Room' : 'Sofa' }}</label>
+        <select v-model="selectedRoomId" :disabled="loadingRooms || !serviceType">
+          <option value="">-- Pilih {{ serviceType === 'SPA' ? 'Room' : 'Sofa' }} --</option>
+          <option 
+            v-for="r in rooms" 
+            :key="r.id" 
+            :value="r.id"
+            :disabled="r.is_occupied"
+          >
+            {{ r.name }} {{ r.is_occupied ? '❌ Occupied' : '✅ Free' }}
+          </option>
+        </select>
+        <span v-if="loadingRooms" class="loading-text">Memuat...</span>
       </div>
 
       <!-- DURATION (FIX, READONLY) -->
-      <div class="duration">
-        ? Durasi: <strong>{{ duration }} menit</strong>
+      <div class="duration" v-if="duration">
+        ⏱ Durasi: <strong>{{ duration }} menit</strong>
+      </div>
+
+      <!-- ERROR MESSAGE -->
+      <div v-if="errorMessage" class="error-message">
+        {{ errorMessage }}
       </div>
 
       <!-- ACTIONS -->
@@ -39,8 +59,8 @@
         <button class="cancel" @click="$emit('close')">
           Batal
         </button>
-        <button class="start" @click="submit">
-          Mulai
+        <button class="start" @click="submit" :disabled="isSubmitting">
+          {{ isSubmitting ? 'Memproses...' : 'Mulai' }}
         </button>
       </div>
     </div>
@@ -48,39 +68,145 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue"
+import { ref, computed, onMounted, watch } from "vue"
+import api from "@/services/api"
 
 const emit = defineEmits(["close", "start"])
 
-const serviceType = ref("SPA")
-const therapist = ref("")
-const room = ref("")
-const sofa = ref("")
+// State
+const services = ref([])
+const therapists = ref([])
+const rooms = ref([])
 
-/**
- * ? DURASI FIX SESUAI SERVICE
- * (NANTI BISA DIAMBIL DARI DB)
- */
-const duration = computed(() => {
-  if (serviceType.value === "SPA") return 60
-  if (serviceType.value === "LC") return 180
-  return 60
+const selectedServiceId = ref("")
+const selectedTherapistId = ref("")
+const selectedRoomId = ref("")
+
+const loadingServices = ref(false)
+const loadingTherapists = ref(false)
+const loadingRooms = ref(false)
+const isSubmitting = ref(false)
+const errorMessage = ref("")
+
+// Computed
+const selectedService = computed(() => {
+  return services.value.find(s => s.id === parseInt(selectedServiceId.value))
 })
 
+const serviceType = computed(() => {
+  return selectedService.value?.type || ""
+})
+
+const duration = computed(() => {
+  return selectedService.value?.duration_minutes || 0
+})
+
+// Methods
+const fetchServices = async () => {
+  try {
+    loadingServices.value = true
+    errorMessage.value = ""
+    
+    // Fetch all services (will be filtered by active services on backend)
+    const res = await api.get("/services")
+    services.value = res.data.filter(s => s.is_active && s.duration_minutes > 0)
+  } catch (err) {
+    console.error("Error fetching services:", err)
+    errorMessage.value = "Gagal memuat daftar service"
+  } finally {
+    loadingServices.value = false
+  }
+}
+
+const fetchTherapists = async () => {
+  if (!serviceType.value) return
+  
+  try {
+    loadingTherapists.value = true
+    errorMessage.value = ""
+    
+    const res = await api.get("/timers/therapists", {
+      params: { service_type: serviceType.value }
+    })
+    therapists.value = res.data
+  } catch (err) {
+    console.error("Error fetching therapists:", err)
+    errorMessage.value = "Gagal memuat daftar terapis"
+  } finally {
+    loadingTherapists.value = false
+  }
+}
+
+const fetchRooms = async () => {
+  if (!serviceType.value) return
+  
+  try {
+    loadingRooms.value = true
+    errorMessage.value = ""
+    
+    const res = await api.get("/timers/rooms", {
+      params: { service_type: serviceType.value }
+    })
+    rooms.value = res.data
+  } catch (err) {
+    console.error("Error fetching rooms:", err)
+    errorMessage.value = "Gagal memuat daftar room/sofa"
+  } finally {
+    loadingRooms.value = false
+  }
+}
+
+const onServiceChange = () => {
+  // Reset selections when service changes
+  selectedTherapistId.value = ""
+  selectedRoomId.value = ""
+  
+  // Fetch therapists and rooms for the new service type
+  if (serviceType.value) {
+    fetchTherapists()
+    fetchRooms()
+  }
+}
+
 const submit = () => {
-  if (!therapist.value) {
-    alert("Nama terapis wajib diisi")
+  errorMessage.value = ""
+  
+  // Validation
+  if (!selectedServiceId.value) {
+    errorMessage.value = "Silakan pilih service"
     return
   }
-
+  
+  if (!selectedTherapistId.value) {
+    errorMessage.value = "Silakan pilih terapis"
+    return
+  }
+  
+  if (!selectedRoomId.value && serviceType.value) {
+    errorMessage.value = `Silakan pilih ${serviceType.value === 'SPA' ? 'room' : 'sofa'}`
+    return
+  }
+  
+  isSubmitting.value = true
+  
   emit("start", {
+    service_id: parseInt(selectedServiceId.value),
     service_type: serviceType.value,
-    therapist_name: therapist.value,
-    room_no: serviceType.value === "SPA" ? room.value : null,
-    sofa_no: serviceType.value === "LC" ? sofa.value : null,
-    duration: duration.value
+    therapist_id: parseInt(selectedTherapistId.value),
+    room_id: parseInt(selectedRoomId.value),
+    duration_minutes: duration.value
   })
+  
+  // Reset submitting state after a delay
+  setTimeout(() => {
+    isSubmitting.value = false
+  }, 1000)
 }
+
+// Lifecycle
+onMounted(() => {
+  fetchServices()
+})
 </script>
 
 <style scoped>
@@ -101,6 +227,8 @@ const submit = () => {
   border-radius: 16px;
   padding: 20px;
   color: #fff;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 h2 {
@@ -110,6 +238,7 @@ h2 {
 
 .field {
   margin-bottom: 12px;
+  position: relative;
 }
 
 label {
@@ -128,10 +257,37 @@ input, select {
   color: #fff;
 }
 
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+select option:disabled {
+  color: #666;
+}
+
+.loading-text {
+  font-size: 11px;
+  color: #c9a24d;
+  margin-top: 4px;
+  display: block;
+}
+
 .duration {
   margin: 14px 0;
   font-size: 14px;
   color: #c9a24d;
+  text-align: center;
+}
+
+.error-message {
+  background: rgba(255, 59, 48, 0.1);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  color: #ff3b30;
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  margin: 10px 0;
   text-align: center;
 }
 
@@ -148,6 +304,12 @@ button {
   border: none;
   font-weight: 700;
   cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .cancel {
@@ -158,5 +320,13 @@ button {
 .start {
   background: #c9a24d;
   color: #000;
+}
+
+.start:hover:not(:disabled) {
+  background: #d4b05d;
+}
+
+.cancel:hover {
+  background: #333;
 }
 </style>

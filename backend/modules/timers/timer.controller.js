@@ -219,3 +219,89 @@ exports.createFromOrder = async (req, res) => {
   }
 }
 
+// NEW ENDPOINTS FOR TIMER MODAL
+
+/**
+ * GET /api/timers/therapists?branch_id=X&service_type=SPA
+ * Fetch active therapists from database
+ */
+exports.getTherapists = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const branch_id = req.query.branch_id || req.user.branch_id
+    const service_type = req.query.service_type
+
+    let query = `
+      SELECT 
+        t.id,
+        t.name,
+        t.grade_id,
+        tg.name AS grade_name
+      FROM therapists t
+      LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
+      WHERE t.active = true
+        AND t.branch_id = $1
+      ORDER BY t.name ASC
+    `
+
+    const { rows } = await db.query(query, [branch_id])
+    res.json(rows)
+  } catch (err) {
+    console.error("GET THERAPISTS ERROR:", err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+/**
+ * GET /api/timers/rooms?branch_id=X&service_type=SPA
+ * Fetch available rooms by service type with occupancy status
+ */
+exports.getRooms = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const branch_id = req.query.branch_id || req.user.branch_id
+    const service_type = req.query.service_type
+
+    let query = `
+      SELECT 
+        r.id,
+        r.name,
+        r.type,
+        r.is_active,
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 FROM timers t 
+            WHERE t.room_id = r.id 
+              AND t.end_time IS NULL
+          ) THEN true
+          ELSE false
+        END AS is_occupied
+      FROM rooms r
+      WHERE r.branch_id = $1
+        AND r.is_active = true
+    `
+    
+    const params = [branch_id]
+    
+    if (service_type) {
+      query += ` AND r.type = $2`
+      params.push(service_type)
+    }
+    
+    query += ` ORDER BY r.name ASC`
+
+    const { rows } = await db.query(query, params)
+    
+    // Add status field based on occupancy
+    const roomsWithStatus = rows.map(room => ({
+      ...room,
+      status: room.is_occupied ? 'occupied' : 'available'
+    }))
+    
+    res.json(roomsWithStatus)
+  } catch (err) {
+    console.error("GET ROOMS ERROR:", err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
