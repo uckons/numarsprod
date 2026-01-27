@@ -14,5 +14,8 @@ router.get("/active", auth, controller.getActive)
 // STOP / FINISH TIMER
 router.post("/:id/stop", auth, controller.stop)
 
+// NEW ENDPOINTS FOR TIMER MODAL
+router.get("/therapists", auth, controller.getTherapists)
+router.get("/rooms", auth, controller.getRooms)
 
 module.exports = router

@@ -81,3 +81,24 @@ exports.toggleStatus = async (req, res) => {
     res.status(500).json({ message: "Toggle failed" })
   }
 }
+
+/**
+ * GET /api/services/by-type?type=SPA&branch_id=X
+ * Fetch services by type to get duration_minutes
+ */
+exports.getByType = async (req, res) => {
+  try {
+    const branch_id = req.query.branch_id || req.user.branch_id
+    const type = req.query.type
+
+    if (!type) {
+      return res.status(400).json({ message: "type parameter is required" })
+    }
+
+    const data = await service.list({ branch_id, type })
+    res.json(data)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: "Failed to load services" })
+  }
+}
