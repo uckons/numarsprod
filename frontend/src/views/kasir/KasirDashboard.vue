@@ -62,6 +62,7 @@
       :key="t.slot"
       :timer="t"
       @start="openStartTimer"
+      @stop="stopTimer"
     />
   </div>
 </section>
@@ -111,7 +112,8 @@ const timers = ref(
     warned: false
   }))
 )
-const visibleTimers = computed(() => timers.value.filter(t => t.status === "RUNNING").slice(0, 12))
+// Show all running timers (no limit)
+const visibleTimers = computed(() => timers.value.filter(t => t.status === "RUNNING"))
 
 // Countdown interval
 let countdownInterval = null
@@ -147,6 +149,17 @@ const showStartModal = ref(false)
 const openStartTimer = (slot) => {
   selectedSlot.value = slot
   showStartModal.value = true
+}
+
+const stopTimer = async (timerId) => {
+  try {
+    await api.post(`/timers/${timerId}/stop`)
+    // Refresh timers to reflect the change
+    await syncTimers()
+  } catch (err) {
+    console.error("Failed to stop timer:", err)
+    alert("Gagal menghentikan timer. Silakan coba lagi.")
+  }
 }
 /* KODE KAMU DI SINI */
 const createManualTimer = async (data) => {
@@ -442,9 +455,33 @@ watch(
 
 .timer-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
   align-items: stretch;
+}
+
+@media (max-width: 1920px) {
+  .timer-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+@media (max-width: 1440px) {
+  .timer-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .timer-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .timer-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 

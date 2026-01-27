@@ -93,7 +93,7 @@ exports.stopTimer = async (db, id) => {
   const { rows } = await db.query(
     `
     UPDATE timers
-    SET status = 'FINISHED', end_time = NOW()
+    SET end_time = NOW()
     WHERE id = $1
     RETURNING *
     `,
