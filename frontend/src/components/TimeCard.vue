@@ -1,25 +1,15 @@
 <template>
-  <div class="timer-card" :class="statusClass" :style="{ backgroundColor: cardBackgroundColor }">
+  <div class="timer-card" :class="statusClass">
     <!-- HEADER -->
     <div class="header">
-      <div>
-        <h4>{{ title }}</h4>
-        <small v-if="timer.order_id">
-          Order #{{ timer.order_id }}
-        </small>
-      </div>
-
-      <span class="badge" v-if="timer.service_name">
-        {{ timer.service_name }}
-      </span>
+      <h4>{{ timer.service_name || `Slot ${timer.slot}` }}</h4>
     </div>
 
     <!-- INFO -->
     <div class="info" v-if="timer.status !== 'EMPTY'">
-      <div v-if="timer.service_name">Service: <strong>{{ timer.service_name }}</strong></div>
-      <div v-if="timer.therapist_name">Terapis: <strong>{{ timer.therapist_name }}</strong></div>
+      <div v-if="timer.therapist_name">Therapist: <strong>{{ timer.therapist_name }}</strong></div>
       <div v-if="timer.room_name">
-        Room/Sofa: <strong>{{ timer.room_name }}</strong>
+        Room: <strong>{{ timer.room_name }}</strong>
       </div>
     </div>
 
@@ -34,9 +24,19 @@
       <button
         v-if="timer.status !== 'RUNNING'"
         class="start"
+        :disabled="isStartDisabled"
         @click="$emit('start', timer.slot)"
       >
         Start
+      </button>
+
+      <!-- STOP -->
+      <button
+        v-if="timer.status === 'RUNNING'"
+        class="stop"
+        @click="$emit('stop', timer.id)"
+      >
+        Stop
       </button>
 
       <!-- PAUSE / RESUME -->
@@ -45,7 +45,7 @@
         class="pause"
         @click="$emit('pause', timer.slot)"
       >
-        ? Pause
+        ⏸ Pause
       </button>
 
       <button
@@ -53,7 +53,7 @@
         class="resume"
         @click="$emit('resume', timer.slot)"
       >
-        ? Resume
+        ▶ Resume
       </button>
 
       <!-- EXTEND -->
@@ -75,11 +75,6 @@ const props = defineProps({
   timer: { type: Object, required: true }
 })
 
-const title = computed(() => {
-  if (props.timer.status === "EMPTY") return `Slot ${props.timer.slot}`
-  return props.timer.therapist_name || "Terapis"
-})
-
 const remainingMs = computed(() => {
   if (!props.timer.planned_end_time) return 0
   return (
@@ -97,21 +92,9 @@ const displayTime = computed(() => {
   return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
 })
 
-// Color thresholds in seconds
-const COLOR_THRESHOLD_GREEN = 3600  // 60 minutes
-const COLOR_THRESHOLD_YELLOW = 1800 // 30 minutes
-const COLOR_THRESHOLD_RED = 600     // 10 minutes
-
-const cardBackgroundColor = computed(() => {
-  if (props.timer.status !== "RUNNING") return "#0f0f0f"
-  
-  const remainingSeconds = Math.floor(remainingMs.value / 1000)
-  
-  if (remainingSeconds >= COLOR_THRESHOLD_GREEN) return "#10b981" // Green: >= 60 minutes
-  if (remainingSeconds <= COLOR_THRESHOLD_YELLOW && remainingSeconds >= COLOR_THRESHOLD_RED) return "#eab308" // Yellow: <= 30 minutes
-  if (remainingSeconds < COLOR_THRESHOLD_RED) return "#ef4444" // Red: < 10 minutes
-  
-  return "#64748b" // Gray: default
+// Start button should be disabled if timer is running OR has remaining time
+const isStartDisabled = computed(() => {
+  return props.timer.status === "RUNNING" || (props.timer.remaining_seconds && props.timer.remaining_seconds > 0)
 })
 
 const statusClass = computed(() => ({
@@ -124,20 +107,22 @@ const statusClass = computed(() => ({
 
 <style scoped>
 .timer-card {
-  background: #0f0f0f;
-  border: 2px solid #222;
-  border-radius: 16px;
-  padding: 14px;
+  background: #1a1a1a;
+  border: 1px solid #222;
+  border-left: 4px solid #d4a574;
+  border-radius: 8px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  transition: background-color .3s ease, all .2s ease;
+  gap: 6px;
+  width: 180px;
+  min-height: 140px;
 }
 
 /* STATES */
-.running { border-color: #2ecc71; }
-.finished { border-color: #e74c3c; }
-.empty { border-color: #333; }
+.running { border-left-color: #d4a574; }
+.finished { border-left-color: #888; }
+.empty { border-left-color: #333; }
 .paused { opacity: .7; }
 
 /* HEADER */
@@ -149,54 +134,57 @@ const statusClass = computed(() => ({
 
 .header h4 {
   margin: 0;
-  font-size: 14px;
-}
-
-.header small {
-  color: #888;
-  font-size: 11px;
-}
-
-.badge {
-  background: rgba(201,162,77,.2);
-  color: #c9a24d;
-  font-size: 11px;
-  padding: 4px 10px;
-  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
 }
 
 /* INFO */
 .info {
-  font-size: 12px;
+  font-size: 11px;
   color: #bbb;
-  line-height: 1.4;
+  line-height: 1.3;
+}
+
+.info div {
+  margin-bottom: 2px;
 }
 
 /* TIME */
 .time {
   text-align: center;
-  font-size: 30px;
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: 1px;
+  color: #fff;
+  margin: 4px 0;
 }
 
 /* ACTIONS */
 .actions {
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
 }
 
 button {
-  flex: 1;
-  padding: 8px 0;
-  border-radius: 10px;
+  width: 100%;
+  padding: 6px 0;
+  border-radius: 6px;
   border: none;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .start { background: #c9a24d; color: #000; }
+.stop { background: #ef4444; color: #fff; }
 .pause { background: #e67e22; color: #fff; }
 .resume { background: #27ae60; color: #fff; }
 .extend { background: #444; color: #fff; }
