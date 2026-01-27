@@ -92,7 +92,9 @@ const displayTime = computed(() => {
   return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
 })
 
-// Start button should be disabled if timer is running OR has remaining time
+// Start button should be disabled if:
+// 1. Timer is currently running
+// 2. Timer has remaining time (hasn't expired yet)
 const isStartDisabled = computed(() => {
   return props.timer.status === "RUNNING" || (props.timer.remaining_seconds && props.timer.remaining_seconds > 0)
 })
@@ -115,7 +117,6 @@ const statusClass = computed(() => ({
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 180px;
   min-height: 140px;
 }
 

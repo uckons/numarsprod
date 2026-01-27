@@ -112,6 +112,7 @@ const timers = ref(
     warned: false
   }))
 )
+// Show all running timers (no limit)
 const visibleTimers = computed(() => timers.value.filter(t => t.status === "RUNNING"))
 
 // Countdown interval
