@@ -116,6 +116,11 @@ const visibleTimers = computed(() => timers.value.filter(t => t.status === "RUNN
 // Countdown interval
 let countdownInterval = null
 let apiRefreshInterval = null
+let isSyncing = false
+
+// Refresh intervals in milliseconds
+const COUNTDOWN_INTERVAL = 1000    // 1 second
+const API_REFRESH_INTERVAL = 30000 // 30 seconds
 
 const format = n =>
   new Intl.NumberFormat("id-ID").format(n || 0)
@@ -190,7 +195,10 @@ const createManualTimer = async (data) => {
   }
 }
 const syncTimers = async () => {
+  if (isSyncing) return // Prevent multiple simultaneous syncs
+  
   try {
+    isSyncing = true
     const response = await api.get("/timers/active", {
       params: { branch_id: auth.user.branch_id }
     })
@@ -233,6 +241,8 @@ const syncTimers = async () => {
     })
   } catch (err) {
     console.error("Failed to sync timers:", err)
+  } finally {
+    isSyncing = false
   }
 }
 
@@ -259,10 +269,10 @@ onMounted(async () => {
   await syncTimers()
   
   // Start countdown interval (every 1 second)
-  countdownInterval = setInterval(updateCountdown, 1000)
+  countdownInterval = setInterval(updateCountdown, COUNTDOWN_INTERVAL)
   
   // Start API refresh interval (every 30 seconds)
-  apiRefreshInterval = setInterval(syncTimers, 30000)
+  apiRefreshInterval = setInterval(syncTimers, API_REFRESH_INTERVAL)
 })
 
 onUnmounted(() => {

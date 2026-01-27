@@ -97,14 +97,19 @@ const displayTime = computed(() => {
   return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
 })
 
+// Color thresholds in seconds
+const COLOR_THRESHOLD_GREEN = 3600  // 60 minutes
+const COLOR_THRESHOLD_YELLOW = 1800 // 30 minutes
+const COLOR_THRESHOLD_RED = 600     // 10 minutes
+
 const cardBackgroundColor = computed(() => {
   if (props.timer.status !== "RUNNING") return "#0f0f0f"
   
   const remainingSeconds = Math.floor(remainingMs.value / 1000)
   
-  if (remainingSeconds >= 3600) return "#10b981" // Green: >= 60 minutes
-  if (remainingSeconds <= 1800 && remainingSeconds >= 600) return "#eab308" // Yellow: <= 30 minutes
-  if (remainingSeconds < 600) return "#ef4444" // Red: < 10 minutes
+  if (remainingSeconds >= COLOR_THRESHOLD_GREEN) return "#10b981" // Green: >= 60 minutes
+  if (remainingSeconds <= COLOR_THRESHOLD_YELLOW && remainingSeconds >= COLOR_THRESHOLD_RED) return "#eab308" // Yellow: <= 30 minutes
+  if (remainingSeconds < COLOR_THRESHOLD_RED) return "#ef4444" // Red: < 10 minutes
   
   return "#64748b" // Gray: default
 })
