@@ -122,8 +122,8 @@ const cardBackgroundColor = computed(() => {
   // Green: >= 3600 seconds (60+ minutes)
   if (remaining >= 3600) return "#10b981"
   
-  // Yellow: 600-1800 seconds (10-30 minutes)
-  if (remaining > 600 && remaining <= 1800) return "#eab308"
+  // Yellow: 600 to < 3600 seconds (10-60 minutes)
+  if (remaining >= 600 && remaining < 3600) return "#eab308"
   
   // Red: < 600 seconds (< 10 minutes)
   if (remaining < 600) return "#ef4444"
