@@ -52,10 +52,6 @@
 {{ timers }}
 </pre>
 -->
- <div v-if="visibleTimers.length === 0">
-    Tidak ada timer berjalan
-  </div>
-
   <div class="timer-grid">
     <TimeCard
       v-for="t in visibleTimers"
@@ -112,8 +108,8 @@ const timers = ref(
     warned: false
   }))
 )
-// Show all running timers (no limit)
-const visibleTimers = computed(() => timers.value.filter(t => t.status === "RUNNING"))
+// Show all 30 slots (both empty and running)
+const visibleTimers = computed(() => timers.value)
 
 // Countdown interval
 let countdownInterval = null
@@ -212,43 +208,26 @@ const syncTimers = async () => {
   
   try {
     isSyncing = true
-    const response = await api.get("/timers/active", {
+    const response = await api.get("/timers/slots", {
       params: { branch_id: auth.user.branch_id }
     })
-    const activeTimers = response.data
+    const slots = response.data
     
-    // Reset all slots to EMPTY
-    timers.value.forEach(t => {
-      Object.assign(t, {
-        status: "EMPTY",
-        id: null,
-        order_id: null,
-        service_name: null,
-        therapist_name: null,
-        room_name: null,
-        start_time: null,
-        planned_end_time: null,
-        remaining_seconds: null,
-        paused: false,
-        warned: false
-      })
-    })
-    
-    // Populate slots with active timers
-    activeTimers.forEach((at, index) => {
+    // Update timers array with the 30 slots from backend
+    slots.forEach((slot, index) => {
       if (index < timers.value.length) {
-        const slot = timers.value[index]
-        Object.assign(slot, {
-          status: "RUNNING",
-          id: at.id,
-          order_id: at.order_id,
-          service_name: at.service_name,
-          therapist_name: at.therapist_name,
-          room_name: at.room_name,
-          start_time: at.start_time,
-          planned_end_time: at.planned_end_time,
-          remaining_seconds: at.remaining_seconds,
-          paused: false
+        Object.assign(timers.value[index], {
+          slot: slot.slot_number,
+          status: slot.status,
+          id: slot.timer_id,
+          service_name: slot.service_name,
+          therapist_name: slot.therapist_name,
+          room_name: slot.room_name,
+          start_time: slot.start_time,
+          planned_end_time: slot.planned_end_time,
+          remaining_seconds: slot.remaining_seconds,
+          paused: false,
+          warned: false
         })
       }
     })

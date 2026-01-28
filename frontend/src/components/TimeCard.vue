@@ -84,7 +84,7 @@ const remainingMs = computed(() => {
 })
 
 const displayTime = computed(() => {
-  if (props.timer.status !== "RUNNING") return "00:00:00"
+  if (props.timer.status !== "RUNNING") return "Ready"
   const ms = Math.max(0, remainingMs.value)
   const h = Math.floor(ms / 3600000)
   const m = Math.floor((ms % 3600000) / 60000)

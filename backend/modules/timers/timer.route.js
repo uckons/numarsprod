@@ -8,8 +8,12 @@ const controller = require("./timer.controller")
 router.post("/start", auth, controller.startTimer)
 router.post("/start", auth, controller.startManual)
 router.post("/from-order/:orderId", auth, controller.createFromOrder)
+
 // GET ACTIVE TIMERS (POS dashboard)
 router.get("/active", auth, controller.getActive)
+
+// GET TIMER SLOTS (30 permanent slots with active timers merged)
+router.get("/slots", auth, controller.getTimerSlots)
 
 // STOP / FINISH TIMER
 router.post("/:id/stop", auth, controller.stop)
