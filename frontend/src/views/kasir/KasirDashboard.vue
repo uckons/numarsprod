@@ -220,6 +220,8 @@ const syncTimers = async () => {
           slot: slot.slot_number,
           status: slot.status,
           id: slot.timer_id,
+          order_id: slot.order_id,
+          service_id: slot.service_id,
           service_name: slot.service_name,
           therapist_name: slot.therapist_name,
           room_name: slot.room_name,

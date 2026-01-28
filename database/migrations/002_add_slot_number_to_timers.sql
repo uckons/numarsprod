@@ -9,3 +9,6 @@ ALTER TABLE timers ADD COLUMN IF NOT EXISTS slot_number INT CHECK (slot_number >
 
 -- Create index for faster slot lookups
 CREATE INDEX IF NOT EXISTS idx_timers_slot ON timers(branch_id, slot_number, end_time) WHERE end_time IS NULL;
+
+-- Create unique constraint to prevent multiple active timers on the same slot
+CREATE UNIQUE INDEX IF NOT EXISTS idx_timers_unique_slot ON timers(branch_id, slot_number) WHERE end_time IS NULL;

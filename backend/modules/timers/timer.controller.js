@@ -68,7 +68,20 @@ exports.startTimer = async (req, res) => {
     // Validate slot number
     const slot_number = slot || null
     if (slot_number !== null && (slot_number < 1 || slot_number > 30)) {
-      return res.status(400).json({ message: "Slot number must be between 1 and 30" })
+      return res.status(400).json({ message: "Nomor slot harus antara 1 dan 30" })
+    }
+
+    // Check if slot is already occupied (only if slot_number is provided)
+    if (slot_number !== null) {
+      const { rows: existingTimer } = await db.query(
+        `SELECT id FROM timers 
+         WHERE branch_id = $1 AND slot_number = $2 AND end_time IS NULL`,
+        [user.branch_id, slot_number]
+      )
+      
+      if (existingTimer.length > 0) {
+        return res.status(400).json({ message: `Slot ${slot_number} sudah terisi` })
+      }
     }
 
     const start = new Date()
