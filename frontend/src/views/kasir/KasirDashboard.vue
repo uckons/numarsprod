@@ -243,12 +243,11 @@ const syncTimers = async () => {
 // Update countdown every second
 const updateCountdown = () => {
   timers.value.forEach(t => {
-    if (t.status === "RUNNING" && t.planned_end_time) {
-      const remaining = Math.floor((new Date(t.planned_end_time).getTime() - Date.now()) / 1000)
-      t.remaining_seconds = remaining
+    if (t.status === "RUNNING" && t.remaining_seconds > 0) {
+      t.remaining_seconds--
       
       // Handle timer completion
-      if (remaining <= 0 && !t.warned) {
+      if (t.remaining_seconds <= 0 && !t.warned) {
         t.warned = true
         console.warn(`⏰ Timer selesai: ${t.therapist_name || "Terapis"}`)
         // Re-sync to remove completed timers
