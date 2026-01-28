@@ -1,5 +1,9 @@
 <template>
-  <div class="timer-card" :class="statusClass">
+  <div 
+    class="timer-card" 
+    :class="statusClass"
+    :style="{ backgroundColor: cardBackgroundColor }"
+  >
     <!-- HEADER -->
     <div class="header">
       <h4>{{ timer.service_name || `Slot ${timer.slot}` }}</h4>
@@ -105,6 +109,28 @@ const statusClass = computed(() => ({
   finished: props.timer.status === "FINISHED",
   paused: props.timer.paused
 }))
+
+// Dynamic background color based on remaining time
+const cardBackgroundColor = computed(() => {
+  // Empty slots: gray
+  if (props.timer.status === "EMPTY") return "#1a1a1a"
+  
+  // Check remaining_seconds for running timers
+  const remaining = props.timer.remaining_seconds
+  if (remaining == null) return "#1a1a1a"
+  
+  // Green: >= 3600 seconds (60+ minutes)
+  if (remaining >= 3600) return "#10b981"
+  
+  // Yellow: 600-1800 seconds (10-30 minutes)
+  if (remaining > 600 && remaining <= 1800) return "#eab308"
+  
+  // Red: < 600 seconds (< 10 minutes)
+  if (remaining < 600) return "#ef4444"
+  
+  // Default gray for other cases
+  return "#1a1a1a"
+})
 </script>
 
 <style scoped>
@@ -118,6 +144,7 @@ const statusClass = computed(() => ({
   flex-direction: column;
   gap: 6px;
   min-height: 140px;
+  transition: background-color 0.3s ease;
 }
 
 /* STATES */
