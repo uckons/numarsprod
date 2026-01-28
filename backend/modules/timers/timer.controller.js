@@ -58,11 +58,30 @@ exports.getActive = async (req, res) => {
 exports.startTimer = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const { order_id, therapist_id, service_id, room_id, duration_minutes } = req.body
+    const { order_id, therapist_id, service_id, room_id, duration_minutes, slot } = req.body
     const user = req.user
 
-    if (!order_id || !therapist_id || !service_id || !duration_minutes) {
+    if (!service_id || !duration_minutes) {
       return res.status(400).json({ message: "Data timer tidak lengkap" })
+    }
+
+    // Validate slot number
+    const slot_number = slot || null
+    if (slot_number !== null && (slot_number < 1 || slot_number > 30)) {
+      return res.status(400).json({ message: "Nomor slot harus antara 1 dan 30" })
+    }
+
+    // Check if slot is already occupied (only if slot_number is provided)
+    if (slot_number !== null) {
+      const { rows: existingTimer } = await db.query(
+        `SELECT id FROM timers 
+         WHERE branch_id = $1 AND slot_number = $2 AND end_time IS NULL`,
+        [user.branch_id, slot_number]
+      )
+      
+      if (existingTimer.length > 0) {
+        return res.status(400).json({ message: `Slot ${slot_number} sudah terisi` })
+      }
     }
 
     const start = new Date()
@@ -70,17 +89,18 @@ exports.startTimer = async (req, res) => {
 
     const { rows } = await db.query(
       `INSERT INTO timers
-       (order_id, therapist_id, service_id, room_id, start_time, planned_end_time, paused, branch_id)
-       VALUES ($1,$2,$3,$4,$5,$6,false,$7)
+       (order_id, therapist_id, service_id, room_id, start_time, planned_end_time, paused, branch_id, slot_number)
+       VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8)
        RETURNING *`,
       [
-        order_id,
-        therapist_id,
+        order_id || null,
+        therapist_id || null,
         service_id,
         room_id || null,
         start,
         plannedEnd,
-        user.branch_id
+        user.branch_id,
+        slot_number
       ]
     )
 
@@ -301,6 +321,23 @@ exports.getRooms = async (req, res) => {
     res.json(roomsWithStatus)
   } catch (err) {
     console.error("GET ROOMS ERROR:", err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+/**
+ * GET /api/timers/slots?branch_id=X
+ * Fetch 30 permanent timer slots with active timer data merged in
+ */
+exports.getTimerSlots = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const branch_id = req.query.branch_id || req.user.branch_id
+
+    const slots = await service.getTimerSlots(db, branch_id)
+    res.json(slots)
+  } catch (err) {
+    console.error("GET TIMER SLOTS ERROR:", err)
     res.status(500).json({ message: err.message })
   }
 }
