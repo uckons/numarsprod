@@ -59,7 +59,7 @@
       :timer="t"
       @start="openStartTimer"
       @stop="stopTimer"
-      @extend="syncTimers"
+      @extend="extendTimer"
     />
   </div>
 </section>
@@ -81,7 +81,6 @@ import TimeCard from "@/components/TimeCard.vue"
 import api from "@/services/api"
 import { watch } from "vue"
 import StartTimerModal from "@/components/StartTimerModal.vue"
-import Swal from "sweetalert2"
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -221,7 +220,7 @@ const syncTimers = async () => {
         Object.assign(timers.value[index], {
           slot: slot.slot_number,
           status: slot.status,
-          id: slot.timer_id || slot.timer_id || null,
+          id: slot.timer_id,
           order_id: slot.order_id,
           service_id: slot.service_id,
           service_name: slot.service_name,
@@ -257,70 +256,26 @@ const updateCountdown = () => {
     }
   })
 }
-const handleExtend = async ({ timer_id, service_id, duration }) => {
-  try {
-    await api.post(`/timers/${timer_id}/extend`, {
-      duration_minutes: duration
-    })
-
-    // optional: sync ulang dari backend
-    await syncTimers()
-  } catch (err) {
-    console.error("Extend gagal", err)
-  }
-}
-
-const confirmExtend = async (timer) => {
-  const result = await Swal.fire({
-    title: "Extend Waktu?",
-    text: "Durasi service akan ditambahkan sesuai service",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonText: "Ya, Extend",
-    cancelButtonText: "Batal",
-    confirmButtonColor: "#c9a24d"
-  })
-
-  if (!result.isConfirmed) return
-
-  await extendTimer(timer)
-}
 // extend timer
-const extendTimer = async (timer) => {
-  try {
-    // ambil durasi dari service (sudah ada di timer)
-    const extraMinutes = timer.duration_minutes
+const extendTimer = async (timer, minutes = 10) => {
+  const slot = timers.value.find(t => t.slot === timer.slot)
+  if (!slot || slot.status !== "RUNNING") return
 
-    // 🔹 backend
-    await api.post(`/timers/${timer.id}/extend`, {
-      minutes: extraMinutes
-    })
+  // extend di frontend
+  const newEnd =
+    new Date(slot.planned_end_time).getTime() +
+    minutes * 60000
 
-    // 🔹 frontend update (REALTIME)
-    const extraMs = extraMinutes * 60 * 1000
-    timer.planned_end_time = new Date(
-      new Date(timer.planned_end_time).getTime() + extraMs
-    )
+  slot.planned_end_time = new Date(newEnd)
 
-    // 🔹 tambahkan order_items (qty++)
-    await api.post(`/orders/${timer.order_id}/extend`, {
-      service_id: timer.service_id
-    })
+  // reset warning
+  slot.warned = false
 
-    Swal.fire({
-      icon: "success",
-      title: "Berhasil",
-      text: "Waktu berhasil ditambahkan",
-      timer: 1500,
-      showConfirmButton: false
-    })
-  } catch (err) {
-    Swal.fire({
-      icon: "error",
-      title: "Gagal",
-      text: err.response?.data?.message || err.message
-    })
-  }
+  // 🔹 sync ke backend (recommended)
+  await api.post("/timers/extend", {
+    timer_id: slot.id,
+    minutes
+  })
 }
 
 onMounted(async () => {
@@ -339,6 +294,29 @@ onUnmounted(() => {
   if (apiRefreshInterval) clearInterval(apiRefreshInterval)
 })
 
+watch(
+  timers,
+  (list) => {
+    const now = Date.now()
+
+    list.forEach(t => {
+      if (!t.planned_end_time || t.warned) return
+
+      const remaining =
+        new Date(t.planned_end_time).getTime() - now
+
+      if (remaining <= 10 * 60 * 1000 && remaining > 0) {
+        t.warned = true
+
+        // UI alert (sementara)
+        alert(`⏰ Timer hampir habis: ${t.therapist_name || "Terapis"}`)
+
+        // 🔔 nanti bisa ganti toast / sound / modal
+      }
+    })
+  },
+  { deep: true }
+)
 </script>
 
 <style scoped>

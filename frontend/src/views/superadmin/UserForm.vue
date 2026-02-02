@@ -10,36 +10,23 @@
       <!-- BODY -->
       <div class="modal-body">
         <div class="form-group">
-  <label>Full Name</label>
-  <input
-    v-model="form.name"
-    placeholder="Full name"
-  />
-</div>
-<div class="form-group">
-  <label>Phone</label>
-  <input
-    v-model="form.phone"
-    placeholder="08xxxxxxxxxx"
-  />
-</div>
+          <label>Full Name</label>
+          <input v-model="form.name" placeholder="Full name" />
+        </div>
+
+        <div class="form-group">
+          <label>Phone</label>
+          <input v-model="form.phone" placeholder="08xxxxxxxxxx" />
+        </div>
 
         <div class="form-group">
           <label>Username</label>
-          <input
-            v-model="form.username"
-            :disabled="edit"
-            placeholder="username"
-          />
+          <input v-model="form.username" :disabled="edit" placeholder="username" />
         </div>
 
         <div class="form-group" v-if="!edit">
           <label>Password</label>
-          <input
-            type="password"
-            v-model="form.password"
-            placeholder="Default: 123456"
-          />
+          <input type="password" v-model="form.password" placeholder="Default: 123456" />
         </div>
 
         <div class="row">
@@ -47,13 +34,7 @@
             <label>Role</label>
             <select v-model="form.role_id">
               <option disabled value="">Select Role</option>
-              <option
-                v-for="r in roles"
-                :key="r.id"
-                :value="r.id"
-              >
-                {{ r.name }}
-              </option>
+              <option v-for="r in roles" :key="r.id" :value="r.id">{{ r.name }}</option>
             </select>
           </div>
 
@@ -61,13 +42,7 @@
             <label>Branch</label>
             <select v-model="form.branch_id">
               <option value="">All / None</option>
-              <option
-                v-for="b in branches"
-                :key="b.id"
-                :value="b.id"
-              >
-                {{ b.name }}
-              </option>
+              <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
             </select>
           </div>
         </div>
@@ -75,12 +50,8 @@
 
       <!-- FOOTER -->
       <div class="modal-footer">
-        <button class="btn-outline" @click="$emit('close')">
-          Cancel
-        </button>
-        <button class="btn-primary" @click="save" :disabled="loading">
-          {{ loading ? "Saving..." : "Save" }}
-        </button>
+        <button class="btn-outline" @click="$emit('close')">Cancel</button>
+        <button class="btn-primary" @click="save" :disabled="loading">{{ loading ? "Saving..." : "Save" }}</button>
       </div>
     </div>
   </div>
@@ -89,14 +60,18 @@
 <script setup>
 import { ref, onMounted } from "vue"
 import api from "../../services/api"
+import Swal from "sweetalert2"
+import "sweetalert2/dist/sweetalert2.min.css" // base styles; can be moved to main.js if desired
+
 const emit = defineEmits(["saved", "close"])
 const props = defineProps({
   edit: Boolean,
   data: Object,
 })
+
 const form = ref({
-  name:"",
-  username:"",
+  name: "",
+  username: "",
   phone: "",
   password: "",
   role_id: "",
@@ -107,43 +82,75 @@ const loading = ref(false)
 const roles = ref([])
 const branches = ref([])
 
+/* ===== Add Swal theme mixin (black & gold) ===== */
+const SwalTheme = Swal.mixin({
+  customClass: {
+    popup: "swal-theme-popup",
+    title: "swal-theme-title",
+    content: "swal-theme-content",
+    confirmButton: "swal-theme-confirm",
+    cancelButton: "swal-theme-cancel",
+    denyButton: "swal-theme-deny"
+  },
+  buttonsStyling: false
+})
+/* ============================================= */
 
 /* INIT */
 onMounted(async () => {
-  const [r, b] = await Promise.all([
-    api.get("/roles"),
-    api.get("/branches"),
-  ])
+  try {
+    const [r, b] = await Promise.all([api.get("/roles"), api.get("/branches")])
+    roles.value = r.data.data || r.data
+    branches.value = b.data.data || b.data
 
-  roles.value = r.data.data || r.data
-  branches.value = b.data.data || b.data
-
-  if (props.edit && props.data) {
-  form.value = {
-    name: props.data.name,
-    username: props.data.username,
-    phone: props.data.phone,
-    role_id: props.data.role_id,
-    branch_id: props.data.branch_id || "",
-    password: ""
+    if (props.edit && props.data) {
+      form.value = {
+        name: props.data.name,
+        username: props.data.username,
+        phone: props.data.phone,
+        role_id: props.data.role_id,
+        branch_id: props.data.branch_id || "",
+        password: ""
+      }
+    }
+  } catch (err) {
+    // optional: show error fetching roles/branches
+    console.error(err)
+    await SwalTheme.fire({
+      icon: "error",
+      title: "Gagal memuat data",
+      text: err?.response?.data?.message || "Failed to load roles or branches",
+      confirmButtonText: "OK"
+    })
   }
-}
-
 })
 
 /* SAVE */
 const save = async () => {
   if (!form.value.name || !form.value.phone || !form.value.username || !form.value.role_id) {
-    return alert("Name, Phone, Username & Role required")
+    await SwalTheme.fire({
+      icon: "warning",
+      title: "Validasi",
+      text: "Name, Phone, Username & Role required",
+      confirmButtonText: "OK"
+    })
+    return
   }
 
   loading.value = true
   try {
     if (props.edit) {
-      // ⛔ JANGAN kirim password saat edit
+      // ⛔ do not send password when editing
       await api.put(`/users/${props.data.id}`, {
         role_id: form.value.role_id,
         branch_id: form.value.branch_id
+      })
+
+      await SwalTheme.fire({
+        icon: "success",
+        title: "Berhasil",
+        text: "User berhasil diperbarui",
+        confirmButtonText: "OK"
       })
 
       emit("saved", {
@@ -158,16 +165,28 @@ const save = async () => {
       }
 
       await api.post("/users", form.value)
+
+      await SwalTheme.fire({
+        icon: "success",
+        title: "Berhasil",
+        text: "User berhasil dibuat",
+        confirmButtonText: "OK"
+      })
+
       emit("saved")
     }
   } catch (err) {
-    console.error(err.response?.data)
-    alert(err.response?.data?.message || "Failed save user")
+    console.error(err?.response?.data || err)
+    await SwalTheme.fire({
+      icon: "error",
+      title: "Gagal",
+      text: err?.response?.data?.message || "Failed save user",
+      confirmButtonText: "OK"
+    })
   } finally {
     loading.value = false
   }
 }
-
 </script>
 
 <style scoped>
@@ -268,5 +287,61 @@ input, select {
   border: 1px solid var(--gold);
   color: var(--gold);
   padding: 8px 14px;
+}
+
+/* ===== SweetAlert2 Black & Gold theme (scoped using :deep) =====
+   Using :deep(...) avoids deprecated ::v-deep combinator warnings.
+*/
+:deep(.swal-theme-popup) {
+  background: linear-gradient(145deg, #0e0e0e, #151515) !important;
+  color: #fff !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 215, 0, 0.08) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6) !important;
+}
+
+:deep(.swal-theme-title) {
+  color: var(--gold, #f5c518) !important;
+  font-weight: 600;
+}
+
+:deep(.swal-theme-content) {
+  color: #cfcfcf !important;
+  font-size: 14px;
+}
+
+:deep(.swal-theme-confirm) {
+  background: var(--gold, #f5c518) !important;
+  color: #000 !important;
+  border: none !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+:deep(.swal-theme-cancel) {
+  background: transparent !important;
+  color: var(--gold, #f5c518) !important;
+  border: 1px solid var(--gold, #f5c518) !important;
+  padding: 7px 14px !important;
+  border-radius: 8px !important;
+}
+
+:deep(.swal-theme-deny) {
+  background: transparent !important;
+  color: var(--gold, #f5c518) !important;
+  border: 1px solid rgba(255, 215, 0, 0.12) !important;
+  padding: 7px 14px !important;
+  border-radius: 8px !important;
+}
+
+/* success icon overrides */
+:deep(.swal2-success-ring),
+:deep(.swal2-success-fix) {
+  border-color: var(--gold, #f5c518) !important;
+}
+:deep(.swal2-success-line-tip),
+:deep(.swal2-success-line-long) {
+  background-color: var(--gold, #f5c518) !important;
 }
 </style>

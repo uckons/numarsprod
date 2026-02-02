@@ -54,49 +54,101 @@ exports.getActive = async (req, res) => {
   res.json(timers)
 }
 
-
 exports.startTimer = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const { order_id, therapist_id, service_id, room_id, duration_minutes, slot } = req.body
     const user = req.user
 
-    if (!service_id || !duration_minutes) {
+    const {
+      order_id,
+      service_id,
+      therapist_id,
+      room_id,
+      duration_minutes,
+      slot
+    } = req.body
+
+    // 🔒 VALIDASI MINIMAL
+    if (!service_id || !therapist_id || !room_id || !duration_minutes) {
       return res.status(400).json({ message: "Data timer tidak lengkap" })
     }
 
-    // Validate slot number
-    const slot_number = slot || null
-    if (slot_number !== null && (slot_number < 1 || slot_number > 30)) {
-      return res.status(400).json({ message: "Nomor slot harus antara 1 dan 30" })
+    // =========================
+    // 🔑 1. PASTIKAN ORDER ADA
+    // =========================
+    let finalOrderId = order_id
+
+    if (!finalOrderId) {
+      const { rows } = await db.query(
+        `
+        INSERT INTO orders
+          (branch_id, user_id, status, total)
+        VALUES
+          ($1, $2, 'DRAFT', 0)
+        RETURNING id
+        `,
+        [user.branch_id, user.id]
+      )
+      finalOrderId = rows[0].id
     }
 
-    // Check if slot is already occupied (only if slot_number is provided)
+    // =========================
+    // 🔒 2. VALIDASI SLOT (JIKA ADA)
+    // =========================
+    let slot_number = slot ?? null
     if (slot_number !== null) {
-      const { rows: existingTimer } = await db.query(
-        `SELECT id FROM timers 
-         WHERE branch_id = $1 AND slot_number = $2 AND end_time IS NULL`,
+      if (slot_number < 1 || slot_number > 30) {
+        return res.status(400).json({ message: "Nomor slot harus 1–30" })
+      }
+
+      const { rows: used } = await db.query(
+        `
+        SELECT 1 FROM timers
+        WHERE branch_id = $1
+          AND slot_number = $2
+          AND end_time IS NULL
+        `,
         [user.branch_id, slot_number]
       )
-      
-      if (existingTimer.length > 0) {
+
+      if (used.length) {
         return res.status(400).json({ message: `Slot ${slot_number} sudah terisi` })
       }
     }
 
+    // =========================
+    // ⏱️ 3. HITUNG WAKTU
+    // =========================
     const start = new Date()
     const plannedEnd = new Date(start.getTime() + duration_minutes * 60000)
 
+    // =========================
+    // 🧠 4. INSERT TIMER (LENGKAP)
+    // =========================
     const { rows } = await db.query(
-      `INSERT INTO timers
-       (order_id, therapist_id, service_id, room_id, start_time, planned_end_time, paused, branch_id, slot_number)
-       VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8)
-       RETURNING *`,
+      `
+      INSERT INTO timers
+        (
+          order_id,
+          therapist_id,
+          service_id,
+          room_id,
+          start_time,
+          planned_end_time,
+          paused,
+          branch_id,
+          slot_number,
+          status
+        )
+      VALUES
+        ($1,$2,$3,$4,$5,$6,false,$7,$8,'RUNNING')
+      RETURNING *
+      `,
       [
-        order_id || null,
-        therapist_id || null,
+        finalOrderId,
+        therapist_id,
         service_id,
-        room_id || null,
+        room_id,
         start,
         plannedEnd,
         user.branch_id,
@@ -106,13 +158,10 @@ exports.startTimer = async (req, res) => {
 
     res.json(rows[0])
   } catch (err) {
-    console.error(err)
+    console.error("START TIMER ERROR:", err)
     res.status(500).json({ message: err.message })
   }
 }
-
-
-
 
 exports.stop = async (req, res) => {
   try {
@@ -338,6 +387,76 @@ exports.getTimerSlots = async (req, res) => {
     res.json(slots)
   } catch (err) {
     console.error("GET TIMER SLOTS ERROR:", err)
+    res.status(500).json({ message: err.message })
+  }
+}
+exports.extendTimer = async (req, res) => {
+  const db = req.app.get("db")
+  const timerId = req.params.id
+
+  try {
+    // 🔹 ambil timer + service + order
+    const { rows } = await db.query(
+      `
+      SELECT 
+        t.id,
+        t.order_id,
+        t.service_id,
+        s.duration_minutes,
+        s.base_price
+      FROM timers t
+      JOIN services s ON s.id = t.service_id
+      WHERE t.id = $1
+      `,
+      [timerId]
+    )
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Timer tidak ditemukan" })
+    }
+
+    const timer = rows[0]
+
+    // 🔹 extend timer
+    await db.query(
+      `
+      UPDATE timers
+      SET planned_end_time = planned_end_time + ($1 || ' minutes')::interval
+      WHERE id = $2
+      `,
+      [timer.duration_minutes, timerId]
+    )
+
+    // 🔹 update order_items (qty + subtotal)
+    await db.query(
+      `
+      UPDATE order_items
+      SET
+        qty = qty + 1,
+        subtotal = subtotal + $1
+      WHERE order_id = $2
+        AND service_id = $3
+      `,
+      [
+        timer.base_price,
+        timer.order_id,
+        timer.service_id
+      ]
+    )
+
+    // 🔹 update orders.total
+    await db.query(
+      `
+      UPDATE orders
+      SET total = total + $1
+      WHERE id = $2
+      `,
+      [timer.base_price, timer.order_id]
+    )
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error("EXTEND TIMER ERROR:", err)
     res.status(500).json({ message: err.message })
   }
 }

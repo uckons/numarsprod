@@ -89,57 +89,23 @@ exports.getActiveTimers = async (db, branchId) => {
 }
 
 
-// timer.service.js
-exports.stopTimer = async (db, timerId) => {
-  // 1. ambil timer
-  const { rows } = await db.query(`
-    SELECT 
-      t.*,
-      th.name AS therapist_name,
-      r.name AS room_name
-    FROM timers t
-    LEFT JOIN therapists th ON th.id = t.therapist_id
-    LEFT JOIN rooms r ON r.id = t.room_id
-    WHERE t.id = $1
-  `, [timerId])
-
-  if (!rows.length) throw new Error("Timer tidak ditemukan")
-
-  const timer = rows[0]
-
-  // 2. stop timer
-  await db.query(`
+exports.stopTimer = async (db, id) => {
+  const { rows } = await db.query(
+    `
     UPDATE timers
-    SET end_time = now(), status = 'FINISHED'
+    SET end_time = NOW()
     WHERE id = $1
-  `, [timerId])
+    RETURNING *
+    `,
+    [id]
+  )
 
-  // 🔥 3. INI BAGIAN PALING PENTING
- if (
-  timer.order_id !== null &&
-  timer.service_id !== null
-) {
-//  await db.query(
-//    `
-//    UPDATE order_items
-//    SET
-//      therapist_name = $1,
-//      room_name = $2
-//    WHERE order_id = $3
-//      AND service_id = $4
-//    `,
-//    [
-//      timer.therapist_name || null,
-//      timer.room_name || null,
-//      timer.order_id,     // ⬅️ JANGAN Number()
-//      timer.service_id    // ⬅️ JANGAN Number()
-//    ]
-//  )
+  if (!rows.length) {
+    throw new Error("Timer not found")
+  }
+
+  return rows[0]
 }
-
-  return timer
-}
-
 
 exports.getTimerSlots = async (db, branchId) => {
   // Generate 30 permanent slots (1-30)

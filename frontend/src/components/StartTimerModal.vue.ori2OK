@@ -222,10 +222,12 @@ onMounted(() => {
 }
 
 .modal {
-  width: 420px;
-  background: linear-gradient(180deg, #0f0f0f, #0a0a0a);
-  border: 1px solid #2a2a2a;
-  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  width: 380px;
+  background: linear-gradient(180deg, #121212, #0b0b0b);
+  border-color: #c9a24d;
+  border-radius: 20px;
+  padding: 22px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.8);
 }
 .modal-header {
   text-align: center;
@@ -245,7 +247,10 @@ onMounted(() => {
   margin: 14px 0 18px;
 }
 .field select {
-  height: 42px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23c9a24d' stroke-width='2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
 }
 .duration-box {
   background: rgba(201,162,77,.1);
@@ -267,9 +272,8 @@ onMounted(() => {
   font-size: 14px;
 }
 h2 {
-  text-align: center;
-  font-weight: 700;
-  letter-spacing: .5px;
+  margin: 0 0 16px;
+  font-size: 18px;
 }
 
 .field {

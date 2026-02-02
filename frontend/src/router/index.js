@@ -59,6 +59,13 @@ const routes = [
   component: () => import("@/views/pos/PosView.vue"),
   meta: { requiresAuth: true, transition: "slide-pos" }
 },
+{
+  path: "/kasir/orders",
+  name: "KasirOrders",
+  component: () => import("@/views/kasir/KasirOrders.vue"),
+  meta: { requiresAuth: true }
+},
+
 //AUDIT
 {
   path: "/superadmin/audit-logs",

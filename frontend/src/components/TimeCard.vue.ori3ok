@@ -35,8 +35,7 @@
       <button
         v-if="timer.status === 'RUNNING'"
         class="stop"
-        :disabled="!timer.id"
-        @click="timer.id && $emit('stop', timer.id)"
+        @click="$emit('stop', timer.id)"
       >
         Stop
       </button>
@@ -62,23 +61,20 @@
       <button
         v-if="timer.status === 'RUNNING' && remainingMs > 0"
         class="extend"
-        @click="onExtend"
-       >
-       + Extend
+        @click="$emit('extend', timer.slot, 60)"
+      >
+        +60m
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed,ref, onMounted, onUnmounted, watch } from "vue"
-import Swal from "sweetalert2"
-import api from "@/services/api"
+import { computed,ref, onMounted, onUnmounted } from "vue"
+
 const props = defineProps({
   timer: { type: Object, required: true }
 })
-const emit = defineEmits(["start", "stop", "extended"])
-
 /* 🔥 INI KUNCI */
 const now = ref(Date.now())
 //const tick = ref(Date.now())
@@ -141,76 +137,6 @@ const cardBackgroundColor = computed(() => {
   // Finished / expired
   return "#032D57"
 })
-
-
-const onExtend = async () => {
-  const res = await Swal.fire({
-    title: "Extend Timer?",
-    text: "Durasi service akan ditambah dan order akan bertambah",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonText: "Ya, Extend",
-    cancelButtonText: "Batal",
-    confirmButtonColor: "#c9a24d",
-    background: "#111",
-    color: "#fff"
-  })
-
-  if (!res.isConfirmed) return
-
-  try {
-    await api.post(`/timers/extend/${props.timer.id}`)
-// ✅ ALERT SUKSES
-    Swal.fire({
-      icon: "success",
-      title: "Berhasil",
-      text: "Waktu berhasil ditambahkan",
-      timer: 1400,
-      showConfirmButton: false,
-      background: "#111",
-      color: "#fff"
-    })
-    // notify parent to refresh timers
-    emit("extended")
-  } catch (err) {
-    Swal.fire({
-      icon: "error",
-      title: "Gagal Extend",
-      text: err.response?.data?.message || err.message,
-      background: "#111",
-      color: "#fff"
-    })
-  }
-}
-const warned = ref(false)
-
-watch(
-  remainingMs,
-  (ms) => {
-    if (
-      props.timer.status === "RUNNING" &&
-      ms <= 10 * 60 * 1000 &&
-      ms > 0 &&
-      !warned.value
-    ) {
-      warned.value = true
-
-      Swal.fire({
-        icon: "warning",
-        title: "⏰ Timer Hampir Habis",
-        html: `
-          <strong>${props.timer.therapist_name || "Terapis"}</strong><br/>
-          Sisa waktu <b>10 menit</b>
-        `,
-        confirmButtonText: "OK",
-        background: "#111",
-        color: "#fff",
-        confirmButtonColor: "#c9a24d"
-      })
-    }
-  }
-)
-
 
 </script>
 

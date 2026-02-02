@@ -1,0 +1,59 @@
+/* Black & Gold SweetAlert2 theme (global) */
+
+.swal-theme-popup {
+  background: linear-gradient(145deg, #0e0e0e, #151515) !important;
+  color: #fff !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 215, 0, 0.08) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Title */
+.swal-theme-title {
+  color: var(--gold, #f5c518) !important;
+  font-weight: 600;
+}
+
+/* Content text */
+.swal-theme-content {
+  color: #cfcfcf !important;
+  font-size: 14px;
+}
+
+/* Confirm button (gold filled) */
+.swal-theme-confirm {
+  background: var(--gold, #f5c518) !important;
+  color: #000 !important;
+  border: none !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+/* Cancel button (gold outline) */
+.swal-theme-cancel {
+  background: transparent !important;
+  color: var(--gold, #f5c518) !important;
+  border: 1px solid var(--gold, #f5c518) !important;
+  padding: 7px 14px !important;
+  border-radius: 8px !important;
+}
+
+/* Deny button (if used) */
+.swal-theme-deny {
+  background: transparent !important;
+  color: var(--gold, #f5c518) !important;
+  border: 1px solid rgba(255, 215, 0, 0.12) !important;
+  padding: 7px 14px !important;
+  border-radius: 8px !important;
+}
+
+/* Success icon overrides (make ring & check gold) */
+.swal2-success-ring,
+.swal2-success-fix {
+  border-color: var(--gold, #f5c518) !important;
+}
+.swal2-success-line-tip,
+.swal2-success-line-long {
+  background-color: var(--gold, #f5c518) !important;
+}

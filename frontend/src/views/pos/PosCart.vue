@@ -35,8 +35,8 @@
         <strong>Rp {{ format(grandTotal) }}</strong>
       </div>
 
-      <button class="checkout" @click="checkout">
-        Bayar
+      <button class="checkout" @click="checkout" :disabled="loading">
+        {{ loading ? "Processing..." : "Bayar" }}
       </button>
 
       <button class="cancel" @click="clear">
@@ -44,111 +44,84 @@
       </button>
     </div>
   </div>
-
-<div v-if="showSuccess" class="success-overlay">
-  <div class="success-modal">
-    <div class="icon">✅</div>
-
-    <h2>Transaksi Berhasil</h2>
-    <p class="order-id">Order #{{ lastOrder.order_id }}</p>
-
-    <div class="total">
-      Rp {{ format(lastOrder.total) }}
-    </div>
-
-    <!-- 🧾 BREAKDOWN -->
-    <div class="items">
-      <div
-        v-for="i in lastOrder.items"
-        :key="i.id"
-        class="item"
-      >
-        <span>
-          {{ i.name }} × {{ i.qty }}
-        </span>
-        <strong>
-          Rp {{ format(i.base_price * i.qty) }}
-        </strong>
-      </div>
-    </div>
-
-    <div class="actions">
-      <button class="print" @click="printOrder">🖨 Cetak </button>
-        <button class="close" @click="closeSuccess">
-        Tutup
-      </button>
-    </div>
-  </div>
-</div>
-
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue"
+import { ref, computed } from "vue"
 import { usePosStore } from "@/store/pos.store"
 import api from "@/services/api"
-//import { ref, onMounted } from "vue"
 import { useRouter } from "vue-router"
+import Swal from "sweetalert2"
+import "sweetalert2/dist/sweetalert2.min.css"
+
 const router = useRouter()
 const pos = usePosStore()
-//const items = pos.items
-const items = computed(() => pos.items || []) 
-//onMounted(async () => {
-//  if (!pos.orderId) {
-//    await pos.createOrder()
-//  }
-//})
-//const inc = (i) => i.qty++
-//const dec = (i) => {
-//  if (i.qty > 1) i.qty--
-//}
+
+const items = computed(() => pos.items || [])
 
 const inc = (i) => pos.inc(i.id)
 const dec = (i) => pos.dec(i.id)
 const remove = (id) => pos.remove(id)
-//const remove = (id) => pos.remove(id)
 
-//const clear = () => pos.clear()
-//const clear = async () => {
-//  if (!pos.orderId) {
-//    pos.clear()
-//    return
-//  }
-
-//  if (!confirm("Batalkan order ini?")) return
-
-  //await api.delete(`/orders/${pos.orderId}`)
-//  pos.cancel()
-//}
-const clear = () => {
-  if (!confirm("Batalkan order ini?")) return
-  pos.clear()
-}
+const SwalTheme = Swal.mixin({
+  customClass: {
+    popup: "swal-theme-popup",
+    title: "swal-theme-title",
+    content: "swal-theme-content",
+    confirmButton: "swal-theme-confirm",
+    cancelButton: "swal-theme-cancel",
+    denyButton: "swal-theme-deny"
+  },
+  buttonsStyling: false
+})
 
 const grandTotal = computed(() =>
   items.value.reduce((sum, i) => sum + Number(i.base_price) * i.qty, 0)
 )
-const closeSuccess = async () => {
-  try {
-    await api.post(
-      `/timers/from-order/${lastOrder.value.order_id}`
-    )
-  } catch (e) {
-    console.warn("Timer tidak dibuat:", e.message)
-  }
 
-  showSuccess.value = false
-  pos.clear()
-  router.push("/kasir")
-}
-const showSuccess = ref(false)
+const loading = ref(false)
 const lastOrder = ref({
   order_id: null,
   total: 0,
   items: []
 })
 
+const format = n =>
+  Number(n || 0).toLocaleString("id-ID")
+
+const clear = async () => {
+  const res = await SwalTheme.fire({
+    icon: "warning",
+    title: "Batalkan order ini?",
+    text: "Semua item di cart akan dihapus.",
+    showCancelButton: true,
+    confirmButtonText: "Ya, batalkan",
+    cancelButtonText: "Tidak"
+  })
+
+  if (!res.isConfirmed) return
+  // Jika perlu panggil API untuk membatalkan order yang telah dibuat di server, lakukan di sini.
+  pos.clear()
+  await SwalTheme.fire({
+    icon: "success",
+    title: "Dibatalkan",
+    text: "Order telah dibatalkan",
+    confirmButtonText: "OK"
+  })
+}
+
 const checkout = async () => {
+  if (items.value.length === 0) {
+    await SwalTheme.fire({
+      icon: "info",
+      title: "Kosong",
+      text: "Tidak ada item untuk dibayar",
+      confirmButtonText: "OK"
+    })
+    return
+  }
+
+  loading.value = true
   try {
     const payload = {
       items: items.value.map(i => ({
@@ -167,37 +140,74 @@ const checkout = async () => {
       items: JSON.parse(JSON.stringify(items.value))
     }
 
-    showSuccess.value = true
+    // Clear local cart immediately (same behavior as sebelumnya)
     pos.clear()
+
+    // Build HTML breakdown for SweetAlert
+    const itemsHtml = lastOrder.value.items.map(i =>
+      `<div style="display:flex;justify-content:space-between;margin:6px 0;"><span>${i.name} × ${i.qty}</span><strong>Rp ${format(i.base_price * i.qty)}</strong></div>`
+    ).join("")
+
+    const html = `
+      <p class="order-id" style="margin:6px 0 10px;color:#888;">Order #${lastOrder.value.order_id}</p>
+      <div style="font-size:28px;font-weight:800;margin:6px 0;color:#2ecc71;">Rp ${format(lastOrder.value.total)}</div>
+      <div style="text-align:left;margin-top:10px;">${itemsHtml}</div>
+    `
+
+    // Show SweetAlert success with option to print
+    const result = await SwalTheme.fire({
+      icon: "success",
+      title: "Transaksi Berhasil",
+      html,
+      showDenyButton: true,
+      denyButtonText: "🖨 Cetak",
+      confirmButtonText: "Tutup"
+    })
+
+    if (result.isDenied) {
+      await printOrder(lastOrder.value.order_id)
+      // after printing, still proceed to close flow below
+    }
+
+    // After user closes success dialog, attempt to create timers and navigate
+    try {
+      await api.post(`/timers/from-order/${lastOrder.value.order_id}`)
+    } catch (e) {
+      // not critical; just warn
+      console.warn("Timer tidak dibuat:", e?.message || e)
+    }
+
+    router.push("/kasir")
   } catch (err) {
-    alert(err.response?.data?.message || err.message)
+    await SwalTheme.fire({
+      icon: "error",
+      title: "Gagal",
+      text: err.response?.data?.message || err.message || "Failed to checkout",
+      confirmButtonText: "OK"
+    })
+  } finally {
+    loading.value = false
   }
 }
-// setelah checkout sukses
-//for (const i of items) {
-//  if (i.duration_minutes && i.duration_minutes > 0) {
-//    await api.post("/timers", {
-//      order_id: orderId,
-//      service_id: i.id,
-//      duration_minutes: i.duration_minutes
-//    })
-//  }
-//}
-const printOrder = async () => {
+
+const printOrder = async (order_id = lastOrder.value.order_id) => {
   try {
-    await api.post(
-      `/printers/print-order`,
-      { order_id: lastOrder.value.order_id }
-    )
-    alert("🖨 Struk dikirim ke printer")
+    await api.post(`/printers/print-order`, { order_id })
+    await SwalTheme.fire({
+      icon: "success",
+      title: "Struk dikirim",
+      text: "🖨 Struk dikirim ke printer",
+      confirmButtonText: "OK"
+    })
   } catch (err) {
-    alert("Gagal cetak: " + err.message)
+    await SwalTheme.fire({
+      icon: "error",
+      title: "Gagal cetak",
+      text: err.response?.data?.message || err.message || "Gagal cetak",
+      confirmButtonText: "OK"
+    })
   }
 }
-
-
-const format = n =>
-  Number(n || 0).toLocaleString("id-ID")
 </script>
 
 <style scoped>
@@ -357,100 +367,57 @@ const format = n =>
   cursor: pointer;
 }
 
-.success-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
+/* ===== SweetAlert2 Black & Gold theme (scoped using :deep) ===== */
+:deep(.swal-theme-popup) {
+  background: linear-gradient(145deg, #0e0e0e, #151515) !important;
+  color: #fff !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 215, 0, 0.08) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6) !important;
 }
 
-.success-modal {
-  width: 100%;
-  max-width: 420px;
-  background: #0e0e0e;
-  border-radius: 20px;
-  padding: 24px;
-  text-align: center;
-  border: 1px solid #222;
-  animation: pop .2s ease;
+:deep(.swal-theme-title) {
+  color: var(--gold, #f5c518) !important;
+  font-weight: 600;
 }
 
-@keyframes pop {
-  from { transform: scale(.95); opacity: 0 }
-  to { transform: scale(1); opacity: 1 }
-}
-
-.success-modal .icon {
-  font-size: 48px;
-  margin-bottom: 10px;
-}
-
-.success-modal h2 {
-  margin: 6px 0;
-  font-size: 20px;
-  color: #c9a24d;
-}
-
-.order-id {
-  font-size: 12px;
-  color: #888;
-}
-
-.success-modal .total {
-  font-size: 32px;
-  font-weight: 800;
-  margin: 14px 0;
-  color: #2ecc71;
-}
-
-.items {
-  margin-top: 14px;
-  text-align: left;
-  border-top: 1px solid #222;
-  padding-top: 12px;
-}
-
-.item {
-  display: flex;
-  justify-content: space-between;
+:deep(.swal-theme-content) {
+  color: #cfcfcf !important;
   font-size: 14px;
-  margin-bottom: 6px;
 }
 
-.actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 18px;
+/* Buttons */
+:deep(.swal-theme-confirm) {
+  background: var(--gold, #f5c518) !important;
+  color: #000 !important;
+  border: none !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
 }
 
-.actions button {
-  flex: 1;
-  padding: 10px;
-  border-radius: 12px;
-  font-weight: 700;
-  border: none;
-  cursor: pointer;
+:deep(.swal-theme-cancel) {
+  background: transparent !important;
+  color: var(--gold, #f5c518) !important;
+  border: 1px solid var(--gold, #f5c518) !important;
+  padding: 7px 14px !important;
+  border-radius: 8px !important;
 }
 
-.actions .print {
-  flex: 1;
-  background: #c9a24d;
-  color: #000;
-  font-weight: 700;
-  border-radius: 12px;
-  padding: 12px;
+:deep(.swal-theme-deny) {
+  background: transparent !important;
+  color: var(--gold, #f5c518) !important;
+  border: 1px solid rgba(255, 215, 0, 0.12) !important;
+  padding: 7px 14px !important;
+  border-radius: 8px !important;
 }
 
-.actions .close {
-  flex: 1;
-  background: #222;
-  color: #fff;
-  border-radius: 12px;
-  padding: 12px;
+/* success icon overrides */
+:deep(.swal2-success-ring),
+:deep(.swal2-success-fix) {
+  border-color: var(--gold, #f5c518) !important;
 }
-
-
+:deep(.swal2-success-line-tip),
+:deep(.swal2-success-line-long) {
+  background-color: var(--gold, #f5c518) !important;
+}
 </style>

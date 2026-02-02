@@ -1,0 +1,16 @@
+module.exports = {
+  content: [
+    "./index.html",
+    "./src/**/*.{vue,js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        gold: '#c9a24d',
+        dark: '#0e0e0e',
+        'dark-card': '#151515',
+      },
+    },
+  },
+  darkMode: 'class', // Untuk dark mode support
+}

@@ -8,6 +8,7 @@ const controller = require("./timer.controller")
 router.post("/start", auth, controller.startTimer)
 router.post("/start", auth, controller.startManual)
 router.post("/from-order/:orderId", auth, controller.createFromOrder)
+router.post("/extend/:id",auth,controller.extendTimer)
 
 // GET ACTIVE TIMERS (POS dashboard)
 router.get("/active", auth, controller.getActive)
