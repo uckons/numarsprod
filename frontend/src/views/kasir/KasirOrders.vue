@@ -55,8 +55,8 @@
         :key="idx"
         class="meta"
       >
-        <span v-if="i.therapist_name">
-          {{ i.therapist_name }}
+        <span v-if="o.therapist_name">
+          {{ o.therapist_name }}
         </span>
         <span v-else class="muted">-</span>
       </div>
@@ -69,8 +69,8 @@
         :key="idx"
         class="meta"
       >
-        <span v-if="i.room_name">
-          {{ i.room_name }}
+        <span v-if="o.room_name">
+          {{ o.room_name }}
         </span>
         <span v-else class="muted">-</span>
       </div>

@@ -6,6 +6,9 @@ export const usePosStore = defineStore("pos", () => {
     JSON.parse(localStorage.getItem("pos-cart") || "[]")
   )
 
+  // 🆕 Track current order ID
+  const currentOrderId = ref(null)
+
   function addService(service) {
     const found = items.value.find(i => i.id === service.id)
     if (found) {
@@ -19,7 +22,8 @@ export const usePosStore = defineStore("pos", () => {
       })
     }
   }
-  const locked = ref(false) //tambahan
+
+  const locked = ref(false)
   
   function lock() {
     locked.value = true
@@ -45,6 +49,7 @@ export const usePosStore = defineStore("pos", () => {
 
   function clear() {
     items.value = []
+    currentOrderId.value = null  // 🆕 Reset order ID
   }
 
   // 🔥 AUTO SAVE
@@ -56,12 +61,14 @@ export const usePosStore = defineStore("pos", () => {
 
   return {
     items,
+    currentOrderId,  // 🆕
     addService,
     inc,
     dec,
     remove,
     clear,
     lock,
-    unlock
+    unlock,
+    locked
   }
 })

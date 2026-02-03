@@ -68,7 +68,7 @@ exports.startTimer = async (req, res) => {
       slot
     } = req.body
 
-    // 🔒 VALIDASI MINIMAL
+        // 🔒 VALIDASI MINIMAL
     if (!service_id || !therapist_id || !room_id || !duration_minutes) {
       return res.status(400).json({ message: "Data timer tidak lengkap" })
     }
@@ -91,7 +91,13 @@ exports.startTimer = async (req, res) => {
       )
       finalOrderId = rows[0].id
     }
-
+    // 🆕 UPDATE ORDER dengan therapist_id & room_id
+    await db.query(
+      `UPDATE orders 
+       SET therapist_id = $1, room_id = $2 
+       WHERE id = $3`,
+      [therapist_id, room_id, finalOrderId]
+    )
     // =========================
     // 🆕 2. AMBIL DATA SERVICE & CREATE ORDER_ITEMS
     // =========================

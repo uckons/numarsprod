@@ -8,6 +8,9 @@ export const usePosStore = defineStore("pos", () => {
 
   // 🆕 Track current order ID
   const currentOrderId = ref(null)
+  // 🆕 Track selected therapist & room
+const selectedTherapist = ref(null)
+const selectedRoom = ref(null)
 
   function addService(service) {
     const found = items.value.find(i => i.id === service.id)
@@ -51,7 +54,13 @@ export const usePosStore = defineStore("pos", () => {
     items.value = []
     currentOrderId.value = null  // 🆕 Reset order ID
   }
+ function setTherapist(therapist) {
+  selectedTherapist.value = therapist
+}
 
+function setRoom(room) {
+  selectedRoom.value = room
+}
   // 🔥 AUTO SAVE
   watch(
     items,
@@ -60,15 +69,19 @@ export const usePosStore = defineStore("pos", () => {
   )
 
   return {
-    items,
-    currentOrderId,  // 🆕
-    addService,
-    inc,
-    dec,
-    remove,
-    clear,
-    lock,
-    unlock,
-    locked
-  }
+  items,
+  currentOrderId,
+  selectedTherapist,    // 🆕
+  selectedRoom,         // 🆕
+  addService,
+  locked,
+  lock,
+  unlock,
+  inc,
+  dec,
+  remove,
+  clear,
+  setTherapist,         // 🆕
+  setRoom              // 🆕
+}
 })

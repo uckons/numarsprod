@@ -353,23 +353,25 @@ exports.getKasirOrders = async (req, res) => {
         o.status,
         o.created_at,
         o.total,
+        th.name AS therapist_name,
+        r.name AS room_name,
 
         json_agg(
           DISTINCT jsonb_build_object(
             'service_id', oi.service_id,
             'service_name', oi.service_name,
             'qty', oi.qty,
-            'subtotal', oi.subtotal,
-            'therapist_name', oi.therapist_name,
-            'room_name', oi.room_name
+            'subtotal', oi.subtotal
           )
         ) FILTER (WHERE oi.id IS NOT NULL) AS items
 
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
+      LEFT JOIN therapists th ON th.id = o.therapist_id
+      LEFT JOIN rooms r ON r.id = o.room_id
 
       WHERE o.branch_id = $1
-      GROUP BY o.id
+      GROUP BY o.id, th.name, r.name
       ORDER BY o.created_at DESC
     `, [branchId])
 
