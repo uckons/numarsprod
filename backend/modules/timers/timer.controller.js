@@ -96,7 +96,7 @@ exports.startTimer = async (req, res) => {
     // 🆕 2. AMBIL DATA SERVICE & CREATE ORDER_ITEMS
     // =========================
     const { rows: serviceRows } = await db.query(
-      `SELECT id, name, price, duration_minutes 
+      `SELECT id, name, base_price, duration_minutes 
        FROM services 
        WHERE id = $1`,
       [service_id]
@@ -125,7 +125,7 @@ exports.startTimer = async (req, res) => {
         VALUES
           ($1, $2, $3, 1, $4, $4)
         `,
-        [finalOrderId, service.id, service.name, service.price]
+        [finalOrderId, service.id, service.name, service.base_price]
       )
 
       // Update order total
@@ -133,12 +133,12 @@ exports.startTimer = async (req, res) => {
         `UPDATE orders 
          SET total = total + $1 
          WHERE id = $2`,
-        [service.price, finalOrderId]
+        [service.base_price, finalOrderId]
       )
     } else {
       // Item already exists, increment qty (for extend case)
       const newQty = existingItems[0].qty + 1
-      const newSubtotal = service.price * newQty
+      const newSubtotal = service.base_price * newQty
 
       await db.query(
         `UPDATE order_items 
@@ -152,7 +152,7 @@ exports.startTimer = async (req, res) => {
         `UPDATE orders 
          SET total = total + $1 
          WHERE id = $2`,
-        [service.price, finalOrderId]
+        [service.base_price, finalOrderId]
       )
     }
 
@@ -467,7 +467,7 @@ exports.extendTimer = async (req, res) => {
         t.order_id,
         t.service_id,
         s.duration_minutes,
-        s.price
+        s.base_price
       FROM timers t
       JOIN services s ON s.id = t.service_id
       WHERE t.id = $1
@@ -502,7 +502,7 @@ exports.extendTimer = async (req, res) => {
         AND service_id = $3
       `,
       [
-        timer.price,
+        timer.base_price,
         timer.order_id,
         timer.service_id
       ]
@@ -515,7 +515,7 @@ exports.extendTimer = async (req, res) => {
       SET total = total + $1
       WHERE id = $2
       `,
-      [timer.price, timer.order_id]
+      [timer.base_price, timer.order_id]
     )
 
     res.json({ success: true })

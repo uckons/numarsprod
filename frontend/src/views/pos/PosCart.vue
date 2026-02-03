@@ -131,8 +131,17 @@ const checkout = async () => {
       })),
       payment_method: "CASH"
     }
-
-    const res = await api.post("/orders/pos", payload)
+let res
+    
+// 🆕 Kalau ada currentOrderId, UPDATE order existing
+if (pos.currentOrderId) {
+  console.log('Updating existing order:', pos.currentOrderId)
+  res = await api.post(`/orders/${pos.currentOrderId}/close`, payload)
+} else {
+  console.log('Creating new order')
+  res = await api.post("/orders/pos", payload)
+}
+//    const res = await api.post("/orders/pos", payload)
 
     lastOrder.value = {
       order_id: res.data.order_id,

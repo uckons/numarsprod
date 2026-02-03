@@ -6,43 +6,74 @@
       </div>
 
       <div class="right">
-        <PosCart
-          :items="cart"
-          @checkout="checkout"
-        />
+        <PosCart />
       </div>
     </div>
   </PosLayout>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue"
+import { onMounted, watch } from "vue"
+import { useRoute } from "vue-router"
 import PosLayout from "./PosLayout.vue"
 import PosServiceList from "./PosServiceList.vue"
 import PosCart from "./PosCart.vue"
+import { usePosStore } from "@/store/pos.store"
 import api from "@/services/api"
 
-const cart = ref([])
+const route = useRoute()
+const pos = usePosStore()
 
-const addToCart = (service) => {
-  const existing = cart.value.find(i => i.id === service.id)
-  if (existing) {
-    existing.qty++
-  } else {
-    cart.value.push({ ...service, qty: 1 })
+// 🆕 Load order function - simpan ke STORE
+const loadOrder = async (orderId) => {
+  if (!orderId) return
+  
+  try {
+    console.log('Loading order:', orderId)
+    const res = await api.get(`/orders/${orderId}`)
+    const order = res.data
+    
+    console.log('Order loaded:', order)
+    
+    // Load items dari order ke STORE
+    if (order.items && order.items.length > 0) {
+// 🆕 Set current order ID
+pos.currentOrderId = orderId
+      
+      // Add items ke store
+      order.items.forEach(item => {
+        const cartItem = {
+          id: item.service_id,
+          name: item.service_name,
+          base_price: item.price,
+          qty: 1
+        }
+        
+        // Add sebanyak qty
+        for (let i = 0; i < item.qty; i++) {
+          pos.addService(cartItem)
+        }
+      })
+      
+      console.log('Store updated, items count:', pos.items.length)
+    }
+  } catch (err) {
+    console.error("Failed to load order:", err)
   }
 }
 
-const checkout = async () => {
-  const payload = {
-    items: cart.value,
-    payment_method: "CASH",
-    total: cart.value.reduce((s,i)=>s+i.base_price*i.qty,0)
-  }
+// Load saat mount
+onMounted(() => {
+  loadOrder(route.query.order_id)
+})
 
-  await api.post("/orders/pos", payload)
-  alert("Order berhasil")
-  cart.value = []
+// Watch perubahan route
+watch(() => route.query.order_id, (newId) => {
+  loadOrder(newId)
+})
+
+const addToCart = (service) => {
+  pos.addService(service)
 }
 </script>
 

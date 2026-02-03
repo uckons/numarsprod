@@ -41,65 +41,10 @@ exports.close = async (req, res) => {
   try {
     const db = req.app.get("db")
     const orderId = req.params.id
-    const { items, payment_method } = req.body
 
-    // 🆕 Validasi: items tidak boleh kosong
-    if (!items || items.length === 0) {
-      return res.status(400).json({ message: "Cannot close order with empty items" })
-    }
-
-    // Hapus items lama
-    await db.query(`DELETE FROM order_items WHERE order_id = $1`, [orderId])
-      
-      // Insert items baru
-      for (const i of items) {
-        // Get service name from services table
-        const svcResult = await db.query(
-          `SELECT name FROM services WHERE id = $1`,
-          [i.id]
-        )
-        const serviceName = svcResult.rows[0]?.name || i.name || 'Unknown Service'
-        
-        await db.query(
-          `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [orderId, i.id, serviceName, i.qty, i.base_price, i.qty * i.base_price]
-        )
-      }
-    //}
-
-    // Hitung total baru
-    const totalResult = await db.query(
-      `SELECT COALESCE(SUM(subtotal), 0) as total 
-       FROM order_items 
-       WHERE order_id = $1`,
-      [orderId]
-    )
-    const total = totalResult.rows[0].total
-
-    // Update order dengan payment & status PAID
-    const result = await db.query(
-      `UPDATE orders
-       SET status = 'PAID', 
-           payment_method = $2,
-           total = $3,
-           total_amount = $3
-       WHERE id = $1
-       RETURNING *`,
-      [orderId, payment_method || 'CASH', total]
-    )
-
-    if (!result.rows.length) {
-      throw new Error("Order not found")
-    }
-
-    res.json({ 
-      order_id: result.rows[0].id,
-      total: result.rows[0].total,
-      status: result.rows[0].status
-    })
+    const closed = await service.closeOrder(db, orderId)
+    res.json(closed)
   } catch (err) {
-    console.error("CLOSE ORDER ERROR:", err)
     res.status(400).json({ message: err.message })
   }
 }
@@ -379,41 +324,5 @@ exports.getKasirOrders = async (req, res) => {
     res.status(500).json({ message: err.message })
   }
 }
-exports.getById = async (req, res) => {
-  const db = req.app.get("db")
-  const orderId = req.params.id
 
-  try {
-    const { rows } = await db.query(
-      `
-      SELECT 
-        o.*,
-        json_agg(
-          json_build_object(
-            'service_id', oi.service_id,
-            'service_name', s.name,
-            'qty', oi.qty,
-            'price', oi.price,
-            'subtotal', oi.subtotal
-          ) ORDER BY oi.id
-        ) FILTER (WHERE oi.id IS NOT NULL) as items
-      FROM orders o
-      LEFT JOIN order_items oi ON oi.order_id = o.id
-      LEFT JOIN services s ON s.id = oi.service_id
-      WHERE o.id = $1
-      GROUP BY o.id
-      `,
-      [orderId]
-    )
-
-    if (!rows.length) {
-      return res.status(404).json({ message: "Order not found" })
-    }
-
-    res.json(rows[0])
-  } catch (err) {
-    console.error("GET ORDER BY ID ERROR:", err)
-    res.status(500).json({ message: err.message })
-  }
-}
 

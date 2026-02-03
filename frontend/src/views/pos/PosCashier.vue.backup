@@ -1,0 +1,87 @@
+<template>
+  <PosLayout>
+    <div class="pos-body">
+      <div class="left">
+        <PosServiceList @add="addToCart" />
+      </div>
+
+      <div class="right">
+        <PosCart
+          :items="cart"
+          @checkout="checkout"
+        />
+      </div>
+    </div>
+  </PosLayout>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue"
+import { useRoute } from "vue-router"
+import PosLayout from "./PosLayout.vue"
+import PosServiceList from "./PosServiceList.vue"
+import PosCart from "./PosCart.vue"
+import api from "@/services/api"
+
+const route = useRoute()
+const cart = ref([])
+
+// 🆕 Load order dari URL jika ada order_id
+onMounted(async () => {
+  const orderId = route.query.order_id
+  if (orderId) {
+    try {
+      const res = await api.get(`/orders/${orderId}`)
+      const order = res.data
+      
+      // Load items dari order ke cart
+      if (order.items && order.items.length > 0) {
+        cart.value = order.items.map(item => ({
+          id: item.service_id,
+          name: item.service_name,
+          base_price: item.price,
+          qty: item.qty
+        }))
+      }
+    } catch (err) {
+      console.error("Failed to load order:", err)
+    }
+  }
+})
+
+const addToCart = (service) => {
+  const existing = cart.value.find(i => i.id === service.id)
+  if (existing) {
+    existing.qty++
+  } else {
+    cart.value.push({ ...service, qty: 1 })
+  }
+}
+
+const checkout = async () => {
+  const payload = {
+    items: cart.value,
+    payment_method: "CASH",
+    total: cart.value.reduce((s,i)=>s+i.base_price*i.qty,0)
+  }
+
+  await api.post("/orders/pos", payload)
+  alert("Order berhasil")
+  cart.value = []
+}
+</script>
+
+<style scoped>
+.pos-body {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  height: 100%;
+}
+.left {
+  padding: 16px;
+  overflow-y: auto;
+}
+.right {
+  border-left: 1px solid #222;
+}
+</style>

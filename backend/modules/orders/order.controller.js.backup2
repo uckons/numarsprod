@@ -41,44 +41,33 @@ exports.close = async (req, res) => {
   try {
     const db = req.app.get("db")
     const orderId = req.params.id
-    const { items, payment_method } = req.body
+    const { items, payment_method } = req.body  // 🆕 Terima items & payment
 
-    // 🆕 Validasi: items tidak boleh kosong
-    if (!items || items.length === 0) {
-      return res.status(400).json({ message: "Cannot close order with empty items" })
-    }
-
-    // Hapus items lama
-    await db.query(`DELETE FROM order_items WHERE order_id = $1`, [orderId])
+    // 🆕 Kalau ada items, update dulu
+    if (items && items.length > 0) {
+      // Hapus items lama
+      await db.none(`DELETE FROM order_items WHERE order_id = $1`, [orderId])
       
       // Insert items baru
       for (const i of items) {
-        // Get service name from services table
-        const svcResult = await db.query(
-          `SELECT name FROM services WHERE id = $1`,
-          [i.id]
-        )
-        const serviceName = svcResult.rows[0]?.name || i.name || 'Unknown Service'
-        
-        await db.query(
-          `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [orderId, i.id, serviceName, i.qty, i.base_price, i.qty * i.base_price]
+        await db.none(
+          `INSERT INTO order_items (order_id, service_id, qty, price, subtotal)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [orderId, i.id, i.qty, i.base_price, i.qty * i.base_price]
         )
       }
-    //}
+    }
 
-    // Hitung total baru
-    const totalResult = await db.query(
+    // 🆕 Hitung total baru
+    const { total } = await db.one(
       `SELECT COALESCE(SUM(subtotal), 0) as total 
        FROM order_items 
        WHERE order_id = $1`,
       [orderId]
     )
-    const total = totalResult.rows[0].total
 
-    // Update order dengan payment & status PAID
-    const result = await db.query(
+    // 🆕 Update order dengan payment & status PAID
+    const { rows } = await db.query(
       `UPDATE orders
        SET status = 'PAID', 
            payment_method = $2,
@@ -89,14 +78,14 @@ exports.close = async (req, res) => {
       [orderId, payment_method || 'CASH', total]
     )
 
-    if (!result.rows.length) {
+    if (!rows.length) {
       throw new Error("Order not found")
     }
 
     res.json({ 
-      order_id: result.rows[0].id,
-      total: result.rows[0].total,
-      status: result.rows[0].status
+      order_id: rows[0].id,
+      total: rows[0].total,
+      status: rows[0].status
     })
   } catch (err) {
     console.error("CLOSE ORDER ERROR:", err)
