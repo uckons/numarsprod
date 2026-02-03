@@ -133,6 +133,8 @@ const edit = (b) => {
 }
 
 const remove = async (b) => {
+  // Security Note: Using 'text' property ensures SweetAlert2 automatically
+  // escapes branch name, preventing XSS even if b.name contains special characters
   const result = await Swal.fire({
     title: "Delete Branch?",
     text: `Are you sure you want to delete ${b.name}?`,

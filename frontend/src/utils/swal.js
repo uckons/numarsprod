@@ -61,6 +61,8 @@ export const SwalLoading = (title = "Processing...", text = "Please wait") => {
 }
 
 export const SwalDelete = (itemName) => {
+  // Security Note: Using 'text' property instead of 'html' ensures SweetAlert2
+  // automatically escapes the content, preventing XSS even with user-controlled itemName
   return Swal.fire({
     title: "Delete Confirmation",
     text: `Are you sure you want to delete ${itemName}?`,
