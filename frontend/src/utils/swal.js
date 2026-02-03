@@ -36,10 +36,10 @@ export const SwalWarning = (title, text) => {
   })
 }
 
-export const SwalConfirm = (title, html, confirmText = "Yes", cancelText = "Cancel") => {
+export const SwalConfirm = (title, text, confirmText = "Yes", cancelText = "Cancel") => {
   return Swal.fire({
     title,
-    html,
+    text,
     icon: "question",
     showCancelButton: true,
     confirmButtonText: confirmText,

@@ -139,10 +139,7 @@ const close = () => {
 const cloneServices = async (branchId) => {
   const result = await Swal.fire({
     title: "Clone Services?",
-    html: `
-      Clone all services from Pondok Indah?<br/>
-      <small>Services will be INACTIVE by default</small>
-    `,
+    text: "Clone all services from Pondok Indah? Services will be INACTIVE by default.",
     icon: "question",
     showCancelButton: true,
     confirmButtonText: "Yes, Clone",
