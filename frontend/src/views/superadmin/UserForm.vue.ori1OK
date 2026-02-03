@@ -89,6 +89,7 @@
 <script setup>
 import { ref, onMounted } from "vue"
 import api from "../../services/api"
+import Swal from "sweetalert2"
 const emit = defineEmits(["saved", "close"])
 const props = defineProps({
   edit: Boolean,
@@ -134,7 +135,15 @@ onMounted(async () => {
 /* SAVE */
 const save = async () => {
   if (!form.value.name || !form.value.phone || !form.value.username || !form.value.role_id) {
-    return alert("Name, Phone, Username & Role required")
+    await Swal.fire({
+      icon: "warning",
+      title: "Incomplete Form",
+      text: "Name, Phone, Username & Role are required",
+      background: "#111",
+      color: "#fff",
+      confirmButtonColor: "#c9a24d"
+    })
+    return
   }
 
   loading.value = true
@@ -144,6 +153,16 @@ const save = async () => {
       await api.put(`/users/${props.data.id}`, {
         role_id: form.value.role_id,
         branch_id: form.value.branch_id
+      })
+
+      await Swal.fire({
+        icon: "success",
+        title: "User Updated",
+        text: "User has been updated successfully",
+        timer: 1500,
+        showConfirmButton: false,
+        background: "#111",
+        color: "#fff"
       })
 
       emit("saved", {
@@ -158,11 +177,29 @@ const save = async () => {
       }
 
       await api.post("/users", form.value)
+      
+      await Swal.fire({
+        icon: "success",
+        title: "User Created",
+        text: "User has been created successfully",
+        timer: 1500,
+        showConfirmButton: false,
+        background: "#111",
+        color: "#fff"
+      })
+      
       emit("saved")
     }
   } catch (err) {
     console.error(err.response?.data)
-    alert(err.response?.data?.message || "Failed save user")
+    await Swal.fire({
+      icon: "error",
+      title: "Save Failed",
+      text: err.response?.data?.message || "Failed to save user",
+      background: "#111",
+      color: "#fff",
+      confirmButtonColor: "#c9a24d"
+    })
   } finally {
     loading.value = false
   }

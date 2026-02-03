@@ -90,6 +90,7 @@
 import { ref, onMounted } from "vue"
 import api from "@/services/api"
 import BranchForm from "./BranchForm.vue"
+import Swal from "sweetalert2"
 
 const branches = ref([])
 const loading = ref(false)
@@ -136,21 +137,61 @@ const close = () => {
 }
 
 const cloneServices = async (branchId) => {
-  const ok = confirm(
-    "Clone all services from Pondok Indah?\n" +
-    "Services will be INACTIVE by default."
-  )
-  if (!ok) return
+  const result = await Swal.fire({
+    title: "Clone Services?",
+    text: "Clone all services from Pondok Indah? Services will be INACTIVE by default.",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "Yes, Clone",
+    cancelButtonText: "Cancel",
+    background: "#111",
+    color: "#fff",
+    confirmButtonColor: "#c9a24d",
+    cancelButtonColor: "#666"
+  })
+
+  if (!result.isConfirmed) return
 
   try {
+    // Show loading
+    Swal.fire({
+      title: "Cloning Services...",
+      text: "Please wait",
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading()
+      },
+      background: "#111",
+      color: "#fff"
+    })
+
     await api.post("/services/clone-from-template", {
       target_branch_id: branchId
     })
 
-    alert("? Services cloned successfully (DRAFT)")
+    // Reload data first to ensure we have fresh data
+    await load()
+
+    // Show success message after reload
+    await Swal.fire({
+      icon: "success",
+      title: "Success!",
+      text: "Services cloned successfully (DRAFT)",
+      timer: 2000,
+      showConfirmButton: false,
+      background: "#111",
+      color: "#fff"
+    })
   } catch (err) {
     console.error(err)
-    alert(err.response?.data?.message || "Clone failed")
+    await Swal.fire({
+      icon: "error",
+      title: "Clone Failed",
+      text: err.response?.data?.message || "Failed to clone services",
+      background: "#111",
+      color: "#fff",
+      confirmButtonColor: "#c9a24d"
+    })
   }
 }
 
