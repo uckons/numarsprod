@@ -153,14 +153,17 @@ const stopTimer = async (timerId) => {
   try {
     const timer = timers.value.find(t => t.id === timerId)
     if (!timer) {
-      throw new Error("Timer tidak ditemukan")
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Stop Timer",
+        text: "Timer tidak ditemukan",
+        background: "#111",
+        color: "#fff"
+      })
+      return
     }
 
     await api.post(`/timers/${timerId}/stop`)
-    
-    // Optimistic update
-    timer.status = "FINISHED"
-    timer.remaining_seconds = 0
     
     Swal.fire({
       icon: "success",

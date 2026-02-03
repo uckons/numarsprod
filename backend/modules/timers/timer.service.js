@@ -144,10 +144,14 @@ exports.stopTimer = async (db, timerId) => {
 
     // 5. Update status order menjadi DRAFT jika semua timer selesai
     if (parseInt(runningTimers[0].count) === 0) {
-      await db.query(
-        `UPDATE orders SET status = 'DRAFT' WHERE id = $1 AND status != 'PAID'`,
+      const updateResult = await db.query(
+        `UPDATE orders SET status = 'DRAFT' WHERE id = $1 AND status != 'PAID' RETURNING status`,
         [timer.order_id]
       )
+      
+      if (updateResult.rows.length === 0) {
+        console.warn(`⚠️ Order ${timer.order_id} tidak diupdate ke DRAFT (kemungkinan sudah PAID)`)
+      }
     }
   }
 
