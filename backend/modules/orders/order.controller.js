@@ -304,30 +304,17 @@ exports.getKasirOrders = async (req, res) => {
             'service_id', oi.service_id,
             'service_name', oi.service_name,
             'qty', oi.qty,
-            'subtotal', oi.subtotal
+            'subtotal', oi.subtotal,
+            'therapist_name', oi.therapist_name,
+            'room_name', oi.room_name
           )
-        ) FILTER (WHERE oi.id IS NOT NULL) AS items,
-
-        tm.therapist_name,
-        tm.room_name
+        ) FILTER (WHERE oi.id IS NOT NULL) AS items
 
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
 
-      LEFT JOIN LATERAL (
-        SELECT
-          th.name AS therapist_name,
-          r.name AS room_name
-        FROM timers t
-        LEFT JOIN therapists th ON th.id = t.therapist_id
-        LEFT JOIN rooms r ON r.id = t.room_id
-        WHERE t.order_id = o.id
-        ORDER BY t.start_time DESC
-        LIMIT 1
-      ) tm ON true
-
       WHERE o.branch_id = $1
-      GROUP BY o.id, tm.therapist_name, tm.room_name
+      GROUP BY o.id
       ORDER BY o.created_at DESC
     `, [branchId])
 

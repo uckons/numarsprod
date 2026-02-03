@@ -98,11 +98,16 @@ const remainingMinutes = computed(() => {
 })
 const remainingMs = computed(() => {
   if (!props.timer.planned_end_time) return 0
-  return new Date(props.timer.planned_end_time).getTime() - now.value
+  const remaining = new Date(props.timer.planned_end_time).getTime() - now.value
+  return Math.max(0, remaining)
 })
 const displayTime = computed(() => {
   if (props.timer.status !== "RUNNING") return "Ready"
-  const ms = Math.max(0, remainingMs.value)
+  
+  const ms = remainingMs.value
+  
+  if (ms === 0) return "SELESAI"
+  
   const h = Math.floor(ms / 3600000)
   const m = Math.floor((ms % 3600000) / 60000)
   const s = Math.floor((ms % 60000) / 1000)
@@ -159,8 +164,9 @@ const onExtend = async () => {
   if (!res.isConfirmed) return
 
   try {
-    await api.post(`/timers/extend/${props.timer.id}`)
-// ✅ ALERT SUKSES
+    // FIX: endpoint yang benar
+    await api.post(`/timers/${props.timer.id}/extend`)
+    
     Swal.fire({
       icon: "success",
       title: "Berhasil",
@@ -170,9 +176,10 @@ const onExtend = async () => {
       background: "#111",
       color: "#fff"
     })
-    // notify parent to refresh timers
+    
     emit("extended")
   } catch (err) {
+    console.error("Extend error:", err)
     Swal.fire({
       icon: "error",
       title: "Gagal Extend",

@@ -151,12 +151,40 @@ const openStartTimer = (slot) => {
 
 const stopTimer = async (timerId) => {
   try {
+    const timer = timers.value.find(t => t.id === timerId)
+    if (!timer) {
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Stop Timer",
+        text: "Timer tidak ditemukan",
+        background: "#111",
+        color: "#fff"
+      })
+      return
+    }
+
     await api.post(`/timers/${timerId}/stop`)
-    // Refresh timers to reflect the change
+    
+    Swal.fire({
+      icon: "success",
+      title: "Timer Dihentikan",
+      text: "Timer berhasil dihentikan dan masuk ke order list",
+      timer: 1500,
+      showConfirmButton: false,
+      background: "#111",
+      color: "#fff"
+    })
+    
     await syncTimers()
   } catch (err) {
     console.error("Failed to stop timer:", err)
-    alert("Gagal menghentikan timer. Silakan coba lagi.")
+    Swal.fire({
+      icon: "error",
+      title: "Gagal Stop Timer",
+      text: err.response?.data?.message || "Silakan coba lagi",
+      background: "#111",
+      color: "#fff"
+    })
   }
 }
 /* KODE KAMU DI SINI */
@@ -206,7 +234,7 @@ const createManualTimer = async (data) => {
   }
 }
 const syncTimers = async () => {
-  if (isSyncing) return // Prevent multiple simultaneous syncs
+  if (isSyncing) return
   
   try {
     isSyncing = true
@@ -215,13 +243,12 @@ const syncTimers = async () => {
     })
     const slots = response.data
     
-    // Update timers array with the 30 slots from backend
     slots.forEach((slot, index) => {
       if (index < timers.value.length) {
         Object.assign(timers.value[index], {
           slot: slot.slot_number,
           status: slot.status,
-          id: slot.timer_id || slot.timer_id || null,
+          id: slot.timer_id || null,
           order_id: slot.order_id,
           service_id: slot.service_id,
           service_name: slot.service_name,
@@ -241,86 +268,33 @@ const syncTimers = async () => {
     isSyncing = false
   }
 }
-// Update countdown every second
 const updateCountdown = () => {
   timers.value.forEach(t => {
     if (t.status === "RUNNING" && t.remaining_seconds > 0) {
       t.remaining_seconds--
       
-      // Handle timer completion
       if (t.remaining_seconds <= 0 && !t.warned) {
         t.warned = true
+        
+        Swal.fire({
+          icon: "info",
+          title: "⏰ Timer Selesai",
+          html: `
+            <strong>${t.therapist_name || "Terapis"}</strong><br/>
+            <small>${t.service_name || "Service"}</small><br/>
+            Timer telah selesai dan masuk ke order list
+          `,
+          confirmButtonText: "OK",
+          background: "#111",
+          color: "#fff",
+          confirmButtonColor: "#c9a24d"
+        })
+        
         console.warn(`⏰ Timer selesai: ${t.therapist_name || "Terapis"}`)
-        // Re-sync to remove completed timers
         syncTimers()
       }
     }
   })
-}
-const handleExtend = async ({ timer_id, service_id, duration }) => {
-  try {
-    await api.post(`/timers/${timer_id}/extend`, {
-      duration_minutes: duration
-    })
-
-    // optional: sync ulang dari backend
-    await syncTimers()
-  } catch (err) {
-    console.error("Extend gagal", err)
-  }
-}
-
-const confirmExtend = async (timer) => {
-  const result = await Swal.fire({
-    title: "Extend Waktu?",
-    text: "Durasi service akan ditambahkan sesuai service",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonText: "Ya, Extend",
-    cancelButtonText: "Batal",
-    confirmButtonColor: "#c9a24d"
-  })
-
-  if (!result.isConfirmed) return
-
-  await extendTimer(timer)
-}
-// extend timer
-const extendTimer = async (timer) => {
-  try {
-    // ambil durasi dari service (sudah ada di timer)
-    const extraMinutes = timer.duration_minutes
-
-    // 🔹 backend
-    await api.post(`/timers/${timer.id}/extend`, {
-      minutes: extraMinutes
-    })
-
-    // 🔹 frontend update (REALTIME)
-    const extraMs = extraMinutes * 60 * 1000
-    timer.planned_end_time = new Date(
-      new Date(timer.planned_end_time).getTime() + extraMs
-    )
-
-    // 🔹 tambahkan order_items (qty++)
-    await api.post(`/orders/${timer.order_id}/extend`, {
-      service_id: timer.service_id
-    })
-
-    Swal.fire({
-      icon: "success",
-      title: "Berhasil",
-      text: "Waktu berhasil ditambahkan",
-      timer: 1500,
-      showConfirmButton: false
-    })
-  } catch (err) {
-    Swal.fire({
-      icon: "error",
-      title: "Gagal",
-      text: err.response?.data?.message || err.message
-    })
-  }
 }
 
 onMounted(async () => {
