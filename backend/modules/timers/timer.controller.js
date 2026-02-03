@@ -467,7 +467,7 @@ exports.extendTimer = async (req, res) => {
         t.order_id,
         t.service_id,
         s.duration_minutes,
-        s.base_price
+        s.price
       FROM timers t
       JOIN services s ON s.id = t.service_id
       WHERE t.id = $1
@@ -502,7 +502,7 @@ exports.extendTimer = async (req, res) => {
         AND service_id = $3
       `,
       [
-        timer.base_price,
+        timer.price,
         timer.order_id,
         timer.service_id
       ]
@@ -515,7 +515,7 @@ exports.extendTimer = async (req, res) => {
       SET total = total + $1
       WHERE id = $2
       `,
-      [timer.base_price, timer.order_id]
+      [timer.price, timer.order_id]
     )
 
     res.json({ success: true })
