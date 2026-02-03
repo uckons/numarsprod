@@ -172,7 +172,7 @@ const cloneServices = async (branchId) => {
       target_branch_id: branchId
     })
 
-    Swal.fire({
+    await Swal.fire({
       icon: "success",
       title: "Success!",
       text: "Services cloned successfully (DRAFT)",

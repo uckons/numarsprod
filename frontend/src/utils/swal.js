@@ -74,12 +74,3 @@ export const SwalDelete = (itemName) => {
     color: "#fff"
   })
 }
-
-export default {
-  Success: SwalSuccess,
-  Error: SwalError,
-  Warning: SwalWarning,
-  Confirm: SwalConfirm,
-  Loading: SwalLoading,
-  Delete: SwalDelete
-}
