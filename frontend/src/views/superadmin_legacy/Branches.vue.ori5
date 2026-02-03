@@ -135,7 +135,7 @@ const edit = (b) => {
 const remove = async (b) => {
   const result = await Swal.fire({
     title: "Delete Branch?",
-    html: `Are you sure you want to delete<br/><strong>${b.name}</strong>?`,
+    text: `Are you sure you want to delete ${b.name}?`,
     icon: "warning",
     showCancelButton: true,
     confirmButtonText: "Yes, Delete",

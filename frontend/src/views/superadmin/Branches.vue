@@ -185,7 +185,7 @@ const cloneServices = async (branchId) => {
     await load()
   } catch (err) {
     console.error(err)
-    Swal.fire({
+    await Swal.fire({
       icon: "error",
       title: "Clone Failed",
       text: err.response?.data?.message || "Failed to clone services",

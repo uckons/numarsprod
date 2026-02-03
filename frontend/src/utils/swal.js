@@ -63,7 +63,7 @@ export const SwalLoading = (title = "Processing...", text = "Please wait") => {
 export const SwalDelete = (itemName) => {
   return Swal.fire({
     title: "Delete Confirmation",
-    html: `Are you sure you want to delete<br/><strong>${itemName}</strong>?`,
+    text: `Are you sure you want to delete ${itemName}?`,
     icon: "warning",
     showCancelButton: true,
     confirmButtonText: "Yes, Delete",
