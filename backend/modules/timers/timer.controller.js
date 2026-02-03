@@ -93,7 +93,71 @@ exports.startTimer = async (req, res) => {
     }
 
     // =========================
-    // 🔒 2. VALIDASI SLOT (JIKA ADA)
+    // 🆕 2. AMBIL DATA SERVICE & CREATE ORDER_ITEMS
+    // =========================
+    const { rows: serviceRows } = await db.query(
+      `SELECT id, name, price, duration_minutes 
+       FROM services 
+       WHERE id = $1`,
+      [service_id]
+    )
+
+    if (!serviceRows.length) {
+      return res.status(400).json({ message: "Service tidak ditemukan" })
+    }
+
+    const service = serviceRows[0]
+
+    // Check if order_items already exists for this service
+    const { rows: existingItems } = await db.query(
+      `SELECT id, qty, subtotal 
+       FROM order_items 
+       WHERE order_id = $1 AND service_id = $2`,
+      [finalOrderId, service_id]
+    )
+
+    if (existingItems.length === 0) {
+      // Create new order_item
+      await db.query(
+        `
+        INSERT INTO order_items
+          (order_id, service_id, service_name, qty, price, subtotal)
+        VALUES
+          ($1, $2, $3, 1, $4, $4)
+        `,
+        [finalOrderId, service.id, service.name, service.price]
+      )
+
+      // Update order total
+      await db.query(
+        `UPDATE orders 
+         SET total = total + $1 
+         WHERE id = $2`,
+        [service.price, finalOrderId]
+      )
+    } else {
+      // Item already exists, increment qty (for extend case)
+      const newQty = existingItems[0].qty + 1
+      const newSubtotal = service.price * newQty
+
+      await db.query(
+        `UPDATE order_items 
+         SET qty = $1, subtotal = $2 
+         WHERE id = $3`,
+        [newQty, newSubtotal, existingItems[0].id]
+      )
+
+      // Update order total
+      await db.query(
+        `UPDATE orders 
+         SET total = total + $1 
+         WHERE id = $2`,
+        [service.price, finalOrderId]
+      )
+    }
+
+    // =========================
+    // 🔒 3. VALIDASI SLOT (JIKA ADA)
     // =========================
     let slot_number = slot ?? null
     if (slot_number !== null) {
@@ -117,13 +181,13 @@ exports.startTimer = async (req, res) => {
     }
 
     // =========================
-    // ⏱️ 3. HITUNG WAKTU
+    // ⏱️ 4. HITUNG WAKTU
     // =========================
     const start = new Date()
     const plannedEnd = new Date(start.getTime() + duration_minutes * 60000)
 
     // =========================
-    // 🧠 4. INSERT TIMER (LENGKAP)
+    // 🧠 5. INSERT TIMER (LENGKAP)
     // =========================
     const { rows } = await db.query(
       `
