@@ -169,6 +169,10 @@ const cloneServices = async (branchId) => {
       target_branch_id: branchId
     })
 
+    // Reload data first to ensure we have fresh data
+    await load()
+
+    // Show success message after reload
     await Swal.fire({
       icon: "success",
       title: "Success!",
@@ -178,8 +182,6 @@ const cloneServices = async (branchId) => {
       background: "#111",
       color: "#fff"
     })
-    
-    await load()
   } catch (err) {
     console.error(err)
     await Swal.fire({
