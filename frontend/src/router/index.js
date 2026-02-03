@@ -10,6 +10,7 @@ import KasirDashboard from "@/views/kasir/KasirDashboard.vue"
 import TerapisDashboard from "../views/terapis/TerapisDashboard.vue"
 //import SuperAdminDashboard from "../views/superadmin/SuperAdminDashboard.vue"
 import Users from "../views/superadmin/Users.vue"
+import Therapists from "@/views/superadmin/Therapists.vue"
 import AuditLogs from "../views/superadmin/AuditLogs.vue"
 import Services from "@/views/superadmin/Services.vue"
 import Branches from "@/views/superadmin/Branches.vue"
@@ -24,7 +25,8 @@ const routes = [
   component: SuperAdminDashboard,
   meta: { auth: true, roles: ["SuperAdmin"] },
   children: [
-    { path: "users", component: Users }
+    { path: "users", component: Users },
+    { path: "therapists", component: Therapists }
   ]
 },
   // OWNER

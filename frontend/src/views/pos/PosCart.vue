@@ -44,6 +44,115 @@
       </button>
     </div>
   </div>
+
+  <!-- 🖨️ RECEIPT PREVIEW MODAL -->
+  <div v-if="showReceiptModal" class="modal-overlay" @click="closeReceiptModal">
+    <div class="modal-content receipt-modal" @click.stop>
+      <!-- Header -->
+      <div class="modal-header">
+        <h2>✓ Transaksi Berhasil</h2>
+        <button class="modal-close" @click="closeReceiptModal">✕</button>
+      </div>
+
+      <!-- Receipt Preview -->
+      <div class="receipt-preview" id="receipt-print">
+        <div class="receipt">
+          <!-- Header -->
+          <div class="receipt-header">
+            <h2>{{ receiptData?.branch_name || 'NUMARS SPA' }}</h2>
+            <p>{{ receiptData?.branch_address || 'Jakarta, Indonesia' }}</p>
+            <p>Tel: {{ receiptData?.branch_phone || '021-xxx-xxxx' }}</p>
+          </div>
+
+          <div class="receipt-divider">================================</div>
+
+          <!-- Order Info -->
+          <div class="receipt-info">
+            <div class="info-row">
+              <span>No Order:</span>
+              <span>#{{ receiptData?.id }}</span>
+            </div>
+            <div class="info-row">
+              <span>Tanggal:</span>
+              <span>{{ formatDateTime(receiptData?.created_at) }}</span>
+            </div>
+            <div class="info-row">
+              <span>Kasir:</span>
+              <span>{{ receiptData?.cashier_name }}</span>
+            </div>
+            <div class="info-row" v-if="receiptData?.therapist_name">
+              <span>Terapis:</span>
+              <span>{{ receiptData?.therapist_name }}</span>
+            </div>
+            <div class="info-row" v-if="receiptData?.room_name">
+              <span>Room:</span>
+              <span>{{ receiptData?.room_name }}</span>
+            </div>
+          </div>
+
+          <div class="receipt-divider">================================</div>
+
+          <!-- Items -->
+          <div class="receipt-items">
+            <div class="item-header">
+              <span>Item</span>
+              <span>Qty</span>
+              <span>Subtotal</span>
+            </div>
+            <div v-for="item in receiptData?.items" :key="item.service_id" class="item-row">
+              <div class="item-name">{{ item.service_name }}</div>
+              <div class="item-detail">
+                <span>{{ item.qty }}x</span>
+                <span>{{ formatRupiah(item.price) }}</span>
+                <span class="item-subtotal">{{ formatRupiah(item.subtotal) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="receipt-divider">================================</div>
+
+          <!-- Total -->
+          <div class="receipt-total">
+            <div class="total-row">
+              <span>TOTAL:</span>
+              <span class="total-amount">{{ formatRupiah(receiptData?.total) }}</span>
+            </div>
+            <div class="total-row">
+              <span>Bayar:</span>
+              <span>{{ formatRupiah(receiptData?.payment_amount) }}</span>
+            </div>
+            <div class="total-row">
+              <span>Kembali:</span>
+              <span>{{ formatRupiah(receiptData?.change_amount) }}</span>
+            </div>
+            <div class="total-row payment-method">
+              <span>Metode:</span>
+              <span>{{ receiptData?.payment_method || 'CASH' }}</span>
+            </div>
+          </div>
+
+          <div class="receipt-divider">================================</div>
+
+          <!-- Footer -->
+          <div class="receipt-footer">
+            <p>Terima kasih atas kunjungan Anda</p>
+            <p>Semoga sehat selalu!</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="modal-actions">
+        <button class="btn btn-print" @click="printReceipt">
+          🖨️ Print Sekarang
+        </button>
+        <button class="btn btn-close" @click="closeReceiptModal">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
 </template>
 
 <script setup>
@@ -86,8 +195,34 @@ const lastOrder = ref({
   items: []
 })
 
+// 🖨️ RECEIPT PREVIEW STATE
+const showReceiptModal = ref(false)
+const receiptData = ref(null)
+const receiptLoading = ref(false)
+
 const format = n =>
   Number(n || 0).toLocaleString("id-ID")
+
+// 🖨️ FORMAT CURRENCY
+const formatRupiah = (amount) => {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0
+  }).format(amount)
+}
+
+// 🖨️ FORMAT DATE TIME
+const formatDateTime = (dateString) => {
+  const date = new Date(dateString)
+  return date.toLocaleString('id-ID', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
 
 const clear = async () => {
   const res = await SwalTheme.fire({
@@ -100,7 +235,6 @@ const clear = async () => {
   })
 
   if (!res.isConfirmed) return
-  // Jika perlu panggil API untuk membatalkan order yang telah dibuat di server, lakukan di sini.
   pos.clear()
   await SwalTheme.fire({
     icon: "success",
@@ -131,61 +265,44 @@ const checkout = async () => {
       })),
       payment_method: "CASH"
     }
-let res
     
-// 🆕 Kalau ada currentOrderId, UPDATE order existing
-if (pos.currentOrderId) {
-  console.log('Updating existing order:', pos.currentOrderId)
-  res = await api.post(`/orders/${pos.currentOrderId}/close`, payload)
-} else {
-  console.log('Creating new order')
-  res = await api.post("/orders/pos", payload)
-}
-//    const res = await api.post("/orders/pos", payload)
+    let res
+    
+    // 🆕 Kalau ada currentOrderId, UPDATE order existing
+    if (pos.currentOrderId) {
+      console.log('Updating existing order:', pos.currentOrderId)
+      res = await api.post(`/orders/${pos.currentOrderId}/close`, payload)
+    } else {
+      console.log('Creating new order')
+      res = await api.post("/orders/pos", payload)
+    }
 
-    lastOrder.value = {
+     lastOrder.value = {
       order_id: res.data.order_id,
       total: res.data.total,
       items: JSON.parse(JSON.stringify(items.value))
     }
 
-    // Clear local cart immediately (same behavior as sebelumnya)
+    console.log('✅ Checkout success, order_id:', lastOrder.value.order_id)
+
+    // Clear local cart
     pos.clear()
 
-    // Build HTML breakdown for SweetAlert
-    const itemsHtml = lastOrder.value.items.map(i =>
-      `<div style="display:flex;justify-content:space-between;margin:6px 0;"><span>${i.name} × ${i.qty}</span><strong>Rp ${format(i.base_price * i.qty)}</strong></div>`
-    ).join("")
+    console.log('🖨️ Calling showReceiptPreview...')
+    
+    // 🖨️ SHOW RECEIPT PREVIEW MODAL (WAIT for modal to close)
+    await showReceiptPreview(lastOrder.value.order_id)
 
-    const html = `
-      <p class="order-id" style="margin:6px 0 10px;color:#888;">Order #${lastOrder.value.order_id}</p>
-      <div style="font-size:28px;font-weight:800;margin:6px 0;color:#2ecc71;">Rp ${format(lastOrder.value.total)}</div>
-      <div style="text-align:left;margin-top:10px;">${itemsHtml}</div>
-    `
+    console.log('Modal closed, creating timers...')
 
-    // Show SweetAlert success with option to print
-    const result = await SwalTheme.fire({
-      icon: "success",
-      title: "Transaksi Berhasil",
-      html,
-      showDenyButton: true,
-      denyButtonText: "🖨 Cetak",
-      confirmButtonText: "Tutup"
-    })
-
-    if (result.isDenied) {
-      await printOrder(lastOrder.value.order_id)
-      // after printing, still proceed to close flow below
-    }
-
-    // After user closes success dialog, attempt to create timers and navigate
+    // After closing receipt modal, create timers and navigate
     try {
       await api.post(`/timers/from-order/${lastOrder.value.order_id}`)
     } catch (e) {
-      // not critical; just warn
       console.warn("Timer tidak dibuat:", e?.message || e)
     }
 
+    console.log('Navigating to /kasir...')
     router.push("/kasir")
   } catch (err) {
     await SwalTheme.fire({
@@ -199,6 +316,56 @@ if (pos.currentOrderId) {
   }
 }
 
+// 🖨️ SHOW RECEIPT PREVIEW
+const showReceiptPreview = async (orderId) => {
+  console.log('🖨️ showReceiptPreview called, orderId:', orderId)
+  
+  return new Promise(async (resolve) => {
+    try {
+      receiptLoading.value = true
+      console.log('Fetching order detail...')
+      const res = await api.get(`/orders/${orderId}/detail`)
+      console.log('Order detail received:', res.data)
+      receiptData.value = res.data
+      showReceiptModal.value = true
+      console.log('Modal should show now, showReceiptModal:', showReceiptModal.value)
+      
+      // Wait for modal to close
+      const checkModalClosed = setInterval(() => {
+        if (!showReceiptModal.value) {
+          clearInterval(checkModalClosed)
+          console.log('Modal closed by user')
+          resolve()
+        }
+      }, 100)
+      
+    } catch (err) {
+      console.error("Failed to load receipt:", err)
+      await SwalTheme.fire({
+        icon: "error",
+        title: "Gagal",
+        text: "Gagal memuat struk",
+        confirmButtonText: "OK"
+      })
+      resolve()
+    } finally {
+      receiptLoading.value = false
+    }
+  })
+}
+
+// 🖨️ CLOSE RECEIPT MODAL
+const closeReceiptModal = () => {
+  showReceiptModal.value = false
+  receiptData.value = null
+}
+
+// 🖨️ PRINT RECEIPT
+const printReceipt = () => {
+  window.print()
+}
+
+// 🖨️ PRINT TO THERMAL PRINTER (existing function - optional)
 const printOrder = async (order_id = lastOrder.value.order_id) => {
   try {
     await api.post(`/printers/print-order`, { order_id })
@@ -428,5 +595,318 @@ const printOrder = async (order_id = lastOrder.value.order_id) => {
 :deep(.swal2-success-line-tip),
 :deep(.swal2-success-line-long) {
   background-color: var(--gold, #f5c518) !important;
+}
+/* 🖨️ RECEIPT MODAL */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content.receipt-modal {
+  background: #1a1a1a;
+  border: 2px solid #c9a24d;
+  border-radius: 16px;
+  padding: 0;
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Modal Header */
+.modal-header {
+  background: linear-gradient(145deg, #c9a24d, #d4b560);
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #c9a24d;
+}
+
+.modal-header h2 {
+  color: #000;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.modal-close {
+  background: rgba(0, 0, 0, 0.2);
+  border: none;
+  color: #000;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.modal-close:hover {
+  background: rgba(0, 0, 0, 0.4);
+  transform: rotate(90deg);
+}
+
+/* Receipt Preview */
+.receipt-preview {
+  background: #fff;
+  color: #000;
+  padding: 20px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.receipt {
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+/* Receipt Header */
+.receipt-header {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.receipt-header h2 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 5px 0;
+  text-transform: uppercase;
+  color: #000;
+}
+
+.receipt-header p {
+  font-size: 11px;
+  margin: 2px 0;
+  color: #333;
+}
+
+/* Receipt Divider */
+.receipt-divider {
+  text-align: center;
+  margin: 10px 0;
+  font-size: 10px;
+  color: #333;
+}
+
+/* Receipt Info */
+.receipt-info {
+  margin: 10px 0;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 5px 0;
+  font-size: 11px;
+}
+
+.info-row span:first-child {
+  font-weight: 600;
+}
+
+/* Receipt Items */
+.receipt-items {
+  margin: 10px 0;
+}
+
+.item-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr;
+  font-weight: 700;
+  font-size: 11px;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px dashed #666;
+}
+
+.item-row {
+  margin: 8px 0;
+}
+
+.item-name {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.item-detail {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr;
+  font-size: 11px;
+  color: #333;
+}
+
+.item-subtotal {
+  font-weight: 700;
+  text-align: right;
+}
+
+/* Receipt Total */
+.receipt-total {
+  margin: 10px 0;
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 5px 0;
+  font-size: 12px;
+}
+
+.total-row:first-child {
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: 10px;
+}
+
+.total-amount {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.payment-method {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #666;
+  font-style: italic;
+}
+
+/* Receipt Footer */
+.receipt-footer {
+  text-align: center;
+  margin-top: 15px;
+  font-size: 11px;
+}
+
+.receipt-footer p {
+  margin: 3px 0;
+  color: #333;
+}
+
+/* Modal Actions */
+.modal-actions {
+  background: #0e0e0e;
+  padding: 20px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  border-top: 2px solid #c9a24d;
+}
+
+.btn-print {
+  background: #c9a24d;
+  border: 1px solid #c9a24d;
+  color: #000;
+  padding: 14px 32px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease-out;
+  flex: 1;
+}
+
+.btn-print:hover {
+  background: #d4b560;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(201, 162, 77, 0.4);
+}
+
+.btn-close {
+  background: #333;
+  border: 1px solid #444;
+  color: #fff;
+  padding: 14px 32px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease-out;
+  flex: 1;
+}
+
+.btn-close:hover {
+  background: #444;
+  border-color: #666;
+}
+
+/* Print Media Query */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  .receipt-preview,
+  .receipt-preview * {
+    visibility: visible;
+  }
+  
+  .receipt-preview {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 58mm;
+    background: white;
+    padding: 0;
+  }
+  
+  .modal-actions,
+  .modal-header,
+  .modal-close {
+    display: none !important;
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .modal-content.receipt-modal {
+    max-width: 95%;
+    width: 95%;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .btn-print,
+  .btn-close {
+    width: 100%;
+  }
 }
 </style>

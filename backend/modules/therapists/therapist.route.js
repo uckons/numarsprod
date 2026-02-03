@@ -1,8 +1,22 @@
 const express = require("express")
 const router = express.Router()
+const controller = require("./therapist.controller")
 const auth = require("../../middlewares/auth.middleware")
-const therapistController = require("./therapist.controller")
 
-router.get("/", auth, therapistController.getTherapists)
+// ===== THERAPISTS ROUTES =====
+// 📋 GET ALL THERAPISTS
+router.get("/", auth, controller.getTherapists)
+
+// 📋 GET SINGLE THERAPIST
+router.get("/:id", auth, controller.getTherapist)
+
+// ✅ CREATE THERAPIST
+router.post("/", auth, controller.createTherapist)
+
+// ✏️ UPDATE THERAPIST
+router.put("/:id", auth, controller.updateTherapist)
+
+// ❌ DELETE THERAPIST (soft delete)
+router.delete("/:id", auth, controller.deleteTherapist)
 
 module.exports = router

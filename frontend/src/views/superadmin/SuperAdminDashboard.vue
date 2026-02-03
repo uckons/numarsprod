@@ -11,7 +11,8 @@
         <button :class="{active:tab==='timers'}" @click="tab='timers'"> <UsersIcon size="18" />Timers</button>
         <button :class="{active:tab==='audit'}" @click="tab='audit'"> <ShieldCheck size="18" /> Audit Logs</button>
         <button :class="{active:tab==='services'}" @click="tab='services'"> <Store size="18" /> Services</button>
-
+        <button :class="{active:tab==='therapists'}" @click="tab='therapists'"> <UsersIcon size="18" /> Therapists</button>
+        <button :class="{active:tab==='grades'}" @click="tab='grades'"> 🏆 Grades</button>
       </nav>
 
       <!-- LOGOUT -->
@@ -25,6 +26,8 @@
       <Orders v-if="tab==='orders'" />
       <Timers v-if="tab==='timers'" />
       <Services v-if="tab==='services'" :branch-id="1" />
+      <Therapists v-if="tab==='therapists'" />
+      <Grades v-if="tab==='grades'" />
     </main>
   </div>
 </template>
@@ -42,6 +45,8 @@ import Branches from "./Branches.vue"
 import Orders from "./Orders.vue"
 import Timers from "./Timers.vue"
 import Services from "./Services.vue"
+import Therapists from './Therapists.vue'
+import Grades from './Grades.vue'
 
 
 const tab = ref("users")
