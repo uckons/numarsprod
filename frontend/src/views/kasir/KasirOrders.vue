@@ -49,31 +49,20 @@
     </td>
 
     <!-- TERAPIS -->
+        <!-- TERAPIS -->
     <td>
-      <div
-        v-for="(i, idx) in o.items || []"
-        :key="idx"
-        class="meta"
-      >
-        <span v-if="o.therapist_name">
-          {{ o.therapist_name }}
-        </span>
-        <span v-else class="muted">-</span>
-      </div>
+      <span v-if="o.therapist_name">
+        {{ o.therapist_name }}
+      </span>
+      <span v-else class="muted">-</span>
     </td>
 
     <!-- ROOM / SOFA -->
     <td>
-      <div
-        v-for="(i, idx) in o.items || []"
-        :key="idx"
-        class="meta"
-      >
-        <span v-if="o.room_name">
-          {{ o.room_name }}
-        </span>
-        <span v-else class="muted">-</span>
-      </div>
+      <span v-if="o.room_name">
+        {{ o.room_name }}
+      </span>
+      <span v-else class="muted">-</span>
     </td>
 
     <!-- TOTAL -->
