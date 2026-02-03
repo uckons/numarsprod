@@ -74,6 +74,7 @@
 import { ref, onMounted } from "vue"
 import api from "../../services/api"
 import BranchForm from "./BranchForm.vue"
+import Swal from "sweetalert2"
 
 const branches = ref([])
 const loading = ref(false)
@@ -95,7 +96,14 @@ const load = async () => {
     total.value = res.data.total
   } catch (err) {
     console.error("Failed load branches", err)
-    alert("Failed load branches")
+    await Swal.fire({
+      icon: "error",
+      title: "Load Failed",
+      text: "Failed to load branches",
+      background: "#111",
+      color: "#fff",
+      confirmButtonColor: "#c9a24d"
+    })
   } finally {
     loading.value = false
   }
@@ -125,9 +133,45 @@ const edit = (b) => {
 }
 
 const remove = async (b) => {
-  if (!confirm(`Delete branch ${b.name}?`)) return
-  await api.delete(`/branches/${b.id}`)
-  await load()
+  const result = await Swal.fire({
+    title: "Delete Branch?",
+    html: `Are you sure you want to delete<br/><strong>${b.name}</strong>?`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Yes, Delete",
+    cancelButtonText: "Cancel",
+    background: "#111",
+    color: "#fff",
+    confirmButtonColor: "#ef4444",
+    cancelButtonColor: "#666"
+  })
+
+  if (!result.isConfirmed) return
+
+  try {
+    await api.delete(`/branches/${b.id}`)
+    
+    await Swal.fire({
+      icon: "success",
+      title: "Deleted",
+      text: "Branch has been deleted",
+      timer: 1500,
+      showConfirmButton: false,
+      background: "#111",
+      color: "#fff"
+    })
+    
+    await load()
+  } catch (err) {
+    await Swal.fire({
+      icon: "error",
+      title: "Delete Failed",
+      text: err.response?.data?.message || "Failed to delete branch",
+      background: "#111",
+      color: "#fff",
+      confirmButtonColor: "#c9a24d"
+    })
+  }
 }
 
 const reload = async () => {

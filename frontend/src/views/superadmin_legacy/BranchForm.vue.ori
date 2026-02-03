@@ -46,6 +46,7 @@
 <script setup>
 import { ref, onMounted } from "vue"
 import api from "../../services/api"
+import Swal from "sweetalert2"
 
 const emit = defineEmits(["saved", "close"])
 
@@ -74,7 +75,15 @@ onMounted(() => {
 /* SAVE */
 const save = async () => {
   if (!form.value.name) {
-    return alert("Branch name is required")
+    await Swal.fire({
+      icon: "warning",
+      title: "Branch Name Required",
+      text: "Please enter a branch name",
+      background: "#111",
+      color: "#fff",
+      confirmButtonColor: "#c9a24d"
+    })
+    return
   }
 
   loading.value = true
@@ -85,10 +94,27 @@ const save = async () => {
       await api.post("/branches", form.value)
     }
 
+    await Swal.fire({
+      icon: "success",
+      title: "Success",
+      text: `Branch ${props.edit ? 'updated' : 'created'} successfully`,
+      timer: 1500,
+      showConfirmButton: false,
+      background: "#111",
+      color: "#fff"
+    })
+
     emit("saved")
   } catch (err) {
     console.error(err.response?.data)
-    alert(err.response?.data?.message || "Failed save branch")
+    await Swal.fire({
+      icon: "error",
+      title: "Save Failed",
+      text: err.response?.data?.message || "Failed to save branch",
+      background: "#111",
+      color: "#fff",
+      confirmButtonColor: "#c9a24d"
+    })
   } finally {
     loading.value = false
   }

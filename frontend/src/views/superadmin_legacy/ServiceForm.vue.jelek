@@ -70,6 +70,7 @@
 <script setup>
 import { ref, watch, onMounted } from "vue"
 import api from "@/services/api"
+import Swal from "sweetalert2"
 
 const props = defineProps({
   edit: Boolean,
@@ -119,7 +120,14 @@ const close = () => {
 
 const save = async () => {
   if (!form.value.branch_id) {
-    alert("Branch wajib dipilih")
+    await Swal.fire({
+      icon: "warning",
+      title: "Branch Required",
+      text: "Please select a branch",
+      background: "#111",
+      color: "#fff",
+      confirmButtonColor: "#c9a24d"
+    })
     return
   }
 
@@ -131,11 +139,28 @@ const save = async () => {
       await api.post("/services", form.value)
     }
 
+    await Swal.fire({
+      icon: "success",
+      title: "Success",
+      text: `Service ${props.edit ? 'updated' : 'created'} successfully`,
+      timer: 1500,
+      showConfirmButton: false,
+      background: "#111",
+      color: "#fff"
+    })
+
     emit("saved")
     emit("close")
   } catch (e) {
     console.error(e)
-    alert("Gagal menyimpan service")
+    await Swal.fire({
+      icon: "error",
+      title: "Save Failed",
+      text: "Failed to save service. Please try again.",
+      background: "#111",
+      color: "#fff",
+      confirmButtonColor: "#c9a24d"
+    })
   } finally {
     saving.value = false
   }
