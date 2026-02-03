@@ -91,15 +91,17 @@ exports.getActiveTimers = async (db, branchId) => {
 
 // timer.service.js
 exports.stopTimer = async (db, timerId) => {
-  // 1. ambil timer
+  // 1. ambil timer dengan semua data
   const { rows } = await db.query(`
     SELECT 
       t.*,
       th.name AS therapist_name,
-      r.name AS room_name
+      r.name AS room_name,
+      s.name AS service_name
     FROM timers t
     LEFT JOIN therapists th ON th.id = t.therapist_id
     LEFT JOIN rooms r ON r.id = t.room_id
+    LEFT JOIN services s ON s.id = t.service_id
     WHERE t.id = $1
   `, [timerId])
 
@@ -114,28 +116,40 @@ exports.stopTimer = async (db, timerId) => {
     WHERE id = $1
   `, [timerId])
 
-  // 🔥 3. INI BAGIAN PALING PENTING
- if (
-  timer.order_id !== null &&
-  timer.service_id !== null
-) {
-//  await db.query(
-//    `
-//    UPDATE order_items
-//    SET
-//      therapist_name = $1,
-//      room_name = $2
-//    WHERE order_id = $3
-//      AND service_id = $4
-//    `,
-//    [
-//      timer.therapist_name || null,
-//      timer.room_name || null,
-//      timer.order_id,     // ⬅️ JANGAN Number()
-//      timer.service_id    // ⬅️ JANGAN Number()
-//    ]
-//  )
-}
+  // 3. Update order_items dengan therapist dan room
+  if (timer.order_id !== null && timer.service_id !== null) {
+    await db.query(
+      `
+      UPDATE order_items
+      SET
+        therapist_name = $1,
+        room_name = $2
+      WHERE order_id = $3
+        AND service_id = $4
+      `,
+      [
+        timer.therapist_name || null,
+        timer.room_name || null,
+        timer.order_id,
+        timer.service_id
+      ]
+    )
+
+    // 4. Cek apakah semua timer sudah selesai untuk order ini
+    const { rows: runningTimers } = await db.query(
+      `SELECT COUNT(*) as count FROM timers 
+       WHERE order_id = $1 AND status = 'RUNNING'`,
+      [timer.order_id]
+    )
+
+    // 5. Update status order menjadi DRAFT jika semua timer selesai
+    if (parseInt(runningTimers[0].count) === 0) {
+      await db.query(
+        `UPDATE orders SET status = 'DRAFT' WHERE id = $1 AND status != 'PAID'`,
+        [timer.order_id]
+      )
+    }
+  }
 
   return timer
 }
