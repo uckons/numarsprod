@@ -346,74 +346,7 @@ exports.getKasirOrders = async (req, res) => {
   try {
     const db = req.app.get("db")
     const branchId = req.user.branch_id
-    
-    // 🔍 FILTER PARAMS
-    const { 
-      status,
-      date_from,
-      date_to,
-      therapist_id,
-      room_id,
-      page = 1,        // 📄 PAGINATION
-      limit = 25       // 📄 PAGINATION
-    } = req.query
 
-    // 🏗️ BUILD DYNAMIC WHERE CONDITIONS
-    let whereConditions = ['o.branch_id = $1']
-    let queryParams = [branchId]
-    let paramIndex = 2
-
-    // Filter by status
-    if (status && status !== 'ALL') {
-      whereConditions.push(`o.status = $${paramIndex}`)
-      queryParams.push(status)
-      paramIndex++
-    }
-
-    // Filter by date range
-    if (date_from) {
-      whereConditions.push(`o.created_at >= $${paramIndex}::date`)
-      queryParams.push(date_from)
-      paramIndex++
-    }
-    
-    if (date_to) {
-      whereConditions.push(`o.created_at < ($${paramIndex}::date + interval '1 day')`)
-      queryParams.push(date_to)
-      paramIndex++
-    }
-
-    // Filter by therapist
-    if (therapist_id) {
-      whereConditions.push(`o.therapist_id = $${paramIndex}`)
-      queryParams.push(therapist_id)
-      paramIndex++
-    }
-
-    // Filter by room
-    if (room_id) {
-      whereConditions.push(`o.room_id = $${paramIndex}`)
-      queryParams.push(room_id)
-      paramIndex++
-    }
-
-    const whereClause = whereConditions.join(' AND ')
-
-    // 📊 COUNT TOTAL RECORDS
-    const countQuery = `
-      SELECT COUNT(DISTINCT o.id) as total
-      FROM orders o
-      WHERE ${whereClause}
-    `
-    const { rows: countRows } = await db.query(countQuery, queryParams)
-    const totalRecords = parseInt(countRows[0].total)
-    const totalPages = Math.ceil(totalRecords / limit)
-
-    // 📄 PAGINATION PARAMS
-    const offset = (page - 1) * limit
-    queryParams.push(limit, offset)
-
-    // 📄 GET PAGINATED DATA
     const { rows } = await db.query(`
       SELECT
         o.id,
@@ -437,21 +370,12 @@ exports.getKasirOrders = async (req, res) => {
       LEFT JOIN therapists th ON th.id = o.therapist_id
       LEFT JOIN rooms r ON r.id = o.room_id
 
-      WHERE ${whereClause}
+      WHERE o.branch_id = $1
       GROUP BY o.id, th.name, r.name
       ORDER BY o.created_at DESC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `, queryParams)
+    `, [branchId])
 
-    res.json({
-      data: rows,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalRecords,
-        totalPages
-      }
-    })
+    res.json(rows)
   } catch (err) {
     console.error("GET KASIR ORDERS ERROR:", err)
     res.status(500).json({ message: err.message })
@@ -494,65 +418,4 @@ exports.getById = async (req, res) => {
     res.status(500).json({ message: err.message })
   }
 }
-// 🖨️ GET ORDER DETAIL FOR REPRINT
-exports.getOrderDetail = async (req, res) => {
-  try {
-    const db = req.app.get("db")
-    const { id } = req.params
-    const branchId = req.user.branch_id
 
-    // Get order header
-    const { rows: orderRows } = await db.query(`
-      SELECT
-        o.id,
-        o.status,
-        o.total,
-        o.payment_method,
-        o.created_at,
-        th.name AS therapist_name,
-        r.name AS room_name,
-        b.name AS branch_name,
-        b.address AS branch_address,
-        u.name AS cashier_name
-      FROM orders o
-      LEFT JOIN therapists th ON th.id = o.therapist_id
-      LEFT JOIN rooms r ON r.id = o.room_id
-      LEFT JOIN branches b ON b.id = o.branch_id
-      LEFT JOIN users u ON u.id = o.user_id
-      WHERE o.id = $1 AND o.branch_id = $2
-    `, [id, branchId])
-
-    if (orderRows.length === 0) {
-      return res.status(404).json({ message: "Order not found" })
-    }
-
-    const order = orderRows[0]
-
-    // Get order items
-    const { rows: items } = await db.query(`
-      SELECT
-        service_id,
-        service_name,
-        qty,
-        price,
-        subtotal
-      FROM order_items
-      WHERE order_id = $1
-      ORDER BY id ASC
-    `, [id])
-
-    order.items = items
-    
-    // Set default payment info (columns don't exist in table)
-    order.payment_amount = order.total
-    order.change_amount = 0
-    
-    // Set default phone (column doesn't exist in branches table)
-    order.branch_phone = "021-xxx-xxxx"
-
-    res.json(order)
-  } catch (err) {
-    console.error("GET ORDER DETAIL ERROR:", err)
-    res.status(500).json({ message: err.message })
-  }
-}

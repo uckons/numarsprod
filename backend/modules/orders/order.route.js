@@ -12,6 +12,8 @@ router.get("/", auth, controller.getAll)
 router.get("/kasir",auth,controller.getKasirOrders)
 // GET ORDER BY ID
 router.get("/:id", auth, controller.getById)
+// 🖨️ GET ORDER DETAIL FOR REPRINT
+router.get("/:id/detail", auth, controller.getOrderDetail)
 // CREATE EMPTY ORDER (kasir buka order)
 router.post("/", auth, controller.create)
 
