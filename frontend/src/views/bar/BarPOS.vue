@@ -10,7 +10,8 @@
         @click="sell(item)"
       >
         <h3>{{ item.name }}</h3>
-        <p>Rp {{ format(item.price) }}</p>
+        <!--<p>Rp {{ format(item.price) }}</p>-->
+        <p>Rp {{ format(item.sell_price ?? item.price) }}</p>
         <p :class="{ low: item.stock <= item.alert_stock }">
           Stock: {{ item.stock }}
         </p>
@@ -46,7 +47,8 @@ const sell = async item => {
   await load()
 }
 
-const format = v => v.toLocaleString()
+//const format = v => v.toLocaleString()
+const format = v => Number(v || 0).toLocaleString("id-ID")
 </script>
 
 <style scoped>

@@ -8,7 +8,8 @@ module.exports = app => {
   app.get(
     "/api/fnb",
     auth,
-    rbac(["Staff Bar", "Supervisor", "Manager"]),
+  //  rbac(["Staff Bar", "Supervisor", "Manager"]),
+    rbac(["SuperAdmin", "Owner", "Supervisor", "Manager", "Staff Bar"]),
     controller.getAll
   )
 
@@ -16,7 +17,8 @@ module.exports = app => {
   app.post(
     "/api/fnb",
     auth,
-    rbac(["Supervisor", "Manager"]),
+    //rbac(["Supervisor", "Manager"]),
+    rbac(["SuperAdmin", "Owner", "Supervisor", "Manager"]),
     controller.create
   )
 

@@ -4,14 +4,11 @@
         <header class="topbar">
       <div class="brand">
         <h1>NUMARS POS</h1>
-        <span class="branch">{{auth.user?.branch_name
-        || auth.user?.branch
-        || auth.user?.branch?.name
-        || "Outlet"}}</span>
+        <span class="branch">{{ auth.user.branch_name || "Outlet" }}</span>
       </div>
 
       <div class="user">
-        <span class="name">{{ auth.user?.name || auth.user?.username || "User"  }}</span>
+        <span class="name">{{ auth.user.name }}</span>
         <button class="logout" @click="logout">Logout</button>
       </div>
     </header>
@@ -127,11 +124,7 @@ const API_REFRESH_INTERVAL = 30000 // 30 seconds
 
 const format = n =>
   new Intl.NumberFormat("id-ID").format(n || 0)
-// EXPOSE auth to window for quick debugging in browser console (remove after debug)
-//if (typeof window !== "undefined") {
-//  window.__auth = auth
-//  console.log("Auth store (kasir):", auth.user)
-//}
+
 const logout = () => {
   auth.logout()
   router.push("/login")
@@ -353,9 +346,8 @@ onUnmounted(() => {
 .branch {
   display: block;
   margin-top: 2px;
-  font-size: 14px;
-  font-weight: bold;
-  color: #ffffff;
+  font-size: 12px;
+  color: #888;
 }
 
 .user {
@@ -366,8 +358,7 @@ onUnmounted(() => {
 
 .user .name {
   font-size: 13px;
-  font-weight: bold;
-  color: #ffffff;
+  color: #aaa;
 }
 
 .logout {

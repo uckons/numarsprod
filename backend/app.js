@@ -33,7 +33,7 @@ app.use("/api/therapists", require("./modules/therapists/therapist.route"))
 app.use("/api/grades", require("./modules/therapists/grade.route"))
 app.use("/api/rooms", require("./modules/rooms/room.route"))
 app.use("/api/dashboard", require("./modules/dashboard/dashboard.route"))
-
+require("./modules/fnb/fnb.route")(app)
 
 
 // ❗ JANGAN load module yang belum siap

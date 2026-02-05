@@ -47,26 +47,17 @@ exports.payOrder = async (db, orderId, method, amount) => {
 
   // 5️⃣ F&B — KURANGI STOK (PINDAH KE DALAM ASYNC)
   const itemsRes = await db.query(
-  //  `SELECT oi.service_id, oi.qty
-  //   `SELECT fi.id AS fnb_item_id, oi.qty
-  //   FROM order_items oi
-  //   JOIN services s ON s.id = oi.service_id
-  // WHERE oi.order_id=$1 AND s.category='fnb'`,
-    ["SELECT fi.id AS fnb_item_id, oi.qty",
-      "FROM order_items oi",
-      "JOIN services s ON s.id = oi.service_id",
-      "JOIN fnb_items fi ON fi.service_id = s.id",
-      "WHERE oi.order_id=$1 AND s.type='FNB'"
-    ].join(" "),
+    `SELECT oi.service_id, oi.qty
+     FROM order_items oi
+     JOIN services s ON s.id = oi.service_id
+     WHERE oi.order_id=$1 AND s.category='fnb'`,
     [orderId]
   )
 
   for (const item of itemsRes.rows) {
-  //  await stockService.reduceStock(
-      await stockService.reduceFnbStock(
+    await stockService.reduceStock(
       db,
-  //    item.service_id,
-      item.fnb_item_id,
+      item.service_id,
       item.qty
     )
   }

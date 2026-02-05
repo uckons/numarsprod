@@ -87,6 +87,15 @@ exports.update = async (id, data) => {
     data.is_active,
     id
   ])
+  
+  if (data.type === "FNB") {
+    await db.query(
+      `UPDATE fnb_items
+       SET name=$1
+       WHERE service_id=$2`,
+      [data.name, id]
+    )
+  }
 }
 
 exports.toggle = async (id) => {
@@ -113,42 +122,73 @@ exports.cloneFromBranch = async (sourceBranchId, targetBranchId, actor) => {
 
   try {
     // Ambil semua service dari source
-    const { rows: services } = await db.query(`
-      SELECT
-        type,
-        name,
-        base_price,
-        duration_minutes
-      FROM services
-      WHERE branch_id = $1
-        AND deleted_at IS NULL
-    `, [sourceBranchId])
-
+    //const { rows: services } = await db.query(`
+    //  SELECT
+    //    type,
+    //    name,
+    //    base_price,
+    //    duration_minutes
+     // FROM services
+    //  WHERE branch_id = $1
+    //    AND deleted_at IS NULL
+    //`, [sourceBranchId])
+    const { rows: services } = await db.query(
+      [
+        "SELECT",
+        "type,",
+        "name,",
+        "base_price,",
+        "duration_minutes",
+        "FROM services",
+        "WHERE branch_id = $1",
+        "AND deleted_at IS NULL"
+      ].join(" "),
+      [sourceBranchId]
+    )
     if (!services.length) {
       throw new Error("No services to clone from source branch")
     }
 
     // Insert ke branch target
     for (const s of services) {
-      await db.query(`
-        INSERT INTO services (
-          branch_id,
-          type,
-          name,
-          base_price,
-          duration_minutes,
-          is_active
-        )
-        VALUES ($1,$2,$3,$4,$5,false)
-      `, [
-        targetBranchId,
-        s.type,
-        s.name,
-        s.base_price,
-        s.duration_minutes
-      ])
-    }
-
+    //  await db.query(`
+    //    INSERT INTO services (
+    //      branch_id,
+    //      type,
+    //     name,
+    //      base_price,
+    //      duration_minutes,
+    //      is_active
+    //    )
+    //    VALUES ($1,$2,$3,$4,$5,false)
+    //  `, [
+    //    targetBranchId,
+    //    s.type,
+    //    s.name,
+    //    s.base_price,
+    //    s.duration_minutes
+    //  ])
+   // }
+     await db.query(
+        [
+          "INSERT INTO services (",
+          "branch_id,",
+          "type,",
+          "name,",
+          "base_price,",
+          "duration_minutes,",
+          "is_active",
+          ") VALUES ($1,$2,$3,$4,$5,false)"
+        ].join(" "),
+        [
+          targetBranchId,
+          s.type,
+          s.name,
+          s.base_price,
+          s.duration_minutes
+        ]
+      )
+    } 
     await db.query("COMMIT")
     return { success: true, total: services.length }
 

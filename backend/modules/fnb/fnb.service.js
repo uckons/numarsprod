@@ -1,35 +1,150 @@
 exports.getAll = async (db, user) => {
   const { rows } = await db.query(
-    `SELECT * FROM fnb_items WHERE branch_id=$1 ORDER BY name`,
+  //  `SELECT * FROM fnb_items WHERE branch_id=$1 ORDER BY name`,
+    `SELECT
+      fi.id,
+      fi.branch_id,
+      fi.service_id,
+      fi.name,
+      fi.cost_price,
+      fi.stock,
+      fi.alert_stock,
+      COALESCE(s.base_price, 0) AS sell_price,
+      COALESCE(s.base_price, 0) AS price,
+      s.is_active AS service_active
+     FROM fnb_items fi
+     LEFT JOIN services s ON s.id = fi.service_id
+     WHERE fi.branch_id=$1
+     ORDER BY fi.name`, 
     [user.branch_id]
   )
   return rows
 }
 
 exports.create = async (db, user, data) => {
-  const { name, price, stock, alert_stock } = data
+ // const { name, price, stock, alert_stock } = data
+      const {
+    name,
+    cost_price,
+    sell_price,
+    price,
+    stock,
+    alert_stock
+  } = data
+ //const { rows } = await db.query(
+ //   `INSERT INTO fnb_items
+ //    (branch_id, name, price, stock, alert_stock)
+ //    VALUES ($1,$2,$3,$4,$5)
+ //    RETURNING *`,
+ //   [user.branch_id, name, price, stock, alert_stock]
+ // )
+  await db.query("BEGIN")
 
+  try {
+    const serviceRes = await db.query(
+      `INSERT INTO services
+       (branch_id, type, name, base_price, duration_minutes, is_active)
+       VALUES ($1,'FNB',$2,$3,NULL,true)
+       RETURNING id`,
+      [user.branch_id, name, sell_price ?? price ?? 0]
+    )
+
+    const serviceId = serviceRes.rows[0].id 
+  //return rows[0]
   const { rows } = await db.query(
-    `INSERT INTO fnb_items
-     (branch_id, name, price, stock, alert_stock)
-     VALUES ($1,$2,$3,$4,$5)
-     RETURNING *`,
-    [user.branch_id, name, price, stock, alert_stock]
-  )
+      `INSERT INTO fnb_items
+       (branch_id, service_id, name, cost_price, stock, alert_stock)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING *`,
+      [user.branch_id, serviceId, name, cost_price ?? 0, stock, alert_stock]
+    )
 
-  return rows[0]
+    await db.query("COMMIT")
+    return rows[0]
+  } catch (error) {
+    await db.query("ROLLBACK")
+    throw error
+  }
 }
 
+
 exports.update = async (db, id, data) => {
-  const { name, price, stock, alert_stock } = data
+//  const { name, price, stock, alert_stock } = data
+  const {
+    name,
+    cost_price,
+    sell_price,
+    price,
+    stock,
+    alert_stock
+  } = data  
+  //const { rows } = await db.query(
+  //  `UPDATE fnb_items
+  //   SET name=$1, price=$2, stock=$3, alert_stock=$4
+  //   WHERE id=$5
+  //   RETURNING *`,
+  //  [name, price, stock, alert_stock, id]
+  //)
+   await db.query("BEGIN")
 
-  const { rows } = await db.query(
-    `UPDATE fnb_items
-     SET name=$1, price=$2, stock=$3, alert_stock=$4
-     WHERE id=$5
-     RETURNING *`,
-    [name, price, stock, alert_stock, id]
-  )
+  try {
+    const itemRes = await db.query(
+      `SELECT service_id, branch_id FROM fnb_items WHERE id=$1`,
+      [id]
+    )
 
-  return rows[0]
+    if (!itemRes.rows.length) {
+      throw new Error("Item not found")
+    }
+
+    let serviceId = itemRes.rows[0].service_id
+    const branchId = itemRes.rows[0].branch_id
+
+    if (!serviceId) {
+      const existingService = await db.query(
+        `SELECT id FROM services
+         WHERE branch_id=$1 AND type='FNB' AND name=$2
+         LIMIT 1`,
+        [branchId, name]
+      )
+
+      if (existingService.rows.length) {
+        serviceId = existingService.rows[0].id
+      } else {
+        const created = await db.query(
+          `INSERT INTO services
+           (branch_id, type, name, base_price, duration_minutes, is_active)
+           VALUES ($1,'FNB',$2,$3,NULL,true)
+           RETURNING id`,
+          [branchId, name, sell_price ?? price ?? 0]
+        )
+        serviceId = created.rows[0].id
+      }
+    }
+
+    await db.query(
+      `UPDATE services
+       SET name=$1, base_price=$2
+       WHERE id=$3`,
+      [name, sell_price ?? price ?? 0, serviceId]
+    )
+
+    const { rows } = await db.query(
+      `UPDATE fnb_items
+       SET name=$1,
+           cost_price=$2,
+           stock=$3,
+           alert_stock=$4,
+           service_id=$5
+       WHERE id=$6
+       RETURNING *`,
+      [name, cost_price ?? 0, stock, alert_stock, serviceId, id]
+    ) 
+  //return rows[0]
+   await db.query("COMMIT")
+    return rows[0]
+  } catch (error) {
+    await db.query("ROLLBACK")
+    throw error
+  }
 }

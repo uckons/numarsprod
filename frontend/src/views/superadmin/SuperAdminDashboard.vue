@@ -12,6 +12,7 @@
         <button :class="{active:tab==='audit'}" @click="tab='audit'"> <ShieldCheck size="18" /> Audit Logs</button>
         <button :class="{active:tab==='services'}" @click="tab='services'"> <Store size="18" /> Services</button>
         <button :class="{active:tab==='therapists'}" @click="tab='therapists'"> <UsersIcon size="18" /> Therapists</button>
+        <button :class="{active:tab==='stock'}" @click="tab='stock'"> <Package size="18" /> FNB Stock</button>
         <button :class="{active:tab==='grades'}" @click="tab='grades'"> 🏆 Grades</button>
       </nav>
 
@@ -27,6 +28,7 @@
       <Timers v-if="tab==='timers'" />
       <Services v-if="tab==='services'" :branch-id="1" />
       <Therapists v-if="tab==='therapists'" />
+      <StockDashboard v-if="tab==='stock'" />
       <Grades v-if="tab==='grades'" />
     </main>
   </div>
@@ -36,10 +38,10 @@
 import { ref } from "vue"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "@/store/auth.store"
-import { Users as UsersIcon, Store, ClipboardList, Timer, LogOut } from "lucide-vue-next"
+import { Users as UsersIcon, Store, ClipboardList, Timer, LogOut, Package } from "lucide-vue-next"
 import AuditLogs from "./AuditLogs.vue"
 import { ShieldCheck } from "lucide-vue-next"
-
+import StockDashboard from "@/views/stock/StockDashboard.vue"
 import Users from "./Users.vue"
 import Branches from "./Branches.vue"
 import Orders from "./Orders.vue"

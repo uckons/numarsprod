@@ -28,3 +28,21 @@ exports.deductStockByOrder = async (order_id) => {
     }
   }
 }
+
+exports.reduceFnbStock = async (db, fnbItemId, qty) => {
+  const { rows } = await db.query(
+    `UPDATE fnb_items
+     SET stock = stock - $1
+     WHERE id=$2
+     RETURNING *`,
+    [qty, fnbItemId]
+  )
+
+  await db.query(
+    `INSERT INTO stock_logs (fnb_item_id, qty_change)
+     VALUES ($1,$2)`,
+    [fnbItemId, -qty]
+  )
+
+  return rows[0]
+}
