@@ -9,13 +9,34 @@ exports.getAll = async (db, user) => {
       fi.cost_price,
       fi.stock,
       fi.alert_stock,
-      COALESCE(s.base_price, 0) AS sell_price,
-      COALESCE(s.base_price, 0) AS price,
+      fi.is_beverage,
+      fi.happy_hour_enabled,
+      fi.happy_hour_price,
+      CASE
+        WHEN s.type = 'FNB'
+          AND fi.is_beverage = true
+          AND fi.happy_hour_enabled = true
+          AND NOW()::time >= TIME '17:00'
+          AND NOW()::time < TIME '22:00'
+          AND fi.happy_hour_price IS NOT NULL
+        THEN fi.happy_hour_price
+        ELSE COALESCE(s.base_price, 0)
+      END AS sell_price,
+      CASE
+        WHEN s.type = 'FNB'
+          AND fi.is_beverage = true
+          AND fi.happy_hour_enabled = true
+          AND NOW()::time >= TIME '17:00'
+          AND NOW()::time < TIME '22:00'
+          AND fi.happy_hour_price IS NOT NULL
+        THEN fi.happy_hour_price
+        ELSE COALESCE(s.base_price, 0)
+      END AS price,
       s.is_active AS service_active
      FROM fnb_items fi
      LEFT JOIN services s ON s.id = fi.service_id
      WHERE fi.branch_id=$1
-     ORDER BY fi.name`, 
+     ORDER BY fi.name`,
     [user.branch_id]
   )
   return rows
@@ -29,7 +50,10 @@ exports.create = async (db, user, data) => {
     sell_price,
     price,
     stock,
-    alert_stock
+    alert_stock,
+    is_beverage,
+    happy_hour_enabled,
+    happy_hour_price
   } = data
  //const { rows } = await db.query(
  //   `INSERT INTO fnb_items
@@ -53,10 +77,20 @@ exports.create = async (db, user, data) => {
   //return rows[0]
   const { rows } = await db.query(
       `INSERT INTO fnb_items
-       (branch_id, service_id, name, cost_price, stock, alert_stock)
-       VALUES ($1,$2,$3,$4,$5,$6)
+       (branch_id, service_id, name, cost_price, is_beverage, happy_hour_enabled, happy_hour_price, stock, alert_stock)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
-      [user.branch_id, serviceId, name, cost_price ?? 0, stock, alert_stock]
+      [
+        user.branch_id,
+        serviceId,
+        name,
+        cost_price ?? 0,
+        Boolean(is_beverage),
+        Boolean(happy_hour_enabled),
+        happy_hour_price ?? null,
+        stock,
+        alert_stock
+      ]
     )
 
     await db.query("COMMIT")
@@ -76,7 +110,10 @@ exports.update = async (db, id, data) => {
     sell_price,
     price,
     stock,
-    alert_stock
+    alert_stock,
+    is_beverage,
+    happy_hour_enabled,
+    happy_hour_price
   } = data  
   //const { rows } = await db.query(
   //  `UPDATE fnb_items
@@ -135,10 +172,23 @@ exports.update = async (db, id, data) => {
            cost_price=$2,
            stock=$3,
            alert_stock=$4,
-           service_id=$5
-       WHERE id=$6
+           service_id=$5,
+           is_beverage=$6,
+           happy_hour_enabled=$7,
+           happy_hour_price=$8
+       WHERE id=$9
        RETURNING *`,
-      [name, cost_price ?? 0, stock, alert_stock, serviceId, id]
+      [
+        name,
+        cost_price ?? 0,
+        stock,
+        alert_stock,
+        serviceId,
+        Boolean(is_beverage),
+        Boolean(happy_hour_enabled),
+        happy_hour_price ?? null,
+        id
+      ]
     ) 
   //return rows[0]
    await db.query("COMMIT")

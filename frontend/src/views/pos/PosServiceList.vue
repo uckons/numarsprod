@@ -57,6 +57,7 @@ const categories = [
   "SPA",
   "LC",
   "FNB",
+  "LOUNGE",
   "KARAOKE"
 ]
 
@@ -221,4 +222,3 @@ const format = (v) =>
   padding: 30px;
 }
 </style>
-

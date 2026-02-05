@@ -19,12 +19,22 @@ exports.list = async ({ branch_id, type }) => {
       s.id,
       s.name,
       s.type,
-      s.base_price,
+      CASE
+        WHEN s.type = 'FNB'
+          AND fi.is_beverage = true
+          AND fi.happy_hour_enabled = true
+          AND NOW()::time >= TIME '17:00'
+          AND NOW()::time < TIME '22:00'
+          AND fi.happy_hour_price IS NOT NULL
+        THEN fi.happy_hour_price
+        ELSE s.base_price
+      END AS base_price,
       s.duration_minutes,
       s.is_active,
       b.name AS branch
     FROM services s
     JOIN branches b ON b.id = s.branch_id
+    LEFT JOIN fnb_items fi ON fi.service_id = s.id
     WHERE ${where}
     ORDER BY s.id DESC
   `, params)

@@ -56,15 +56,31 @@ exports.close = async (req, res) => {
       for (const i of items) {
         // Get service name from services table
         const svcResult = await db.query(
-          `SELECT name FROM services WHERE id = $1`,
+        `
+          SELECT
+            s.name,
+            CASE
+              WHEN s.type = 'FNB'
+                AND fi.is_beverage = true
+                AND fi.happy_hour_enabled = true
+                AND NOW()::time >= TIME '17:00'
+                AND NOW()::time < TIME '22:00'
+                AND fi.happy_hour_price IS NOT NULL
+              THEN fi.happy_hour_price
+              ELSE s.base_price
+            END AS base_price
+          FROM services s
+          LEFT JOIN fnb_items fi ON fi.service_id = s.id
+          WHERE s.id = $1
+          `,
           [i.id]
         )
         const serviceName = svcResult.rows[0]?.name || i.name || 'Unknown Service'
-        
+        const unitPrice = Number(svcResult.rows[0]?.base_price ?? i.base_price ?? 0)
         await db.query(
           `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal)
            VALUES ($1, $2, $3, $4, $5, $6)`,
-          [orderId, i.id, serviceName, i.qty, i.base_price, i.qty * i.base_price]
+           [orderId, i.id, serviceName, i.qty, unitPrice, i.qty * unitPrice]
         )
       }
     //}
@@ -282,7 +298,6 @@ exports.createFromPos = async (req, res) => {
       INSERT INTO orders
         (branch_id, user_id, status, payment_method, total)
       VALUES
-      -- ($1,$2,'DRAFT',$3,0)
       ($1,$2,'PAID',$3,0)
       RETURNING id
       `,
@@ -297,9 +312,23 @@ exports.createFromPos = async (req, res) => {
       // ambil service dari DB (WAJIB)
       const svcRes = await db.query(
         `
-        SELECT id, name, base_price, duration_minutes
-        FROM services
-        WHERE id=$1
+        SELECT
+          s.id,
+          s.name,
+          s.duration_minutes,
+          CASE
+            WHEN s.type = 'FNB'
+              AND fi.is_beverage = true
+              AND fi.happy_hour_enabled = true
+              AND NOW()::time >= TIME '17:00'
+              AND NOW()::time < TIME '22:00'
+              AND fi.happy_hour_price IS NOT NULL
+            THEN fi.happy_hour_price
+            ELSE s.base_price
+          END AS base_price
+        FROM services s
+        LEFT JOIN fnb_items fi ON fi.service_id = s.id
+        WHERE s.id=$1
         `,
         [i.id]
       )
@@ -350,7 +379,9 @@ exports.createFromPos = async (req, res) => {
     await db.query(
     //  "UPDATE orders SET total=$1 WHERE id=$2",
     //  [total, orderId]
-    "UPDATE orders SET total=$1, payment_method=$2, status='PAID' WHERE id=$3",
+    //"UPDATE orders SET total=$1, payment_method=$2, status='PAID' WHERE id=$3",
+     // [total, payment_method || "CASH", orderId]
+     "UPDATE orders SET total=$1, payment_method=$2, status='PAID' WHERE id=$3",
       [total, payment_method || "CASH", orderId]
     )
      const fnbItemsRes = await db.query(

@@ -67,6 +67,7 @@
         <option value="SPA">SPA</option>
         <option value="LC">LC</option>
         <option value="FNB">FNB</option>
+        <option value="LOUNGE">LOUNGE</option>
         <option value="KARAOKE">KARAOKE</option>
       </select>
 

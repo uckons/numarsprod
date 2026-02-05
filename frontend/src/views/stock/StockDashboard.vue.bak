@@ -57,18 +57,16 @@
             <th>Alert</th>
             <th>Harga Modal</th>
             <th>Harga Jual</th>
-            <th>Minuman</th>
-            <th>Happy Hour</th>
             <th>Status</th>
             <th width="140">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="9" class="empty">Loading...</td>
+            <td colspan="7" class="empty">Loading...</td>
           </tr>
           <tr v-else-if="!paginatedItems.length">
-            <td colspan="9" class="empty">No stock items found</td>
+            <td colspan="7" class="empty">No stock items found</td>
           </tr>
           <tr
             v-for="item in paginatedItems"
@@ -80,19 +78,6 @@
             <td>{{ item.alert_stock }}</td>
             <td>Rp {{ format(item.cost_price) }}</td>
             <td>Rp {{ format(item.sell_price) }}</td>
-            <td>
-              <span class="badge" :class="item.is_beverage ? 'success' : 'danger'">
-                {{ item.is_beverage ? "YES" : "NO" }}
-              </span>
-            </td>
-            <td>
-              <div class="happy-hour">
-                <span class="badge" :class="item.happy_hour_enabled ? 'success' : 'danger'">
-                  {{ item.happy_hour_enabled ? "ON" : "OFF" }}
-                </span>
-                <span class="muted">Rp {{ format(item.happy_hour_price) }}</span>
-              </div>
-            </td>
             <td>
               <span
                 class="badge"
@@ -142,24 +127,6 @@
                 min="0"
                 class="input"
                 required
-              />
-            </label>
-            <label class="inline-toggle">
-              <span>Minuman (Happy Hour)</span>
-              <input v-model="form.is_beverage" type="checkbox" />
-            </label>
-            <label class="inline-toggle">
-              <span>Happy Hour Aktif</span>
-              <input v-model="form.happy_hour_enabled" type="checkbox" />
-            </label>
-            <label>
-              Harga Happy Hour
-              <input
-                v-model.number="form.happy_hour_price"
-                type="number"
-                min="0"
-                class="input"
-                :disabled="!form.happy_hour_enabled"
               />
             </label>
             <label>
@@ -216,9 +183,6 @@ const form = ref({
   name: "",
   cost_price: 0,
   sell_price: 0,
-  is_beverage: false,
-  happy_hour_enabled: false,
-  happy_hour_price: 0,
   stock: 0,
   alert_stock: 0
 })
@@ -284,9 +248,6 @@ const openAdd = () => {
     name: "",
     cost_price: 0,
     sell_price: 0,
-    is_beverage: false,
-    happy_hour_enabled: false,
-    happy_hour_price: 0,
     stock: 0,
     alert_stock: 0
   }
@@ -299,9 +260,6 @@ const openEdit = (item) => {
     name: item.name,
     cost_price: Number(item.cost_price || 0),
     sell_price: Number(item.sell_price || item.price || 0),
-    is_beverage: Boolean(item.is_beverage),
-    happy_hour_enabled: Boolean(item.happy_hour_enabled),
-    happy_hour_price: Number(item.happy_hour_price || 0),
     stock: Number(item.stock || 0),
     alert_stock: Number(item.alert_stock || 0)
   }
@@ -318,11 +276,6 @@ const submitForm = async () => {
     name: form.value.name,
     cost_price: Number(form.value.cost_price || 0),
     sell_price: Number(form.value.sell_price || 0),
-    is_beverage: Boolean(form.value.is_beverage),
-    happy_hour_enabled: Boolean(form.value.happy_hour_enabled),
-    happy_hour_price: form.value.happy_hour_enabled
-      ? Number(form.value.happy_hour_price || 0)
-      : null,
     stock: Number(form.value.stock || 0),
     alert_stock: Number(form.value.alert_stock || 0)
   }
@@ -515,17 +468,6 @@ td {
   color: #e74c3c;
 }
 
-.happy-hour {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.muted {
-  color: #9b9b9b;
-  font-size: 12px;
-}
-
 .actions button {
   background: transparent;
   border: 1px solid #c9a24d;
@@ -604,21 +546,6 @@ td {
   gap: 6px;
   color: #bbb;
   font-size: 13px;
-}
-
-.inline-toggle {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: #101010;
-  border: 1px solid #222;
-}
-
-.inline-toggle input {
-  width: 18px;
-  height: 18px;
 }
 
 .form-actions {
