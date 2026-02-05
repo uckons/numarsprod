@@ -276,13 +276,14 @@ exports.createFromPos = async (req, res) => {
       return res.status(400).json({ message: "Item kosong" })
     }
 
-    // 3️⃣ create order (DRAFT)
+    // 3️⃣ create order (PAID)
     const orderRes = await db.query(
       `
       INSERT INTO orders
         (branch_id, user_id, status, payment_method, total)
       VALUES
-        ($1,$2,'DRAFT',$3,0)
+      -- ($1,$2,'DRAFT',$3,0)
+      ($1,$2,'PAID',$3,0)
       RETURNING id
       `,
       [branchId, user.id, payment_method || "CASH"]
@@ -347,14 +348,35 @@ exports.createFromPos = async (req, res) => {
 
     // 5️⃣ update total
     await db.query(
-      "UPDATE orders SET total=$1 WHERE id=$2",
-      [total, orderId]
+    //  "UPDATE orders SET total=$1 WHERE id=$2",
+    //  [total, orderId]
+    "UPDATE orders SET total=$1, payment_method=$2, status='PAID' WHERE id=$3",
+      [total, payment_method || "CASH", orderId]
+    )
+     const fnbItemsRes = await db.query(
+      [
+        "SELECT fi.id AS fnb_item_id, oi.qty",
+        "FROM order_items oi",
+        "JOIN services s ON s.id = oi.service_id",
+        "JOIN fnb_items fi ON fi.service_id = s.id",
+        "WHERE oi.order_id=$1 AND s.type='FNB'"
+      ].join(" "),
+      [orderId]
     )
 
+    for (const item of fnbItemsRes.rows) {
+      await stockService.reduceFnbStock(
+        db,
+        item.fnb_item_id,
+        item.qty
+      )
+    } 
     res.json({
       success: true,
       order_id: orderId,
-      total
+    //  total
+      total,
+      status: "PAID"
     })
   } catch (err) {
     console.error("CREATE POS ORDER ERROR:", err)
