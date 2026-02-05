@@ -1,5 +1,4 @@
 const service = require("./order.service")
-const stockService = require("../stock/stock.service")
 
 exports.create = async (req, res) => {
   try {
@@ -92,24 +91,6 @@ exports.close = async (req, res) => {
 
     if (!result.rows.length) {
       throw new Error("Order not found")
-    }
-    const fnbItemsRes = await db.query(
-      [
-        "SELECT fi.id AS fnb_item_id, oi.qty",
-        "FROM order_items oi",
-        "JOIN services s ON s.id = oi.service_id",
-        "JOIN fnb_items fi ON fi.service_id = s.id",
-        "WHERE oi.order_id=$1 AND s.type='FNB'"
-      ].join(" "),
-      [orderId]
-    )
-
-    for (const item of fnbItemsRes.rows) {
-      await stockService.reduceFnbStock(
-        db,
-        item.fnb_item_id,
-        item.qty
-      )
     }
 
     res.json({ 

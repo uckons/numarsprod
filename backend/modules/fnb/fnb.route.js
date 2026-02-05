@@ -26,7 +26,8 @@ module.exports = app => {
   app.put(
     "/api/fnb/:id",
     auth,
-    rbac(["Supervisor", "Manager"]),
+    //rbac(["Supervisor", "Manager"]),
+    rbac(["SuperAdmin", "Owner", "Supervisor", "Manager"]),
     controller.update
   )
 }
