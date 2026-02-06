@@ -22,35 +22,19 @@ exports.list = async ({ branch_id, type }) => {
       CASE
         WHEN s.type = 'FNB'
           AND fi.is_beverage = true
-          AND COALESCE(fi.is_package, false) = false
           AND fi.happy_hour_enabled = true
+          AND NOW()::time >= TIME '17:00'
+          AND NOW()::time < TIME '22:00'
           AND fi.happy_hour_price IS NOT NULL
-          AND hh_active.active = true
         THEN fi.happy_hour_price
-        WHEN s.type IN ('SPA', 'LC')
-          AND s.happy_hour_enabled = true
-          AND s.happy_hour_price IS NOT NULL
-          AND hh_active.active = true
-        THEN s.happy_hour_price
         ELSE s.base_price
       END AS base_price,
       s.duration_minutes,
       s.is_active,
-      s.happy_hour_enabled,
-      s.happy_hour_price,
       b.name AS branch
     FROM services s
     JOIN branches b ON b.id = s.branch_id
     LEFT JOIN fnb_items fi ON fi.service_id = s.id
-    LEFT JOIN LATERAL (
-      SELECT true AS active
-      FROM happy_hours hh
-      WHERE hh.branch_id = s.branch_id
-        AND hh.is_active = true
-        AND CURRENT_TIME BETWEEN hh.start_time AND hh.end_time
-        AND (hh.service_type IS NULL OR hh.service_type = s.type::text OR hh.service_type = 'ALL')
-      LIMIT 1
-    ) hh_active ON true
     WHERE ${where}
     ORDER BY s.id DESC
   `, params)
@@ -65,9 +49,7 @@ exports.create = async (data, actor) => {
     name,
     base_price,
     duration_minutes,
-    is_active = true,
-    happy_hour_enabled = false,
-    happy_hour_price = null
+    is_active = true
   } = data
 
   if (!branch_id || !type || !name) {
@@ -76,17 +58,15 @@ exports.create = async (data, actor) => {
 
   await db.query(`
     INSERT INTO services
-    branch_id, type, name, base_price, duration_minutes, is_active, happy_hour_enabled, happy_hour_price)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    (branch_id, type, name, base_price, duration_minutes, is_active)
+    VALUES ($1,$2,$3,$4,$5,$6)
   `, [
     branch_id,
     type,
     name,
     base_price || 0,
     duration_minutes || null,
-    is_active,
-    Boolean(happy_hour_enabled),
-    happy_hour_price ?? null
+    is_active
   ])
 }
 
@@ -107,18 +87,14 @@ exports.update = async (id, data) => {
       type=$2,
       base_price=$3,
       duration_minutes=$4,
-      is_active=$5,
-      happy_hour_enabled=$6,
-      happy_hour_price=$7
-    WHERE id=$8
+      is_active=$5
+    WHERE id=$6
   `, [
     data.name,
     data.type,
     data.base_price,
     data.duration_minutes,
     data.is_active,
-    Boolean(data.happy_hour_enabled),
-    data.happy_hour_price ?? null,
     id
   ])
   

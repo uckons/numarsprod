@@ -68,21 +68,21 @@ onMounted(async () => {
   services.value = res.data.data || res.data
 })
 
-//const addToCart = (service) => {
-//  console.log("CLICK SERVICE =>", service) // ?? DEBUG
-//  pos.add({
-//    id: service.id,
-//    name: service.name,
-//    price: Number(service.base_price),
-//    qty: 1
-//  })
-//}
+const addToCart = (service) => {
+  console.log("CLICK SERVICE =>", service) // ?? DEBUG
+  pos.add({
+    id: service.id,
+    name: service.name,
+    price: Number(service.base_price),
+    qty: 1
+  })
+}
 
-//const clickService = (s) => {
-//  console.log("CLICK SERVICE =>", s)
-//  pos.addService(s)
-//  console.log("ITEMS NOW =>", pos.items)
-//}
+const clickService = (s) => {
+  console.log("CLICK SERVICE =>", s)
+  pos.addService(s)
+  console.log("ITEMS NOW =>", pos.items)
+}
 const filteredServices = computed(() => {
   if (activeCategory.value === "ALL") {
     return services.value
@@ -107,7 +107,7 @@ const filteredServices = computed(() => {
 //  pos.addService(s)
 //}
 const select = async (service) => {
-//  console.log("CLICK SERVICE =>", service)
+  console.log("CLICK SERVICE =>", service)
 
 //  if (!pos.orderId) {
 //    await pos.createOrder()

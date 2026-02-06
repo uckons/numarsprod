@@ -38,13 +38,7 @@
       <button class="checkout" @click="checkout" :disabled="loading">
         {{ loading ? "Processing..." : "Bayar" }}
       </button>
-       <button
-        class="draft"
-        @click="saveDraft"
-        :disabled="loading || hasDraftOrder"
-      >
-        Simpan Draft
-      </button>
+
       <button class="cancel" @click="clear">
         Batalkan Order
       </button>
@@ -173,7 +167,6 @@ const router = useRouter()
 const pos = usePosStore()
 
 const items = computed(() => pos.items || [])
-const hasDraftOrder = computed(() => Boolean(pos.currentOrderId))
 
 const inc = (i) => pos.inc(i.id)
 const dec = (i) => pos.dec(i.id)
@@ -391,60 +384,6 @@ const printOrder = async (order_id = lastOrder.value.order_id) => {
     })
   }
 }
-const saveDraft = async () => {
-  if (items.value.length === 0) {
-    await SwalTheme.fire({
-      icon: "info",
-      title: "Kosong",
-      text: "Tidak ada item untuk disimpan",
-      confirmButtonText: "OK"
-    })
-    return
-  }
-
-  const res = await SwalTheme.fire({
-    icon: "question",
-    title: "Simpan draft?",
-    text: "Order akan masuk ke daftar order sebagai draft.",
-    showCancelButton: true,
-    confirmButtonText: "Simpan",
-    cancelButtonText: "Batal"
-  })
-
-  if (!res.isConfirmed) return
-
-  loading.value = true
-  try {
-    const payload = {
-      items: items.value.map(i => ({
-        id: i.id,
-        qty: i.qty
-      }))
-    }
-
-    await api.post("/orders/pos/draft", payload)
-
-    pos.clear()
-
-    await SwalTheme.fire({
-      icon: "success",
-      title: "Draft tersimpan",
-      text: "Order masuk ke daftar order.",
-      confirmButtonText: "OK"
-    })
-
-    router.push("/kasir/orders")
-  } catch (err) {
-    await SwalTheme.fire({
-      icon: "error",
-      title: "Gagal",
-      text: err.response?.data?.message || err.message || "Gagal menyimpan draft",
-      confirmButtonText: "OK"
-    })
-  } finally {
-    loading.value = false
-  }
-}
 </script>
 
 <style scoped>
@@ -603,22 +542,7 @@ const saveDraft = async () => {
   border-radius: 10px;
   cursor: pointer;
 }
-.draft {
-  margin-top: 8px;
-  width: 100%;
-  padding: 12px;
-  font-size: 13px;
-  background: #1b1b1b;
-  color: #c9a24d;
-  border: 1px solid #3a2e12;
-  border-radius: 10px;
-  cursor: pointer;
-}
 
-.draft:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 /* ===== SweetAlert2 Black & Gold theme (scoped using :deep) ===== */
 :deep(.swal-theme-popup) {
   background: linear-gradient(145deg, #0e0e0e, #151515) !important;

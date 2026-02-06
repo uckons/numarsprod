@@ -15,17 +15,14 @@
       <select v-model="selectedServiceId" @change="onServiceChange" :disabled="loadingServices">
         <option value="">-- Pilih Service --</option>
         <option v-for="svc in services" :key="svc.id" :value="svc.id">
-          <!--{{ svc.name }} • {{ svc.duration_minutes }} menit-->
-          {{ svc.name }}
-          •
-          {{ svc.duration_minutes ? `${svc.duration_minutes} menit` : 'Durasi manual' }}
+          {{ svc.name }} • {{ svc.duration_minutes }} menit
         </option>
       </select>
       <span v-if="loadingServices" class="loading-text">Memuat service…</span>
     </div>
 
     <!-- THERAPIST -->
-    <div class="field" v-if="serviceType && serviceType !== 'LOUNGE'">
+    <div class="field">
       <label>Nama Terapis</label>
       <select v-model="selectedTherapistId" :disabled="loadingTherapists || !serviceType">
         <option value="">-- Pilih Terapis --</option>
@@ -38,7 +35,7 @@
 
     <!-- ROOM / SOFA -->
     <div class="field" v-if="serviceType">
-      <label>{{ serviceType === 'SPA' ? 'Room' : 'Tabel / Sofa' }}</label>
+      <label>{{ serviceType === 'SPA' ? 'Room' : 'Sofa' }}</label>
       <select v-model="selectedRoomId" :disabled="loadingRooms">
         <option value="">-- Pilih --</option>
         <option v-for="r in rooms" :key="r.id" :value="r.id" :disabled="r.is_occupied">
@@ -47,16 +44,7 @@
       </select>
       <span v-if="loadingRooms" class="loading-text">Memuat data…</span>
     </div>
-    <!-- MANUAL DURATION -->
-    <div class="field" v-if="serviceType && duration === 0">
-      <label>Durasi (menit)</label>
-      <input
-        type="number"
-        min="1"
-        v-model.number="manualDuration"
-        placeholder="Masukkan durasi"
-      />
-    </div>
+
     <!-- DURATION -->
     <div class="duration-box" v-if="duration">
       ⏱ Durasi Service
@@ -81,7 +69,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue"
+import { ref, computed, onMounted, watch } from "vue"
 import api from "@/services/api"
 
 const emit = defineEmits(["close", "start"])
@@ -94,7 +82,6 @@ const rooms = ref([])
 const selectedServiceId = ref("")
 const selectedTherapistId = ref("")
 const selectedRoomId = ref("")
-const manualDuration = ref(0)
 
 const loadingServices = ref(false)
 const loadingTherapists = ref(false)
@@ -114,9 +101,7 @@ const serviceType = computed(() => {
 const duration = computed(() => {
   return selectedService.value?.duration_minutes || 0
 })
-const effectiveDuration = computed(() => {
-  return duration.value || manualDuration.value
-})
+
 // Methods
 const fetchServices = async () => {
   try {
@@ -125,10 +110,7 @@ const fetchServices = async () => {
     
     // Fetch all services (will be filtered by active services on backend)
     const res = await api.get("/services")
-    //services.value = res.data.filter(s => s.is_active && s.duration_minutes > 0)
-    services.value = res.data.filter(
-      s => s.is_active && s.type !== "FNB"
-    )
+    services.value = res.data.filter(s => s.is_active && s.duration_minutes > 0)
   } catch (err) {
     console.error("Error fetching services:", err)
     errorMessage.value = "Gagal memuat daftar service"
@@ -138,8 +120,8 @@ const fetchServices = async () => {
 }
 
 const fetchTherapists = async () => {
-  //if (!serviceType.value) return
-  if (!serviceType.value || serviceType.value === "LOUNGE") return
+  if (!serviceType.value) return
+  
   try {
     loadingTherapists.value = true
     errorMessage.value = ""
@@ -179,7 +161,7 @@ const onServiceChange = () => {
   // Reset selections when service changes
   selectedTherapistId.value = ""
   selectedRoomId.value = ""
-  manualDuration.value = 0
+  
   // Fetch therapists and rooms for the new service type
   if (serviceType.value) {
     fetchTherapists()
@@ -196,32 +178,24 @@ const submit = () => {
     return
   }
   
-  //if (!selectedTherapistId.value) {
-  if (serviceType.value !== "LOUNGE" && !selectedTherapistId.value) {  
+  if (!selectedTherapistId.value) {
     errorMessage.value = "Silakan pilih terapis"
     return
   }
   
   if (!selectedRoomId.value && serviceType.value) {
-    errorMessage.value = `Silakan pilih ${serviceType.value === 'SPA' ? 'room' : 'tabel/sofa'}`
+    errorMessage.value = `Silakan pilih ${serviceType.value === 'SPA' ? 'room' : 'sofa'}`
     return
   }
-  if (duration.value === 0 && !manualDuration.value) {
-    errorMessage.value = "Silakan isi durasi service"
-    return
-  }
+  
   isSubmitting.value = true
   
   emit("start", {
     service_id: parseInt(selectedServiceId.value),
     service_type: serviceType.value,
-    //therapist_id: parseInt(selectedTherapistId.value),
-    therapist_id: selectedTherapistId.value
-      ? parseInt(selectedTherapistId.value)
-      : null,  
+    therapist_id: parseInt(selectedTherapistId.value),
     room_id: parseInt(selectedRoomId.value),
-    //duration_minutes: duration.value
-    duration_minutes: effectiveDuration.value
+    duration_minutes: duration.value
   })
   
   // Reset submitting state after a delay

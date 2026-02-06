@@ -22,6 +22,7 @@
               <option>SPA</option>
               <option>LC</option>
               <option>FNB</option>
+              <option>LOUNGE</option>
               <option>KARAOKE</option>
             </select>
           </div>
@@ -52,7 +53,21 @@
             <input type="number" v-model.number="form.base_price" />
           </div>
         </div>
+          <div class="row" v-if="form.type === 'SPA' || form.type === 'LC'">
+          <div class="form-group">
+            <label>Happy Hour Aktif</label>
+            <input type="checkbox" v-model="form.happy_hour_enabled" />
+          </div>
 
+          <div class="form-group">
+            <label>Harga Happy Hour</label>
+            <input
+              type="number"
+              v-model.number="form.happy_hour_price"
+              :disabled="!form.happy_hour_enabled"
+            />
+          </div>
+        </div>
         <!-- FOOTER -->
         <div class="modal-footer">
           <button type="button" class="btn-outline" @click="closeForm">
@@ -84,7 +99,10 @@ const form = ref({
   type: "",
   base_price: 0,
   duration_minutes: null,
-  branch_id: null
+  branch_id: null,
+  happy_hour_enabled: false,
+  happy_hour_price: 0
+
 })
 
 const branches = ref([])

@@ -69,34 +69,12 @@ exports.startTimer = async (req, res) => {
     } = req.body
 
         // 🔒 VALIDASI MINIMAL
-   // if (!service_id || !therapist_id || !room_id || !duration_minutes) {
-      if (!service_id || !room_id || !duration_minutes) {
+    if (!service_id || !therapist_id || !room_id || !duration_minutes) {
       return res.status(400).json({ message: "Data timer tidak lengkap" })
     }
 
     // =========================
-    // 🆕 1. AMBIL DATA SERVICE     
-    // =========================
-    const { rows: serviceRows } = await db.query(
-      `SELECT id, name, type, base_price, duration_minutes 
-       FROM services 
-       WHERE id = $1`,
-      [service_id]
-    )
-
-    if (!serviceRows.length) {
-      return res.status(400).json({ message: "Service tidak ditemukan" })
-    }
-
-    const service = serviceRows[0]
-    const requiresTherapist = service.type !== "LOUNGE"
-
-    if (requiresTherapist && !therapist_id) {
-      return res.status(400).json({ message: "Data timer tidak lengkap" })
-    }
-
-    // =========================
-    // 🔑 2. PASTIKAN ORDER ADA
+    // 🔑 1. PASTIKAN ORDER ADA
     // =========================
     let finalOrderId = order_id
 
@@ -118,8 +96,23 @@ exports.startTimer = async (req, res) => {
       `UPDATE orders 
        SET therapist_id = $1, room_id = $2 
        WHERE id = $3`,
-       [therapist_id || null, room_id, finalOrderId] 
+      [therapist_id, room_id, finalOrderId]
     )
+    // =========================
+    // 🆕 2. AMBIL DATA SERVICE & CREATE ORDER_ITEMS
+    // =========================
+    const { rows: serviceRows } = await db.query(
+      `SELECT id, name, base_price, duration_minutes 
+       FROM services 
+       WHERE id = $1`,
+      [service_id]
+    )
+
+    if (!serviceRows.length) {
+      return res.status(400).json({ message: "Service tidak ditemukan" })
+    }
+
+    const service = serviceRows[0]
 
     // Check if order_items already exists for this service
     const { rows: existingItems } = await db.query(
@@ -430,12 +423,8 @@ exports.getRooms = async (req, res) => {
     const params = [branch_id]
     
     if (service_type) {
-       if (service_type === "LOUNGE") {
-        query += ` AND r.type IN ('LOUNGE','LC')`
-      } else {
-        query += ` AND r.type = $2`
-        params.push(service_type)
-      }
+      query += ` AND r.type = $2`
+      params.push(service_type)
     }
     
     query += ` ORDER BY r.name ASC`
@@ -541,3 +530,4 @@ exports.extendTimer = async (req, res) => {
     res.status(500).json({ message: err.message })
   }
 }
+

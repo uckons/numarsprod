@@ -41,17 +41,4 @@ router.post(
   },
   controller.createFromPos
 )
-router.post(
-  "/pos/draft",
-  auth,
-  (req, res, next) => {
-    if (req.user.role !== "Kasir") {
-      return res.status(403).json({
-        message: "Only cashier can create POS order"
-      })
-    }
-    next()
-  },
-  controller.createDraftFromPos
-)
 module.exports = router
