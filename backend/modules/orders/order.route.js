@@ -9,6 +9,28 @@ router.get("/", auth, controller.getAll)
 router.get("/kasir", auth, controller.getKasirOrders)
 
 // CREATE FROM POS (static routes MUST be before "/:id" routes)
+
+// CREATE FROM POS (static routes MUST be before "/:id" routes)
+router.get("/kasir",auth,controller.getKasirOrders)
+// GET ORDER BY ID
+router.get("/:id(\\d+)", auth, controller.getById)
+// 🖨️ GET ORDER DETAIL FOR REPRINT
+router.get("/:id(\\d+)/detail", auth, controller.getOrderDetail)
+// CREATE EMPTY ORDER (kasir buka order)
+router.post("/", auth, controller.create)
+
+// ADD ITEM TO ORDER
+router.post("/:id(\\d+)/items", auth, controller.addItem)
+
+// CLOSE ORDER
+router.post("/:id(\\d+)/close", auth, controller.close)
+router.post("/:id(\\d+)/draft", auth, controller.saveDraft)
+// CANCEL / DELETE ORDER
+router.delete("/:id(\\d+)", auth, controller.cancel)
+
+
+// CREATE FROM POS (checkout langsung)
+//router.post("/pos", auth, controller.createFromPos)
 router.post(
   "/pos",
   auth,

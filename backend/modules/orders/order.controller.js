@@ -530,6 +530,7 @@ exports.saveDraft = async (req, res) => {
   try {
     const db = req.app.get("db")
     const orderId = parseOrderId(req.params.id)
+    const orderId = req.params.id
     const { items } = req.body
 
     if (!Array.isArray(items) || items.length === 0) {
