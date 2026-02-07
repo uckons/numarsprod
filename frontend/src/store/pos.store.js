@@ -12,8 +12,16 @@ export const usePosStore = defineStore("pos", () => {
 const selectedTherapist = ref(null)
 const selectedRoom = ref(null)
 
+  const itemKey = (service) => [
+    service.id,
+    Number(service.base_price || 0),
+    service.price_label || '',
+    service.is_package ? 'P' : 'N'
+  ].join(':')
+
   function addService(service) {
-    const found = items.value.find(i => i.id === service.id)
+    const key = itemKey(service)
+    const found = items.value.find(i => i.cart_key === key)
     if (found) {
       found.qty++
     } else {
@@ -21,6 +29,9 @@ const selectedRoom = ref(null)
         id: service.id,
         name: service.name,
         base_price: Number(service.base_price),
+        price_label: service.price_label || null,
+        is_package: Boolean(service.is_package),
+        cart_key: key,
         qty: 1
       })
     }
@@ -36,18 +47,18 @@ const selectedRoom = ref(null)
     locked.value = false
   }
 
-  function inc(id) {
-    const item = items.value.find(i => i.id === id)
+  function inc(id, cartKey = null) {
+    const item = items.value.find(i => i.id === id && (!cartKey || i.cart_key === cartKey))
     if (item) item.qty++
   }
 
-  function dec(id) {
-    const item = items.value.find(i => i.id === id)
+  function dec(id, cartKey = null) {
+    const item = items.value.find(i => i.id === id && (!cartKey || i.cart_key === cartKey))
     if (item && item.qty > 1) item.qty--
   }
 
-  function remove(id) {
-    items.value = items.value.filter(i => i.id !== id)
+  function remove(id, cartKey = null) {
+    items.value = items.value.filter(i => !(i.id === id && (!cartKey || i.cart_key === cartKey)))
   }
 
   function clear() {

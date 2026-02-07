@@ -11,19 +11,20 @@ const controller = require("./order.controller")
 router.get("/", auth, controller.getAll)
 router.get("/kasir",auth,controller.getKasirOrders)
 // GET ORDER BY ID
-router.get("/:id", auth, controller.getById)
+router.get("/:id(\\d+)", auth, controller.getById)
 // 🖨️ GET ORDER DETAIL FOR REPRINT
-router.get("/:id/detail", auth, controller.getOrderDetail)
+router.get("/:id(\\d+)/detail", auth, controller.getOrderDetail)
 // CREATE EMPTY ORDER (kasir buka order)
 router.post("/", auth, controller.create)
 
 // ADD ITEM TO ORDER
-router.post("/:id/items", auth, controller.addItem)
+router.post("/:id(\\d+)/items", auth, controller.addItem)
 
 // CLOSE ORDER
-router.post("/:id/close", auth, controller.close)
+router.post("/:id(\\d+)/close", auth, controller.close)
+router.post("/:id(\\d+)/draft", auth, controller.saveDraft)
 // CANCEL / DELETE ORDER
-router.delete("/:id", auth, controller.cancel)
+router.delete("/:id(\\d+)", auth, controller.cancel)
 
 
 // CREATE FROM POS (checkout langsung)

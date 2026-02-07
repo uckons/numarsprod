@@ -23,6 +23,7 @@
         <div class="card-top">
           <h4>{{ s.name }}</h4>
           <span class="badge">{{ s.type }}</span>
+          <span v-if="s.price_label" class="badge price-badge">{{ s.price_label }}</span>
         </div>
 
         <div class="card-bottom">
@@ -195,6 +196,13 @@ const format = (v) =>
   border-radius: 12px;
   font-size: 12px;
   width: fit-content;
+}
+
+
+.price-badge {
+  margin-left: 6px;
+  background: #f5c518;
+  color: #111;
 }
 
 .card-bottom {
