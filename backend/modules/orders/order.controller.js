@@ -527,10 +527,10 @@ exports.createDraftFromPos = async (req, res) => {
 }
 
 exports.saveDraft = async (req, res) => {
+  const db = req.app.get("db")
   let inTransaction = false
 
   try {
-    const db = req.app.get("db")
     const idOrder = parseOrderId(req.params.id)
     const { items } = req.body
 
@@ -578,7 +578,7 @@ exports.saveDraft = async (req, res) => {
   } catch (err) {
     try {
       if (inTransaction) {
-        await req.app.get("db").query("ROLLBACK")
+        await db.query("ROLLBACK")
       }
     } catch (rollbackErr) {
       console.error("ROLLBACK SAVE DRAFT ERROR:", rollbackErr)
