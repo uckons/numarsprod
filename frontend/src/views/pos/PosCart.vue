@@ -8,12 +8,13 @@
 
     <div
       v-for="i in items"
-      :key="i.id"
+      :key="i.cart_key || `${i.id}-${i.base_price}-${i.price_label || ''}`"
       class="cart-item"
     >
       <div class="info">
         <strong>{{ i.name }}</strong>
         <small>Rp {{ format(i.base_price) }}</small>
+        <small v-if="i.price_label" class="item-label">{{ i.price_label }}</small>
       </div>
 
       <div class="qty">
@@ -26,7 +27,7 @@
         Rp {{ format(i.base_price * i.qty) }}
       </div>
 
-      <button class="remove" @click="remove(i.id)">✕</button>
+      <button class="remove" @click="remove(i)">✕</button>
     </div>
 
     <div v-if="items.length" class="summary">
@@ -41,7 +42,7 @@
        <button
         class="draft"
         @click="saveDraft"
-        :disabled="loading || hasDraftOrder"
+        :disabled="loading"
       >
         Simpan Draft
       </button>
@@ -173,11 +174,9 @@ const router = useRouter()
 const pos = usePosStore()
 
 const items = computed(() => pos.items || [])
-const hasDraftOrder = computed(() => Boolean(pos.currentOrderId))
-
-const inc = (i) => pos.inc(i.id)
-const dec = (i) => pos.dec(i.id)
-const remove = (id) => pos.remove(id)
+const inc = (i) => pos.inc(i.id, i.cart_key)
+const dec = (i) => pos.dec(i.id, i.cart_key)
+const remove = (item) => pos.remove(item.id, item.cart_key)
 
 const SwalTheme = Swal.mixin({
   customClass: {
@@ -268,7 +267,9 @@ const checkout = async () => {
       items: items.value.map(i => ({
         id: i.id,
         qty: i.qty,
-        base_price: i.base_price
+        base_price: i.base_price,
+        name: i.name,
+        price_label: i.price_label
       })),
       payment_method: "CASH"
     }
@@ -418,11 +419,18 @@ const saveDraft = async () => {
     const payload = {
       items: items.value.map(i => ({
         id: i.id,
-        qty: i.qty
+        qty: i.qty,
+        base_price: i.base_price,
+        name: i.name,
+        price_label: i.price_label
       }))
     }
 
-    await api.post("/orders/pos/draft", payload)
+    if (pos.currentOrderId) {
+      await api.post(`/orders/${pos.currentOrderId}/draft`, payload)
+    } else {
+      await api.post("/orders/pos/draft", payload)
+    }
 
     pos.clear()
 
@@ -503,6 +511,18 @@ const saveDraft = async () => {
   margin-top: 2px;
   font-size: 12px;
   color: #888;
+}
+
+
+.item-label {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #111;
+  background: #f5c518;
+  padding: 2px 8px;
+  border-radius: 999px;
+  width: fit-content;
 }
 
 /* ======================
