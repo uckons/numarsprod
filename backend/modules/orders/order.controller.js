@@ -527,40 +527,32 @@ exports.createDraftFromPos = async (req, res) => {
 }
 
 exports.saveDraft = async (req, res) => {
-  const db = req.app.get("db")
-  let inTransaction = false
-
   try {
-    const idOrder = parseOrderId(req.params.id)
+    const db = req.app.get("db")
+    const orderId = parseOrderId(req.params.id)
+    const orderId = req.params.id
     const { items } = req.body
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Item kosong" })
     }
 
-    await db.query("BEGIN")
-    inTransaction = true
-
-    await db.query("DELETE FROM order_items WHERE order_id = $1", [idOrder])
+    await db.query(`DELETE FROM order_items WHERE order_id = $1`, [orderId])
 
     let total = 0
+    for (const i of items) {
+      const svcRes = await db.query(`SELECT name FROM services WHERE id = $1`, [i.id])
+      if (!svcRes.rows.length) throw new Error("Service tidak ditemukan")
 
-    for (const item of items) {
-      const svcRes = await db.query("SELECT name FROM services WHERE id = $1", [item.id])
-
-      if (!svcRes.rows.length) {
-        throw new Error("Service tidak ditemukan")
-      }
-
-      const qty = Number(item.qty || 1)
-      const unitPrice = Number(item.base_price ?? 0)
+      const qty = Number(i.qty || 1)
+      const unitPrice = Number(i.base_price ?? 0)
       const subtotal = qty * unitPrice
       total += subtotal
 
       await db.query(
         `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal)
          VALUES ($1,$2,$3,$4,$5,$6)`,
-        [idOrder, item.id, item.name || svcRes.rows[0].name, qty, unitPrice, subtotal]
+        [orderId, i.id, i.name || svcRes.rows[0].name, qty, unitPrice, subtotal]
       )
     }
 
@@ -568,22 +560,11 @@ exports.saveDraft = async (req, res) => {
       `UPDATE orders
        SET status = 'DRAFT', total = $2, total_amount = $2
        WHERE id = $1`,
-      [idOrder, total]
+      [orderId, total]
     )
 
-    await db.query("COMMIT")
-    inTransaction = false
-
-    res.json({ success: true, order_id: idOrder, status: "DRAFT", total })
+    res.json({ success: true, order_id: Number(orderId), status: "DRAFT", total })
   } catch (err) {
-    try {
-      if (inTransaction) {
-        await db.query("ROLLBACK")
-      }
-    } catch (rollbackErr) {
-      console.error("ROLLBACK SAVE DRAFT ERROR:", rollbackErr)
-    }
-
     console.error("SAVE DRAFT ERROR:", err)
     res.status(400).json({ message: err.message })
   }
