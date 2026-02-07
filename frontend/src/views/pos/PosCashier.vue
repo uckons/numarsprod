@@ -41,11 +41,13 @@ const loadOrder = async (orderId) => {
 pos.currentOrderId = orderId
       
       // Add items ke store
+      pos.clear()
       order.items.forEach(item => {
         const cartItem = {
           id: item.service_id,
           name: item.service_name,
           base_price: item.price,
+          price_label: item.price_label || null,
           qty: 1
         }
         
