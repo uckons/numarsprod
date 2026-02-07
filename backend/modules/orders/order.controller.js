@@ -1,6 +1,14 @@
 const service = require("./order.service")
 const stockService = require("../stock/stock.service")
 
+const parseOrderId = (rawId) => {
+  const orderId = Number(rawId)
+  if (!Number.isInteger(orderId) || orderId <= 0) {
+    throw new Error("Invalid order id")
+  }
+  return orderId
+}
+
 exports.create = async (req, res) => {
   try {
     const db = req.app.get("db")
@@ -16,7 +24,7 @@ exports.create = async (req, res) => {
 exports.addItem = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const orderId = req.params.id
+    const orderId = parseOrderId(req.params.id)
     const { service_id, qty } = req.body
 
     const item = await service.addItem(db, orderId, service_id, qty || 1)
@@ -41,7 +49,7 @@ exports.getAll = async (req, res) => {
 exports.close = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const orderId = req.params.id
+    const orderId = parseOrderId(req.params.id)
     const { items, payment_method } = req.body
     const orderStatusRes = await db.query(
       "SELECT status FROM orders WHERE id = $1",
@@ -229,7 +237,7 @@ exports.close = async (req, res) => {
 //exports.cancel = async (req, res) => {
 //  try {
 //    const db = req.app.get("db")
-//    const orderId = req.params.id
+//    const orderId = parseOrderId(req.params.id)
 
 //    await db.query(
 //      `DELETE FROM order_items WHERE order_id=$1`,
@@ -248,11 +256,11 @@ exports.close = async (req, res) => {
 //}
 exports.cancel = async (req, res) => {
   const db = req.app.get("db")
-  const { id } = req.params
+  const orderId = parseOrderId(req.params.id)
 
   await db.query(
     "UPDATE orders SET status='CANCELLED' WHERE id=$1",
-    [id]
+    [orderId]
   )
 
   res.json({ success: true })
@@ -521,6 +529,7 @@ exports.createDraftFromPos = async (req, res) => {
 exports.saveDraft = async (req, res) => {
   try {
     const db = req.app.get("db")
+    const orderId = parseOrderId(req.params.id)
     const orderId = req.params.id
     const { items } = req.body
 
@@ -678,7 +687,7 @@ exports.getKasirOrders = async (req, res) => {
 }
 exports.getById = async (req, res) => {
   const db = req.app.get("db")
-  const orderId = req.params.id
+  const orderId = parseOrderId(req.params.id)
 
   try {
     const { rows } = await db.query(
@@ -717,7 +726,7 @@ exports.getById = async (req, res) => {
 exports.getOrderDetail = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const { id } = req.params
+    const orderId = parseOrderId(req.params.id)
     const branchId = req.user.branch_id
 
     // Get order header
@@ -739,7 +748,7 @@ exports.getOrderDetail = async (req, res) => {
       LEFT JOIN branches b ON b.id = o.branch_id
       LEFT JOIN users u ON u.id = o.user_id
       WHERE o.id = $1 AND o.branch_id = $2
-    `, [id, branchId])
+    `, [orderId, branchId])
 
     if (orderRows.length === 0) {
       return res.status(404).json({ message: "Order not found" })

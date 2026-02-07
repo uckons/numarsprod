@@ -9,6 +9,8 @@ router.get("/", auth, controller.getAll)
 router.get("/kasir", auth, controller.getKasirOrders)
 
 // CREATE FROM POS (static routes MUST be before "/:id" routes)
+
+// CREATE FROM POS (static routes MUST be before "/:id" routes)
 router.get("/kasir",auth,controller.getKasirOrders)
 // GET ORDER BY ID
 router.get("/:id(\\d+)", auth, controller.getById)
