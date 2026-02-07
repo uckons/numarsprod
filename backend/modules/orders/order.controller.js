@@ -58,47 +58,18 @@ exports.close = async (req, res) => {
       
       // Insert items baru
       for (const i of items) {
-        // Get service name from services table
         const svcResult = await db.query(
-        `
-          SELECT
-            s.name,
-            CASE
-              WHEN s.type = 'FNB'
-                AND fi.is_beverage = true
-                AND COALESCE(fi.is_package, false) = false
-                AND fi.happy_hour_enabled = true
-                AND fi.happy_hour_price IS NOT NULL
-                AND hh_active.active = true
-              THEN fi.happy_hour_price
-              WHEN s.type IN ('SPA', 'LC')
-                AND s.happy_hour_enabled = true
-                AND s.happy_hour_price IS NOT NULL
-                AND hh_active.active = true
-              THEN s.happy_hour_price
-              ELSE s.base_price
-            END AS base_price
-          FROM services s
-          LEFT JOIN fnb_items fi ON fi.service_id = s.id
-          LEFT JOIN LATERAL (
-            SELECT true AS active
-            FROM happy_hours hh
-            WHERE hh.branch_id = s.branch_id
-              AND hh.is_active = true
-              AND CURRENT_TIME BETWEEN hh.start_time AND hh.end_time
-              AND (hh.service_type IS NULL OR hh.service_type = s.type::text OR hh.service_type = 'ALL')
-            LIMIT 1
-          ) hh_active ON true
-          WHERE s.id = $1
-          `,
+          `SELECT name FROM services WHERE id = $1`,
           [i.id]
         )
-        const serviceName = svcResult.rows[0]?.name || i.name || 'Unknown Service'
-        const unitPrice = Number(svcResult.rows[0]?.base_price ?? i.base_price ?? 0)
+        const serviceName = i.name || svcResult.rows[0]?.name || "Unknown Service"
+        const qty = Number(i.qty || 1)
+        const unitPrice = Number(i.base_price ?? 0)
+
         await db.query(
           `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal)
            VALUES ($1, $2, $3, $4, $5, $6)`,
-           [orderId, i.id, serviceName, i.qty, unitPrice, i.qty * unitPrice]
+           [orderId, i.id, serviceName, qty, unitPrice, qty * unitPrice]
         )
       }
     //}
@@ -328,41 +299,8 @@ exports.createFromPos = async (req, res) => {
 
     // 4️⃣ loop item (SATU KALI SAJA)
     for (const i of items) {
-      // ambil service dari DB (WAJIB)
       const svcRes = await db.query(
-        `
-        SELECT
-          s.id,
-          s.name,
-          s.duration_minutes,
-          CASE
-            WHEN s.type = 'FNB'
-              AND fi.is_beverage = true
-              AND COALESCE(fi.is_package, false) = false
-              AND fi.happy_hour_enabled = true
-              AND fi.happy_hour_price IS NOT NULL
-              AND hh_active.active = true
-            THEN fi.happy_hour_price
-            WHEN s.type IN ('SPA', 'LC')
-              AND s.happy_hour_enabled = true
-              AND s.happy_hour_price IS NOT NULL
-              AND hh_active.active = true
-            THEN s.happy_hour_price
-            ELSE s.base_price
-          END AS base_price
-        FROM services s
-        LEFT JOIN fnb_items fi ON fi.service_id = s.id
-        LEFT JOIN LATERAL (
-          SELECT true AS active
-          FROM happy_hours hh
-          WHERE hh.branch_id = s.branch_id
-            AND hh.is_active = true
-            AND CURRENT_TIME BETWEEN hh.start_time AND hh.end_time
-            AND (hh.service_type IS NULL OR hh.service_type = s.type::text OR hh.service_type = 'ALL')
-          LIMIT 1
-        ) hh_active ON true
-        WHERE s.id=$1
-        `,
+        `SELECT id, name, duration_minutes FROM services WHERE id=$1`,
         [i.id]
       )
 
@@ -372,12 +310,11 @@ exports.createFromPos = async (req, res) => {
 
       const svc = svcRes.rows[0]
       const qty = Number(i.qty || 1)
-      const unitPrice = Number(svc.base_price)
+      const unitPrice = Number(i.base_price ?? 0)
       const subtotal = unitPrice * qty
 
       total += subtotal
 
-      // insert order_items
       await db.query(
         `
         INSERT INTO order_items
@@ -385,10 +322,9 @@ exports.createFromPos = async (req, res) => {
         VALUES
           ($1,$2,$3,$4,$5,$6)
         `,
-        [orderId, svc.id, svc.name, qty, unitPrice, subtotal]
+        [orderId, svc.id, i.name || svc.name, qty, unitPrice, subtotal]
       )
 
-      // ⏱️ AUTO TIMER (SPA / LC / SERVICE BERDURASI)
       if (svc.duration_minutes && svc.duration_minutes > 0) {
         await db.query(
           `
@@ -581,6 +517,50 @@ exports.createDraftFromPos = async (req, res) => {
     res.status(500).json({ message: err.message })
   }
 }
+
+exports.saveDraft = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const orderId = req.params.id
+    const { items } = req.body
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "Item kosong" })
+    }
+
+    await db.query(`DELETE FROM order_items WHERE order_id = $1`, [orderId])
+
+    let total = 0
+    for (const i of items) {
+      const svcRes = await db.query(`SELECT name FROM services WHERE id = $1`, [i.id])
+      if (!svcRes.rows.length) throw new Error("Service tidak ditemukan")
+
+      const qty = Number(i.qty || 1)
+      const unitPrice = Number(i.base_price ?? 0)
+      const subtotal = qty * unitPrice
+      total += subtotal
+
+      await db.query(
+        `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [orderId, i.id, i.name || svcRes.rows[0].name, qty, unitPrice, subtotal]
+      )
+    }
+
+    await db.query(
+      `UPDATE orders
+       SET status = 'DRAFT', total = $2, total_amount = $2
+       WHERE id = $1`,
+      [orderId, total]
+    )
+
+    res.json({ success: true, order_id: Number(orderId), status: "DRAFT", total })
+  } catch (err) {
+    console.error("SAVE DRAFT ERROR:", err)
+    res.status(400).json({ message: err.message })
+  }
+}
+
 exports.getKasirOrders = async (req, res) => {
   try {
     const db = req.app.get("db")
@@ -708,7 +688,7 @@ exports.getById = async (req, res) => {
         json_agg(
           json_build_object(
             'service_id', oi.service_id,
-            'service_name', s.name,
+            'service_name', oi.service_name,
             'qty', oi.qty,
             'price', oi.price,
             'subtotal', oi.subtotal
