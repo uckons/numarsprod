@@ -36,6 +36,7 @@ const selectedRoom = ref(null)
         package_service_id: service.package_service_id || null,
         package_price: Number(service.package_price || 0) || null,
         package_name: service.package_name || null,
+        locked_package: Boolean(service.locked_package),
         cart_key: key,
         qty: 1
       })
@@ -100,6 +101,7 @@ function findByCartKey(cartKey) {
       addService({
         ...packageService,
         is_package: true,
+        locked_package: true,
         price_label: 'PAKET',
         base_price: Number(packageService.base_price)
       })

@@ -489,9 +489,12 @@ const loadOrders = async () => {
 const loadTherapists = async () => {
   try {
     const res = await api.get("/therapists")
-    therapists.value = res.data
+    therapists.value = Array.isArray(res.data)
+      ? res.data
+      : (res.data?.data || [])
   } catch (err) {
     console.error("Failed to load therapists:", err)
+    therapists.value = []
   }
 }
 
