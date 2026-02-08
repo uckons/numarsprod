@@ -10,26 +10,26 @@
       v-for="i in items"
       :key="i.cart_key || `${i.id}-${i.base_price}-${i.price_label || ''}`"
       class="cart-item"
-      :class="{ locked: i.is_package }"
+      :class="{ locked: i.locked_package }"
     >
       <div class="info">
         <strong>{{ i.name }}</strong>
         <small>Rp {{ format(i.base_price) }}</small>
         <small v-if="i.price_label" class="item-label">{{ i.price_label }}</small>
-        <small v-if="i.is_package" class="item-locked">LOCKED PAKET</small>
+        <small v-if="i.locked_package" class="item-locked">LOCKED PAKET</small>
       </div>
 
       <div class="qty">
-        <button @click="dec(i)" :disabled="i.is_package">−</button>
+        <button @click="dec(i)" :disabled="i.locked_package">−</button>
         <span>{{ i.qty }}</span>
-        <button @click="inc(i)" :disabled="i.is_package">+</button>
+        <button @click="inc(i)" :disabled="i.locked_package">+</button>
       </div>
 
       <div class="total">
         Rp {{ format(i.base_price * i.qty) }}
       </div>
 
-      <button class="remove" @click="remove(i)" :disabled="i.is_package">✕</button>
+      <button class="remove" @click="remove(i)" :disabled="i.locked_package">✕</button>
     </div>
 
     <div v-if="items.length" class="summary">
