@@ -70,11 +70,15 @@ onMounted(async () => {
   services.value = res.data.data || res.data
 })
 
+const sellableServices = computed(() =>
+  services.value.filter(s => !(s.type === 'FNB' && s.is_package))
+)
+
 const filteredServices = computed(() => {
   if (activeCategory.value === "ALL") {
-    return services.value
+    return sellableServices.value
   }
-  return services.value.filter(
+  return sellableServices.value.filter(
     s => s.type === activeCategory.value
   )
 })
@@ -88,15 +92,18 @@ const packageByGroup = computed(() => {
 
 const enrichService = (service) => {
   if (service.type !== 'FNB' || service.is_package) return service
-  if (!service.package_group || !Number(service.package_qty || 0)) return service
+  if (!service.package_group) return service
 
   const pkg = packageByGroup.value.get(service.package_group)
   if (!pkg) return service
 
+  const packageQty = Number(service.package_qty || pkg.package_qty || 0)
+  if (!packageQty) return service
+
   return {
     ...service,
     package_group: service.package_group || pkg.package_group,
-    package_qty: Number(pkg.package_qty || service.package_qty || 0),
+    package_qty: packageQty,
     package_service_id: pkg.id,
     package_price: Number(pkg.base_price || 0),
     package_name: pkg.name || service.name,
