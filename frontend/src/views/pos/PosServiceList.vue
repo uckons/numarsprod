@@ -95,6 +95,8 @@ const enrichService = (service) => {
 
   return {
     ...service,
+    package_group: service.package_group || pkg.package_group,
+    package_qty: Number(pkg.package_qty || service.package_qty || 0),
     package_service_id: pkg.id,
     package_price: Number(pkg.base_price || 0),
     package_name: pkg.name || service.name,
