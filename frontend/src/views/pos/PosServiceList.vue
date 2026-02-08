@@ -70,8 +70,23 @@ onMounted(async () => {
   services.value = res.data.data || res.data
 })
 
+const regularPackageGroups = computed(() => {
+  const groups = new Set()
+  services.value
+    .filter(s => s.type === 'FNB' && !s.is_package && s.package_group)
+    .forEach(s => groups.add(s.package_group))
+  return groups
+})
+
 const sellableServices = computed(() =>
-  services.value.filter(s => !(s.type === 'FNB' && s.is_package))
+  services.value.filter((s) => {
+    // Hide package variant only when regular variant in same group exists.
+    // If package is the only configured variant, keep it visible in kasir list.
+    if (s.type === 'FNB' && s.is_package && s.package_group) {
+      return !regularPackageGroups.value.has(s.package_group)
+    }
+    return true
+  })
 )
 
 const filteredServices = computed(() => {
