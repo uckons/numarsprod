@@ -10,24 +10,26 @@
       v-for="i in items"
       :key="i.cart_key || `${i.id}-${i.base_price}-${i.price_label || ''}`"
       class="cart-item"
+      :class="{ locked: i.is_package }"
     >
       <div class="info">
         <strong>{{ i.name }}</strong>
         <small>Rp {{ format(i.base_price) }}</small>
         <small v-if="i.price_label" class="item-label">{{ i.price_label }}</small>
+        <small v-if="i.is_package" class="item-locked">LOCKED PAKET</small>
       </div>
 
       <div class="qty">
-        <button @click="dec(i)">−</button>
+        <button @click="dec(i)" :disabled="i.is_package">−</button>
         <span>{{ i.qty }}</span>
-        <button @click="inc(i)">+</button>
+        <button @click="inc(i)" :disabled="i.is_package">+</button>
       </div>
 
       <div class="total">
         Rp {{ format(i.base_price * i.qty) }}
       </div>
 
-      <button class="remove" @click="remove(i)">✕</button>
+      <button class="remove" @click="remove(i)" :disabled="i.is_package">✕</button>
     </div>
 
     <div v-if="items.length" class="summary">
@@ -579,6 +581,23 @@ const saveDraft = async () => {
   padding: 2px 8px;
   border-radius: 999px;
   width: fit-content;
+}
+
+.item-locked {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #888;
+}
+
+.cart-item.locked {
+  opacity: .92;
+}
+
+.cart-item.locked .qty button,
+.cart-item.locked .remove {
+  opacity: .45;
+  cursor: not-allowed;
 }
 
 /* ======================
