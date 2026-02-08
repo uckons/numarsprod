@@ -186,7 +186,7 @@
               <span>Paket Minuman</span>
               <input v-model="form.is_package" type="checkbox" />
             </label>
-              <label>
+            <label>
               Qty Paket
               <input
                 v-model.number="form.package_qty"

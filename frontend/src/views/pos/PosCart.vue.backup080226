@@ -228,41 +228,6 @@ const grandTotal = computed(() =>
   items.value.reduce((sum, i) => sum + Number(i.base_price) * i.qty, 0)
 )
 
-const toPayloadItems = () => {
-  const normalized = []
-
-  for (const i of items.value) {
-    const qty = Number(i.qty || 0)
-    const packageQty = Number(i.package_qty || 0)
-    const packagePrice = Number(i.package_price || 0)
-    const canConvert = !i.is_package && i.package_service_id && packageQty > 0 && qty > 0 && qty % packageQty === 0 && packagePrice > 0
-
-    if (canConvert) {
-      const packageCount = qty / packageQty
-      normalized.push({
-        id: i.package_service_id,
-        qty: packageCount,
-        base_price: packagePrice,
-        name: i.package_name || i.name,
-        price_label: "PAKET",
-        is_package: true
-      })
-      continue
-    }
-
-    normalized.push({
-      id: i.id,
-      qty: i.qty,
-      base_price: i.base_price,
-      name: i.name,
-      price_label: i.price_label,
-      is_package: Boolean(i.is_package)
-    })
-  }
-
-  return normalized
-}
-
 const loading = ref(false)
 const lastOrder = ref({
   order_id: null,
@@ -333,7 +298,14 @@ const checkout = async () => {
   loading.value = true
   try {
     const payload = {
-      items: toPayloadItems(),
+      items: items.value.map(i => ({
+        id: i.id,
+        qty: i.qty,
+        base_price: i.base_price,
+        name: i.name,
+        price_label: i.price_label,
+        is_package: Boolean(i.is_package)
+      })),
       payment_method: "CASH"
     }
     
@@ -480,7 +452,14 @@ const saveDraft = async () => {
   loading.value = true
   try {
     const payload = {
-      items: toPayloadItems()
+      items: items.value.map(i => ({
+        id: i.id,
+        qty: i.qty,
+        base_price: i.base_price,
+        name: i.name,
+        price_label: i.price_label,
+        is_package: Boolean(i.is_package)
+      }))
     }
 
     if (pos.currentOrderId) {
@@ -569,6 +548,7 @@ const saveDraft = async () => {
   font-size: 12px;
   color: #888;
 }
+
 
 .item-label {
   display: inline-block;

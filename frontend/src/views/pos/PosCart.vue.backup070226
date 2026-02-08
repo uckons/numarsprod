@@ -174,41 +174,7 @@ const router = useRouter()
 const pos = usePosStore()
 
 const items = computed(() => pos.items || [])
-const maybeOfferPackage = async (cartItem) => {
-  if (!cartItem || cartItem.is_package) return
-
-const packageQty = Number(cartItem.package_qty || 0)
-  if (!packageQty || cartItem.qty % packageQty !== 0) return
-
-  const res = await SwalTheme.fire({
-    icon: "question",
-    title: "Jadikan paket?",
-    text: `Qty ${cartItem.name} sudah ${cartItem.qty}. Gunakan harga paket?`,
-    showCancelButton: true,
-    confirmButtonText: "Ya, jadikan paket",
-    cancelButtonText: "Tidak"
-  })
-
-  if (!res.isConfirmed) return
-
-  const packageService = {
-    id: cartItem.package_service_id,
-    name: cartItem.package_name || cartItem.name,
-    base_price: Number(cartItem.package_price || 0),
-    price_label: "PAKET",
-    is_package: true,
-    package_group: cartItem.package_group,
-    package_qty: cartItem.package_qty
-  }
-
-  pos.convertToPackage(cartItem.cart_key, packageService)
-}
-
-const inc = async (i) => {
-  pos.inc(i.id, i.cart_key)
-  const updated = pos.findByCartKey(i.cart_key)
-  await maybeOfferPackage(updated)
-}
+const inc = (i) => pos.inc(i.id, i.cart_key)
 const dec = (i) => pos.dec(i.id, i.cart_key)
 const remove = (item) => pos.remove(item.id, item.cart_key)
 
@@ -227,41 +193,6 @@ const SwalTheme = Swal.mixin({
 const grandTotal = computed(() =>
   items.value.reduce((sum, i) => sum + Number(i.base_price) * i.qty, 0)
 )
-
-const toPayloadItems = () => {
-  const normalized = []
-
-  for (const i of items.value) {
-    const qty = Number(i.qty || 0)
-    const packageQty = Number(i.package_qty || 0)
-    const packagePrice = Number(i.package_price || 0)
-    const canConvert = !i.is_package && i.package_service_id && packageQty > 0 && qty > 0 && qty % packageQty === 0 && packagePrice > 0
-
-    if (canConvert) {
-      const packageCount = qty / packageQty
-      normalized.push({
-        id: i.package_service_id,
-        qty: packageCount,
-        base_price: packagePrice,
-        name: i.package_name || i.name,
-        price_label: "PAKET",
-        is_package: true
-      })
-      continue
-    }
-
-    normalized.push({
-      id: i.id,
-      qty: i.qty,
-      base_price: i.base_price,
-      name: i.name,
-      price_label: i.price_label,
-      is_package: Boolean(i.is_package)
-    })
-  }
-
-  return normalized
-}
 
 const loading = ref(false)
 const lastOrder = ref({
@@ -333,7 +264,13 @@ const checkout = async () => {
   loading.value = true
   try {
     const payload = {
-      items: toPayloadItems(),
+      items: items.value.map(i => ({
+        id: i.id,
+        qty: i.qty,
+        base_price: i.base_price,
+        name: i.name,
+        price_label: i.price_label
+      })),
       payment_method: "CASH"
     }
     
@@ -480,7 +417,13 @@ const saveDraft = async () => {
   loading.value = true
   try {
     const payload = {
-      items: toPayloadItems()
+      items: items.value.map(i => ({
+        id: i.id,
+        qty: i.qty,
+        base_price: i.base_price,
+        name: i.name,
+        price_label: i.price_label
+      }))
     }
 
     if (pos.currentOrderId) {
@@ -569,6 +512,7 @@ const saveDraft = async () => {
   font-size: 12px;
   color: #888;
 }
+
 
 .item-label {
   display: inline-block;

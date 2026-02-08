@@ -1,9 +1,22 @@
 exports.createOrder = async (db, user) => {
+  let branchId = user.branch_id
+
+  if (!branchId && user?.id) {
+    const userRes = await db.query(
+      "SELECT branch_id FROM users WHERE id=$1",
+      [user.id]
+    )
+    branchId = userRes.rows[0]?.branch_id || null
+  }
+
+  if (!branchId) {
+    throw new Error("User belum terikat ke branch")
+  }
   const { rows } = await db.query(
     `INSERT INTO orders (branch_id, cashier_id, status, total)
      VALUES ($1, $2, 'OPEN', 0)
      RETURNING *`,
-    [user.branch_id, user.id]
+    [branchId, user.id]
   )
 
   return rows[0]

@@ -45,7 +45,6 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue"
-import Swal from "sweetalert2"
 import api from "@/services/api"
 import { usePosStore } from "@/store/pos.store"
 const pos = usePosStore()
@@ -70,6 +69,21 @@ onMounted(async () => {
   services.value = res.data.data || res.data
 })
 
+//const addToCart = (service) => {
+//  console.log("CLICK SERVICE =>", service) // ?? DEBUG
+//  pos.add({
+//    id: service.id,
+//    name: service.name,
+//    price: Number(service.base_price),
+//    qty: 1
+//  })
+//}
+
+//const clickService = (s) => {
+//  console.log("CLICK SERVICE =>", s)
+//  pos.addService(s)
+//  console.log("ITEMS NOW =>", pos.items)
+//}
 const filteredServices = computed(() => {
   if (activeCategory.value === "ALL") {
     return services.value
@@ -78,66 +92,29 @@ const filteredServices = computed(() => {
     s => s.type === activeCategory.value
   )
 })
-const packageByGroup = computed(() => {
-  const map = new Map()
-  services.value
-    .filter(s => s.type === 'FNB' && s.is_package && s.package_group)
-    .forEach(s => map.set(s.package_group, s))
-  return map
-})
 
-const enrichService = (service) => {
-  if (service.type !== 'FNB' || service.is_package) return service
-  if (!service.package_group || !Number(service.package_qty || 0)) return service
-
-  const pkg = packageByGroup.value.get(service.package_group)
-  if (!pkg) return service
-
-  return {
-    ...service,
-    package_service_id: pkg.id,
-    package_price: Number(pkg.base_price || 0),
-    package_name: pkg.name || service.name,
-    package_label: 'PAKET'
-  }
-}
-
-const maybeOfferPackage = async (cartKey) => {
-  const item = pos.findByCartKey(cartKey)
-  if (!item || item.is_package) return
-
-  const packageQty = Number(item.package_qty || 0)
-  if (!packageQty || item.qty % packageQty !== 0) return
-
-  const packageService = services.value.find(s => s.id === item.package_service_id)
-  if (!packageService) return
-
-  const confirm = await Swal.fire({
-    icon: 'question',
-    title: 'Jadikan paket?',
-    text: `Qty ${item.name} sudah ${item.qty}. Gunakan harga paket?`,
-    showCancelButton: true,
-    confirmButtonText: 'Ya, jadikan paket',
-    cancelButtonText: 'Tidak'
-  })
-
-  if (confirm.isConfirmed) {
-    pos.convertToPackage(item.cart_key, packageService)
-  }
-}
-
+//const select = (service) => {
+//  emit("select", service)
+// }
+//const select = (service) => {
+//  pos.add(service)
+//}
+//const addToCart = (service) => {
+//  console.log("CLICK SERVICE:", service)
+//  pos.add(service)
+//}
+//const selectService = (s) => {
+//  console.log("CLICK SERVICE =>", s)
+//  pos.addService(s)
+//}
 const select = async (service) => {
-  const enriched = enrichService(service)
-  pos.addService(enriched)
+//  console.log("CLICK SERVICE =>", service)
 
-  const key = [
-    enriched.id,
-    Number(enriched.base_price || 0),
-    enriched.price_label || "",
-    enriched.is_package ? "P" : "N"
-  ].join(":")
+//  if (!pos.orderId) {
+//    await pos.createOrder()
+//  }
 
-  await maybeOfferPackage(key)
+  pos.addService(service)
 }
 const format = (v) =>
   Number(v || 0).toLocaleString("id-ID")

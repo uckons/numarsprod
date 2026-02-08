@@ -161,20 +161,13 @@
 
     <!-- AKSI -->
     <td>
-      <template v-if="o.status === 'DRAFT'">
-        <button
-          class="btn add-item"
-          @click="addItemToDraft(o)"
-        >
-          + Item
-        </button>
-        <button
-          class="btn pay"
-          @click="confirmPay(o)"
-        >
-          PAY
-        </button>
-      </template>
+      <button
+        v-if="o.status === 'DRAFT'"
+        class="btn pay"
+        @click="confirmPay(o)"
+      >
+        PAY
+      </button>
       <button
         v-else-if="o.status === 'PAID'"
         class="btn print"
@@ -386,7 +379,7 @@
 
 </template>
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from "vue"
+import { ref, onMounted, watch } from "vue"
 import { useRouter } from "vue-router"
 import Swal from "sweetalert2"
 import api from "@/services/api"
@@ -398,7 +391,7 @@ const loading = ref(false)
 // 🔍 FILTER STATE
 const filters = ref({
   status: 'ALL',
-  dateRange: 'all',
+  dateRange: 'today',
   dateFrom: '',
   dateTo: '',
   therapistId: '',
@@ -532,14 +525,6 @@ const confirmPay = async (order) => {
     query: { order_id: order.id }
   })
 }
-const addItemToDraft = (order) => {
-  router.push({
-    path: "/kasir/pos",
-    query: { order_id: order.id }
-  })
-}
-
-let poller = null
 
 // 🔙 GO BACK
 const goBack = () => {
@@ -550,7 +535,7 @@ const goBack = () => {
 const resetFilters = () => {
   filters.value = {
     status: 'ALL',
-    dateRange: 'all',
+    dateRange: 'today',
     dateFrom: '',
     dateTo: '',
     therapistId: '',
@@ -659,14 +644,6 @@ onMounted(() => {
   loadOrders()
   loadTherapists()
   loadRooms()
-
-  poller = setInterval(() => {
-    loadOrders()
-  }, 10000)
-})
-
-onBeforeUnmount(() => {
-  if (poller) clearInterval(poller)
 })
 </script>
 <style scoped>
@@ -776,25 +753,13 @@ th {
   transform: scale(1.05);
 }
 
-/* Hover effect untuk tombol aksi */
-.btn.add-item {
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid #3a2e12;
-  background: #1c1c1c;
-  color: #c9a24d;
-  font-weight: 700;
-  cursor: pointer;
-  margin-right: 6px;
-  transition: all 0.3s ease-out;
-}
+/* Hover effect untuk PAY button */
 .btn.pay {
   transition: all 0.3s ease-out;
 }
 
-.orders-table tbody tr:hover .btn.add-item,
 .orders-table tbody tr:hover .btn.pay {
-  transform: scale(1.05);
+  transform: scale(1.1);
   box-shadow: 0 4px 12px rgba(201, 162, 77, 0.4);
 }
 .service-item small {
@@ -826,17 +791,6 @@ th {
 .badge.paid {
   background: #22c55e;
   color: #000;
-}
-
-.btn.add-item {
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid #3a2e12;
-  background: #1c1c1c;
-  color: #c9a24d;
-  font-weight: 700;
-  cursor: pointer;
-  margin-right: 6px;
 }
 
 .btn.pay {

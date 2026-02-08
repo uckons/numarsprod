@@ -31,11 +31,6 @@ const selectedRoom = ref(null)
         base_price: Number(service.base_price),
         price_label: service.price_label || null,
         is_package: Boolean(service.is_package),
-        package_qty: Number(service.package_qty || 0),
-        package_group: service.package_group || null,
-        package_service_id: service.package_service_id || null,
-        package_price: Number(service.package_price || 0) || null,
-        package_name: service.package_name || null,
         cart_key: key,
         qty: 1
       })
@@ -77,35 +72,6 @@ const selectedRoom = ref(null)
 function setRoom(room) {
   selectedRoom.value = room
 }
-function findByCartKey(cartKey) {
-    return items.value.find(i => i.cart_key === cartKey)
-  }
-
-  function convertToPackage(cartKey, packageService) {
-    const item = findByCartKey(cartKey)
-    if (!item || !packageService) return
-
-    const packageQty = Number(packageService.package_qty || item.package_qty || 0)
-    if (!packageQty || item.qty < packageQty) return
-
-    const bundles = Math.floor(item.qty / packageQty)
-    const remainder = item.qty % packageQty
-
-    item.qty = remainder
-    if (item.qty === 0) {
-      items.value = items.value.filter(i => i.cart_key !== cartKey)
-    }
-
-    for (let idx = 0; idx < bundles; idx += 1) {
-      addService({
-        ...packageService,
-        is_package: true,
-        price_label: 'PAKET',
-        base_price: Number(packageService.base_price)
-      })
-    }
-  }
-
   // 🔥 AUTO SAVE
   watch(
     items,
@@ -126,8 +92,6 @@ function findByCartKey(cartKey) {
   dec,
   remove,
   clear,
-  findByCartKey,
-  convertToPackage,
   setTherapist,         // 🆕
   setRoom              // 🆕
 }

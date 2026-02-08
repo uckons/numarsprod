@@ -47,8 +47,6 @@ exports.list = async ({ branch_id, type }) => {
         ELSE NULL
       END AS price_label,
       COALESCE(fi.is_package, false) AS is_package,
-      fi.package_qty,
-      fi.package_group,
       s.duration_minutes,
       s.is_active,
       s.happy_hour_enabled,

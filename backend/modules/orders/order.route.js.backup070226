@@ -6,7 +6,7 @@ const controller = require("./order.controller")
 
 router.get("/", auth, controller.getAll)
 router.get("/kasir", auth, controller.getKasirOrders)
-// CREATE FROM POS (static routes MUST be before "/:id" routes)
+
 router.post(
   "/pos",
   auth,
@@ -31,18 +31,13 @@ router.post(
   controller.createDraftFromPos
 )
 
-// CREATE EMPTY ORDER (kasir buka order)
 router.post("/", auth, controller.create)
 
-// 🖨️ GET ORDER DETAIL FOR REPRINT
-router.get("/:id/detail", auth, controller.getOrderDetail)
-// GET ORDER BY ID
 router.get("/:id", auth, controller.getById)
+router.get("/:id/detail", auth, controller.getOrderDetail)
 
-// ADD ITEM TO ORDER
 router.post("/:id/items", auth, controller.addItem)
 
-// CLOSE / DRAFT / CANCEL ORDER
 router.post("/:id/close", auth, controller.close)
 router.post("/:id/draft", auth, controller.saveDraft)
 router.delete("/:id", auth, controller.cancel)

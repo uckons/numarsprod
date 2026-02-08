@@ -30,6 +30,24 @@ exports.start = async (req, res) => {
   }
 }
 
+//exports.getActive = async (req, res) => {
+//  try {
+//    const db = req.app.get("db")
+//    const branch_id = req.user.branch_id
+
+//    const timers = await service.getActiveTimers(db, branch_id)
+//    res.json(timers)
+//  } catch (err) {
+//    res.status(400).json({ message: err.message })
+//  }
+//}
+//exports.getActive = async (req, res) => {
+// const db = req.app.get("db")
+//  const branchId = req.user.branch_id
+
+//  const timers = await service.getActiveTimers(db, branchId)
+//  res.json(timers)
+//}
 exports.getActive = async (req, res) => {
   const db = req.app.get("db")
   const timers = await service.getActiveTimers(db, req.user.branch_id)
@@ -40,19 +58,6 @@ exports.startTimer = async (req, res) => {
   try {
     const db = req.app.get("db")
     const user = req.user
-
-    let branchId = user.branch_id
-    if (!branchId && user?.id) {
-      const userRes = await db.query(
-        "SELECT branch_id FROM users WHERE id=$1",
-        [user.id]
-      )
-      branchId = userRes.rows[0]?.branch_id || null
-    }
-
-    if (!branchId) {
-      return res.status(400).json({ message: "User belum terikat ke branch" })
-    }
 
     const {
       order_id,
@@ -104,7 +109,7 @@ exports.startTimer = async (req, res) => {
           ($1, $2, 'DRAFT', 0)
         RETURNING id
         `,
-        [branchId, user.id]
+        [user.branch_id, user.id]
       )
       finalOrderId = rows[0].id
     }
@@ -180,7 +185,7 @@ exports.startTimer = async (req, res) => {
           AND slot_number = $2
           AND end_time IS NULL
         `,
-        [branchId, slot_number]
+        [user.branch_id, slot_number]
       )
 
       if (used.length) {
@@ -223,7 +228,7 @@ exports.startTimer = async (req, res) => {
         room_id,
         start,
         plannedEnd,
-        branchId,
+        user.branch_id,
         slot_number
       ]
     )
@@ -250,7 +255,7 @@ exports.stop = async (req, res) => {
 exports.create = async (req, res) => {
   const db = req.app.get("db")
   const { order_id, service_id, duration_minutes } = req.body
-  const branch_id = req.user.branch_id || null
+  const branch_id = req.user.branch_id
 
   const start = new Date()
   const end = new Date(start.getTime() + duration_minutes * 60000)
@@ -294,7 +299,7 @@ exports.startManual = async (req, res) => {
       [
         order_id,
         service_id,
-        branchId,
+        user.branch_id,
         `${rows[0].duration_minutes} minutes`
       ]
     )
@@ -344,7 +349,7 @@ exports.createFromOrder = async (req, res) => {
         [
           orderId,
           i.service_id,
-          branchId,
+          user.branch_id,
           start,
           end
         ]
