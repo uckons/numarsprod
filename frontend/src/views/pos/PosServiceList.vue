@@ -132,8 +132,8 @@ const enrichService = (service) => {
     package_group: seed.package_group || pkg.package_group,
     package_qty: packageQty,
     package_service_id: pkg.id,
-    package_price: Number(pkg.base_price || 0),
-    package_name: pkg.name || seed.name,
+    package_price: Number(pkg.package_price || pkg.base_price || 0),
+    package_name: pkg.package_name || pkg.name || seed.name,
     package_label: 'PAKET'
   }
 }
