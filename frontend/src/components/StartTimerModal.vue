@@ -59,7 +59,12 @@
           :disabled="loadingTherapists || !serviceType"
         >
           <option value="">-- Pilih Terapis #{{ idx }} --</option>
-          <option v-for="t in therapists" :key="`ther-opt-${idx}-${t.id}`" :value="t.id">
+          <option
+            v-for="t in therapists"
+            :key="`ther-opt-${idx}-${t.id}`"
+            :value="t.id"
+            :disabled="isTherapistDisabled(t.id, idx - 1)"
+          >
             {{ t.name }} <span v-if="t.grade_name">({{ t.grade_name }})</span>
           </option>
         </select>
@@ -201,11 +206,19 @@ const normalizeServicePayload = (payload) => {
   return []
 }
 
+const resizeSelection = (currentValues, qty, { keepFirstValue = false } = {}) => {
+  const next = Array.from({ length: qty }, (_, idx) => {
+    if (currentValues[idx] !== undefined) return currentValues[idx]
+    if (keepFirstValue && idx === 0) return currentValues[0] || ""
+    return ""
+  })
+  return next
+}
+
 const initSelections = () => {
   const qty = Number(selectedServiceQty.value || 1)
-  const firstService = selectedServiceIds.value[0] || ""
-  selectedServiceIds.value = Array(qty).fill(firstService)
-  selectedTherapistIds.value = Array(qty).fill("")
+  selectedServiceIds.value = resizeSelection(selectedServiceIds.value, qty, { keepFirstValue: true })
+  selectedTherapistIds.value = resizeSelection(selectedTherapistIds.value, qty)
 }
 
 const ensureComboBaseService = () => {
@@ -240,6 +253,20 @@ const onServiceSelectionChange = async () => {
   if (!serviceType.value) return
   await fetchTherapists()
   await fetchRooms()
+}
+
+const isTherapistDisabled = (therapistId, currentIndex) => {
+  const normalizedId = Number(therapistId)
+  if (!Number.isInteger(normalizedId) || normalizedId <= 0) return false
+
+  if (therapists.value.find(t => Number(t.id) === normalizedId)?.is_occupied) {
+    return true
+  }
+
+  return selectedTherapistIds.value.some((selectedId, idx) => {
+    if (idx === currentIndex) return false
+    return Number(selectedId) === normalizedId
+  })
 }
 
 const fetchServices = async () => {
