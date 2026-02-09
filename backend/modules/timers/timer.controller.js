@@ -73,9 +73,56 @@ exports.startTimer = async (req, res) => {
     // 🆕 1. AMBIL DATA SERVICE     
     // =========================
     const { rows: serviceRows } = await db.query(
-      `SELECT id, name, type, base_price, duration_minutes 
-       FROM services 
-       WHERE id = $1`,
+      `SELECT
+         s.id,
+         s.name,
+         s.type,
+         s.duration_minutes,
+         CASE
+           WHEN s.type = 'FNB'
+             AND fi.is_beverage = true
+             AND COALESCE(fi.is_package, false) = false
+             AND fi.happy_hour_enabled = true
+             AND fi.happy_hour_price IS NOT NULL
+             AND hh_active.active = true
+           THEN fi.happy_hour_price
+           WHEN s.type IN ('SPA', 'LC', 'LOUNGE')
+             AND s.happy_hour_enabled = true
+             AND s.happy_hour_price IS NOT NULL
+             AND hh_active.active = true
+           THEN s.happy_hour_price
+           ELSE COALESCE(fi.price, s.base_price)
+         END AS base_price
+       FROM services s
+       LEFT JOIN fnb_items fi ON fi.service_id = s.id
+       LEFT JOIN LATERAL (
+         SELECT true AS active
+         FROM happy_hours hh
+         WHERE hh.branch_id = s.branch_id
+           AND hh.is_active = true
+           AND (
+             (
+               hh.start_time <= hh.end_time
+               AND (timezone('Asia/Jakarta', now()))::time BETWEEN hh.start_time AND hh.end_time
+             )
+             OR (
+               hh.start_time > hh.end_time
+               AND (
+                 (timezone('Asia/Jakarta', now()))::time >= hh.start_time
+                 OR (timezone('Asia/Jakarta', now()))::time <= hh.end_time
+               )
+             )
+           )
+           AND (
+             hh.service_type IS NULL
+             OR hh.service_type = s.type::text
+             OR hh.service_type = 'ALL'
+             OR (hh.service_type = 'LC' AND s.type = 'LOUNGE')
+             OR (hh.service_type = 'LOUNGE' AND s.type = 'LC')
+           )
+         LIMIT 1
+       ) hh_active ON true
+       WHERE s.id = $1`,
       [service_id]
     )
 

@@ -28,8 +28,7 @@ exports.list = async ({ branch_id, type, is_active }) => {
       CASE
         WHEN s.type = 'FNB'
           AND COALESCE(fi.is_package, false) = true
-          AND fi.package_price IS NOT NULL
-        THEN fi.package_price
+        THEN COALESCE(fi.price, fi.package_price, s.base_price)
         WHEN s.type = 'FNB'
           AND fi.is_beverage = true
           AND COALESCE(fi.is_package, false) = false
