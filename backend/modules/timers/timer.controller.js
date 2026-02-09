@@ -187,9 +187,15 @@ exports.startTimer = async (req, res) => {
     const requiresTherapist = selectedService.type !== "LOUNGE"
     const requestedComboQty = Number(req.body.combo_qty || 0)
     const comboQtyFromName = parseComboQtyFromName(selectedService.name, selectedService.type)
+    const comboQtyFromPayload = Math.max(
+      Array.isArray(service_ids) ? service_ids.length : 0,
+      Array.isArray(therapist_ids) ? therapist_ids.length : 0
+    )
     const comboQty = Number.isInteger(requestedComboQty) && requestedComboQty > 1
       ? requestedComboQty
-      : comboQtyFromName
+      : comboQtyFromPayload > 1
+        ? comboQtyFromPayload
+        : comboQtyFromName
     const selectedTherapistIds = normalizeTherapistIds(therapist_id, therapist_ids)
 
     if (comboQty > 1 && !['SPA', 'LC'].includes(selectedService.type)) {
