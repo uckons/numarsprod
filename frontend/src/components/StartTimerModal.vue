@@ -145,7 +145,24 @@ const comboQty = computed(() => parseComboQty(selectedService.value))
 // Methods
 const normalizeServicePayload = (payload) => {
   if (Array.isArray(payload)) return payload
-  if (Array.isArray(payload?.data)) return payload.data
+
+  const candidates = [
+    payload?.data,
+    payload?.rows,
+    payload?.items,
+    payload?.results,
+    payload?.services,
+    payload?.data?.data,
+    payload?.data?.rows,
+    payload?.data?.items,
+    payload?.data?.results,
+    payload?.data?.services
+  ]
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate
+  }
+
   return []
 }
 
@@ -163,9 +180,7 @@ const fetchServices = async () => {
     })
 
     const allServices = normalizeServicePayload(res.data)
-    services.value = allServices.filter(
-      s => Boolean(s?.is_active) && s.type !== "FNB"
-    )
+    services.value = allServices.filter(s => s?.type !== "FNB")
 
     if (!services.value.length) {
       errorMessage.value = "Tidak ada service aktif yang bisa dipilih"
