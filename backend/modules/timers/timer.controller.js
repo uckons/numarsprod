@@ -392,8 +392,8 @@ exports.startTimer = async (req, res) => {
           finalOrderId,
           comboSelections[0].service.id,
           serviceNameSnapshot,
-          comboQty,
-          comboQty > 0 ? comboTotal / comboQty : comboTotal,
+          1,
+          comboTotal,
           comboTotal,
           comboTherapistNames.join(', ') || null
         ]
@@ -595,14 +595,21 @@ exports.getTherapists = async (req, res) => {
   try {
     const db = req.app.get("db")
     const branch_id = req.query.branch_id || req.user.branch_id
-    const service_type = req.query.service_type
-
     let query = `
       SELECT 
         t.id,
         t.name,
         t.grade_id,
-        tg.name AS grade_name
+        tg.name AS grade_name,
+        CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM timers tm
+            WHERE tm.therapist_id = t.id
+              AND tm.end_time IS NULL
+          ) THEN true
+          ELSE false
+        END AS is_occupied
       FROM therapists t
       LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
       WHERE t.active = true

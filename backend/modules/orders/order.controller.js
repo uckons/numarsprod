@@ -61,25 +61,70 @@ exports.close = async (req, res) => {
       return res.status(400).json({ message: "Cannot close order with empty items" })
     }
 
+    const { rows: existingOrderItems } = await db.query(
+      `SELECT service_id, service_name, qty, price, subtotal, therapist_name, room_name
+       FROM order_items
+       WHERE order_id = $1
+       ORDER BY id ASC`,
+      [orderId]
+    )
+
+    const existingByKey = new Map()
+    for (const row of existingOrderItems) {
+      const serviceId = Number(row.service_id)
+      const serviceName = String(row.service_name || "")
+      const key = `${serviceId}::${serviceName}`
+      const bucket = existingByKey.get(key) || []
+      bucket.push(row)
+      existingByKey.set(key, bucket)
+    }
+
     // Hapus items lama
     await db.query(`DELETE FROM order_items WHERE order_id = $1`, [orderId])
-      
-      // Insert items baru
-      for (const i of items) {
-        const svcResult = await db.query(
-          `SELECT name FROM services WHERE id = $1`,
-          [i.id]
-        )
-        const serviceName = i.name || svcResult.rows[0]?.name || "Unknown Service"
-        const qty = Number(i.qty || 1)
-        const unitPrice = Number(i.base_price ?? 0)
 
-        await db.query(
-          `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-           [orderId, i.id, serviceName, qty, unitPrice, qty * unitPrice, i.price_label || null, Boolean(i.is_package)]
-        )
+    // Insert items baru
+    for (const i of items) {
+      const svcResult = await db.query(
+        `SELECT name FROM services WHERE id = $1`,
+        [i.id]
+      )
+
+      const serviceName = i.name || svcResult.rows[0]?.name || "Unknown Service"
+      const qty = Number(i.qty || 1)
+      const serviceId = Number(i.id)
+      const key = `${serviceId}::${serviceName}`
+      const existingSnapshot = (existingByKey.get(key) || []).shift() || null
+
+      let unitPrice = Number(i.base_price ?? 0)
+      let subtotal = qty * unitPrice
+
+      if (existingSnapshot) {
+        const snapshotQty = Number(existingSnapshot.qty || 0)
+        if (snapshotQty === qty) {
+          subtotal = Number(existingSnapshot.subtotal || subtotal)
+          if (!(unitPrice > 0)) {
+            unitPrice = Number(existingSnapshot.price || unitPrice)
+          }
+        }
       }
+
+      await db.query(
+        `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal, therapist_name, room_name, price_label, is_package_snapshot)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          orderId,
+          serviceId,
+          serviceName,
+          qty,
+          unitPrice,
+          subtotal,
+          i.therapist_name || existingSnapshot?.therapist_name || null,
+          i.room_name || existingSnapshot?.room_name || null,
+          i.price_label || null,
+          Boolean(i.is_package)
+        ]
+      )
+    }
   
     // Hitung total baru
     const totalResult = await db.query(
