@@ -95,15 +95,15 @@ exports.close = async (req, res) => {
       const key = `${serviceId}::${serviceName}`
       const existingSnapshot = (existingByKey.get(key) || []).shift() || null
 
-      let unitPrice = Number(i.base_price ?? 0)
-      let subtotal = qty * unitPrice
+      let unitPrice = Math.round(Number(i.base_price ?? 0))
+      let subtotal = Math.round(qty * unitPrice)
 
       if (existingSnapshot) {
         const snapshotQty = Number(existingSnapshot.qty || 0)
         if (snapshotQty === qty) {
-          subtotal = Number(existingSnapshot.subtotal || subtotal)
+          subtotal = Math.round(Number(existingSnapshot.subtotal || subtotal))
           if (!(unitPrice > 0)) {
-            unitPrice = Number(existingSnapshot.price || unitPrice)
+            unitPrice = Math.round(Number(existingSnapshot.price || unitPrice))
           }
         }
       }
@@ -133,7 +133,7 @@ exports.close = async (req, res) => {
        WHERE order_id = $1`,
       [orderId]
     )
-    const total = totalResult.rows[0].total
+    const total = Math.round(Number(totalResult.rows[0].total || 0))
 
     // Update order dengan payment & status PAID
     const result = await db.query(

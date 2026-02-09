@@ -358,10 +358,11 @@ exports.startTimer = async (req, res) => {
         }
       }
 
-      const comboTotal = comboSelections.reduce(
+      const comboTotalRaw = comboSelections.reduce(
         (sum, selection) => sum + Number(selection.service.base_price || 0),
         0
       )
+      const comboTotal = Math.round(comboTotalRaw)
       const comboDurationMinutes = comboSelections.reduce(
         (sum, selection) => sum + Number(selection.service.duration_minutes || durationNum || 0),
         0
