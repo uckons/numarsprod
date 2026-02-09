@@ -201,8 +201,10 @@ const createManualTimer = async (data) => {
     await api.post("/timers/start", {
       slot: selectedSlot.value,
       service_id: data.service_id,
+      service_ids: data.service_ids || [data.service_id],
       therapist_id: data.therapist_id,
       therapist_ids: data.therapist_ids || [],
+      combo_qty: data.combo_qty || 1,
       room_id: data.room_id,
       duration_minutes: data.duration_minutes
     })
