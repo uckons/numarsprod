@@ -23,7 +23,7 @@ const selectedRoom = ref(null)
     const key = itemKey(service)
     const found = items.value.find(i => i.cart_key === key)
     if (found) {
-      found.qty++
+      found.qty += Number(service.seed_qty || 1)
     } else {
       items.value.push({
         id: service.id,
@@ -36,8 +36,10 @@ const selectedRoom = ref(null)
         package_service_id: service.package_service_id || null,
         package_price: Number(service.package_price || 0) || null,
         package_name: service.package_name || null,
+        package_total: Number(service.package_total || 0) || null,
+        locked_package: Boolean(service.locked_package),
         cart_key: key,
-        qty: 1
+        qty: Number(service.seed_qty || 1)
       })
     }
   }
@@ -96,12 +98,18 @@ function findByCartKey(cartKey) {
       items.value = items.value.filter(i => i.cart_key !== cartKey)
     }
 
+    const packageTotal = Number(packageService.base_price || 0)
+    const unitPriceInPackage = packageQty > 0 ? packageTotal / packageQty : packageTotal
+
     for (let idx = 0; idx < bundles; idx += 1) {
       addService({
         ...packageService,
         is_package: true,
+        locked_package: true,
         price_label: 'PAKET',
-        base_price: Number(packageService.base_price)
+        package_total: packageTotal,
+        seed_qty: packageQty,
+        base_price: Number(unitPriceInPackage)
       })
     }
   }

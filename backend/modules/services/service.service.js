@@ -1,6 +1,6 @@
 const db = require("../../config/db")
 
-exports.list = async ({ branch_id, type }) => {
+exports.list = async ({ branch_id, type, is_active }) => {
   const params = []
   let where = "s.deleted_at IS NULL"
 
@@ -12,6 +12,12 @@ exports.list = async ({ branch_id, type }) => {
   if (type) {
     params.push(type)
     where += ` AND s.type = $${params.length}`
+  }
+
+  if (is_active !== undefined) {
+    const activeValue = is_active === true || is_active === 'true' || is_active === 1 || is_active === '1'
+    params.push(activeValue)
+    where += ` AND s.is_active = $${params.length}`
   }
 
   const { rows } = await db.query(`
@@ -49,6 +55,8 @@ exports.list = async ({ branch_id, type }) => {
       COALESCE(fi.is_package, false) AS is_package,
       fi.package_qty,
       fi.package_group,
+      fi.package_price,
+      fi.package_name,
       s.duration_minutes,
       s.is_active,
       s.happy_hour_enabled,

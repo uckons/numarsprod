@@ -131,7 +131,9 @@ CREATE TABLE fnb_items (
   name VARCHAR(100),
   price NUMERIC(12,2),
   stock INT,
-  alert_stock INT
+  alert_stock INT,
+  package_price NUMERIC(12,2),
+  package_name VARCHAR(120)
 );
 
 CREATE TABLE stock_logs (
