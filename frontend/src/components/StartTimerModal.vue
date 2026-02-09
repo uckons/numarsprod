@@ -161,6 +161,10 @@ const selectedService = computed(() => selectedServices.value[0] || null)
 
 const serviceType = computed(() => selectedService.value?.type || "")
 
+const selectedService = computed(() => selectedServices.value[0] || null)
+
+const serviceType = computed(() => selectedService.value?.type || "")
+
 const duration = computed(() => {
   if (!selectedServices.value.length) return 0
   return Number(selectedServices.value[0].duration_minutes || 0)
@@ -172,14 +176,14 @@ const isComboMode = computed(() => selectedOrderType.value === "COMBO" && Number
 const selectableServices = computed(() => {
   if (!services.value.length) return []
 
-  const source = isComboMode.value
-    ? services.value.filter(s => ["SPA", "LC"].includes(s.type))
-    : services.value
+  // Combo should allow picking SPA or LC as starting/alternate selection.
+  // Type consistency is validated on submit/backend.
+  if (isComboMode.value) {
+    return services.value.filter(s => ["SPA", "LC"].includes(s.type))
+  }
 
-  if (!serviceType.value) return source
-  if (isComboMode.value && !["SPA", "LC"].includes(serviceType.value)) return source
-
-  return source.filter(s => s.type === serviceType.value)
+  if (!serviceType.value) return services.value
+  return services.value.filter(s => s.type === serviceType.value)
 })
 
 const normalizeServicePayload = (payload) => {
