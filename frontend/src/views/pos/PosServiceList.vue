@@ -106,22 +106,34 @@ const packageByGroup = computed(() => {
 })
 
 const enrichService = (service) => {
-  if (service.type !== 'FNB' || service.is_package) return service
+  if (service.type !== 'FNB') return service
   if (!service.package_group) return service
 
   const pkg = packageByGroup.value.get(service.package_group)
   if (!pkg) return service
 
-  const packageQty = Number(service.package_qty || pkg.package_qty || 0)
-  if (!packageQty) return service
+  const regular = services.value.find(
+    s => s.type === 'FNB' && !s.is_package && s.package_group === service.package_group
+  )
+
+  // Seed item in cart should stay editable (non-package) until converted.
+  // If cashier clicks package card directly, fallback to regular variant in the same group.
+  const seed = service.is_package
+    ? (regular
+        ? { ...regular }
+        : { ...service, is_package: false, price_label: null })
+    : { ...service }
+
+  const packageQty = Number(pkg.package_qty || seed.package_qty || 0)
+  if (!packageQty) return seed
 
   return {
-    ...service,
-    package_group: service.package_group || pkg.package_group,
+    ...seed,
+    package_group: seed.package_group || pkg.package_group,
     package_qty: packageQty,
     package_service_id: pkg.id,
     package_price: Number(pkg.base_price || 0),
-    package_name: pkg.name || service.name,
+    package_name: pkg.name || seed.name,
     package_label: 'PAKET'
   }
 }
