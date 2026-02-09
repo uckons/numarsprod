@@ -123,6 +123,8 @@ const selectedServiceQty = ref(1)
 const selectedServiceIds = ref([""])
 const selectedTherapistIds = ref([""])
 const selectedRoomId = ref("")
+const selectedComboQty = ref(1)
+const selectedComboServiceIds = ref([])
 const manualDuration = ref(0)
 
 const loadingServices = ref(false)
@@ -142,6 +144,18 @@ const selectedServices = computed(() => {
     .map(id => services.value.find(s => Number(s.id) === id))
     .filter(Boolean)
 })
+const parseComboQty = (service) => {
+  if (!service) return 1
+  if (!["SPA", "LC", "LOUNGE"].includes(service.type)) return 1
+  const match = String(service.name || "").match(/combo\s*(\d+)/i)
+  const qty = match ? Number(match[1]) : 1
+  return Number.isInteger(qty) && qty > 1 ? qty : 1
+}
+
+
+const selectedService = computed(() => selectedServices.value[0] || null)
+
+const serviceType = computed(() => selectedService.value?.type || "")
 
 const selectedService = computed(() => selectedServices.value[0] || null)
 
