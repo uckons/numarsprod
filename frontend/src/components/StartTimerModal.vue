@@ -24,10 +24,35 @@
       <span v-if="loadingServices" class="loading-text">Memuat service…</span>
     </div>
 
+
+    <!-- COMBO QTY -->
+    <div class="field" v-if="['SPA', 'LC', 'LOUNGE'].includes(serviceType)">
+      <label>Qty Combo</label>
+      <select v-model.number="selectedComboQty">
+        <option v-for="n in comboQtyOptions" :key="n" :value="n">{{ n }}</option>
+      </select>
+    </div>
+
     <!-- THERAPIST -->
     <div class="field" v-if="serviceType && serviceType !== 'LOUNGE'">
-      <label>Nama Terapis</label>
-      <select v-model="selectedTherapistId" :disabled="loadingTherapists || !serviceType">
+      <label>
+        Nama Terapis
+        <small v-if="comboQty > 1">(wajib {{ comboQty }} terapis untuk combo)</small>
+      </label>
+      <div v-if="comboQty > 1" class="therapist-grid">
+        <select
+          v-for="idx in comboQty"
+          :key="idx"
+          v-model="selectedTherapistIds[idx - 1]"
+          :disabled="loadingTherapists || !serviceType"
+        >
+          <option value="">-- Pilih Terapis #{{ idx }} --</option>
+          <option v-for="t in therapists" :key="t.id" :value="t.id">
+            {{ t.name }} <span v-if="t.grade_name">({{ t.grade_name }})</span>
+          </option>
+        </select>
+      </div>
+      <select v-else v-model="selectedTherapistIds[0]" :disabled="loadingTherapists || !serviceType">
         <option value="">-- Pilih Terapis --</option>
         <option v-for="t in therapists" :key="t.id" :value="t.id">
           {{ t.name }} <span v-if="t.grade_name">({{ t.grade_name }})</span>
@@ -92,8 +117,9 @@ const therapists = ref([])
 const rooms = ref([])
 
 const selectedServiceId = ref("")
-const selectedTherapistId = ref("")
+const selectedTherapistIds = ref([""])
 const selectedRoomId = ref("")
+const selectedComboQty = ref(1)
 const manualDuration = ref(0)
 
 const loadingServices = ref(false)
@@ -110,6 +136,14 @@ const selectedService = computed(() => {
 const serviceType = computed(() => {
   return selectedService.value?.type || ""
 })
+const parseComboQty = (service) => {
+  if (!service) return 1
+  if (!["SPA", "LC", "LOUNGE"].includes(service.type)) return 1
+  const match = String(service.name || "").match(/combo\s*(\d+)/i)
+  const qty = match ? Number(match[1]) : 1
+  return Number.isInteger(qty) && qty > 1 ? qty : 1
+}
+
 
 const duration = computed(() => {
   return selectedService.value?.duration_minutes || 0
@@ -117,21 +151,59 @@ const duration = computed(() => {
 const effectiveDuration = computed(() => {
   return duration.value || manualDuration.value
 })
+const comboQtyOptions = [1, 2, 3, 4, 5, 6]
+const inferredComboQty = computed(() => parseComboQty(selectedService.value))
+const comboQty = computed(() => {
+  if (!["SPA", "LC", "LOUNGE"].includes(serviceType.value)) return 1
+  const qty = Number(selectedComboQty.value || 1)
+  return Number.isInteger(qty) && qty > 1 ? qty : Number(inferredComboQty.value || 1)
+})
 // Methods
+const normalizeServicePayload = (payload) => {
+  if (Array.isArray(payload)) return payload
+
+  const candidates = [
+    payload?.data,
+    payload?.rows,
+    payload?.items,
+    payload?.results,
+    payload?.services,
+    payload?.data?.data,
+    payload?.data?.rows,
+    payload?.data?.items,
+    payload?.data?.results,
+    payload?.data?.services
+  ]
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate
+  }
+
+  return []
+}
+
 const fetchServices = async () => {
   try {
     loadingServices.value = true
     errorMessage.value = ""
-    
-    // Fetch all services (will be filtered by active services on backend)
-    const res = await api.get("/services")
-    //services.value = res.data.filter(s => s.is_active && s.duration_minutes > 0)
-    services.value = res.data.filter(
-      s => s.is_active && s.type !== "FNB"
-    )
+
+    const res = await api.get("/services", {
+      params: { is_active: true, _ts: Date.now() },
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache"
+      }
+    })
+
+    const allServices = normalizeServicePayload(res.data)
+    services.value = allServices.filter(s => s?.type !== "FNB")
+
+    if (!services.value.length) {
+      errorMessage.value = "Tidak ada service aktif yang bisa dipilih"
+    }
   } catch (err) {
     console.error("Error fetching services:", err)
-    errorMessage.value = "Gagal memuat daftar service"
+    errorMessage.value = err.response?.data?.message || "Gagal memuat daftar service"
   } finally {
     loadingServices.value = false
   }
@@ -177,11 +249,13 @@ const fetchRooms = async () => {
 
 const onServiceChange = () => {
   // Reset selections when service changes
-  selectedTherapistId.value = ""
+  selectedComboQty.value = parseComboQty(selectedService.value)
+  selectedTherapistIds.value = Array(comboQty.value).fill("")
   selectedRoomId.value = ""
   manualDuration.value = 0
   // Fetch therapists and rooms for the new service type
   if (serviceType.value) {
+    selectedTherapistIds.value = Array(comboQty.value).fill("")
     fetchTherapists()
     fetchRooms()
   }
@@ -196,10 +270,25 @@ const submit = () => {
     return
   }
   
-  //if (!selectedTherapistId.value) {
-  if (serviceType.value !== "LOUNGE" && !selectedTherapistId.value) {  
-    errorMessage.value = "Silakan pilih terapis"
-    return
+  const normalizedTherapistIds = selectedTherapistIds.value
+    .map(id => Number(id))
+    .filter(id => Number.isInteger(id) && id > 0)
+
+  if (serviceType.value !== "LOUNGE") {
+    if (!normalizedTherapistIds.length) {
+      errorMessage.value = "Silakan pilih terapis"
+      return
+    }
+
+    if (comboQty.value > 1 && normalizedTherapistIds.length !== comboQty.value) {
+      errorMessage.value = `Combo membutuhkan ${comboQty.value} terapis`
+      return
+    }
+
+    if (new Set(normalizedTherapistIds).size !== normalizedTherapistIds.length) {
+      errorMessage.value = "Terapis combo harus berbeda"
+      return
+    }
   }
   
   if (!selectedRoomId.value && serviceType.value) {
@@ -215,12 +304,10 @@ const submit = () => {
   emit("start", {
     service_id: parseInt(selectedServiceId.value),
     service_type: serviceType.value,
-    //therapist_id: parseInt(selectedTherapistId.value),
-    therapist_id: selectedTherapistId.value
-      ? parseInt(selectedTherapistId.value)
-      : null,  
+    therapist_id: normalizedTherapistIds[0] || null,
+    therapist_ids: normalizedTherapistIds,
+    combo_qty: comboQty.value,
     room_id: parseInt(selectedRoomId.value),
-    //duration_minutes: duration.value
     duration_minutes: effectiveDuration.value
   })
   
@@ -255,6 +342,11 @@ onMounted(() => {
 }
 .modal-header {
   text-align: center;
+}
+
+.therapist-grid {
+  display: grid;
+  gap: 8px;
 }
 .modal-header h2 {
   margin: 0;
