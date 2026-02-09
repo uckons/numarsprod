@@ -1,5 +1,5 @@
 const normalizeType = (value) => String(value || '').toUpperCase().trim()
-const VALID_TYPES = new Set(['SPA', 'LC', 'LOUNGE'])
+const VALID_TYPES = new Set(['SPA', 'LC', 'LOUNGE', 'KTV'])
 
 const resolveBranchId = (req) => {
   const fromQuery = Number(req.query.branch_id)

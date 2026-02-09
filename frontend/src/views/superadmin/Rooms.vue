@@ -17,7 +17,8 @@
         <option value="">Semua Tipe</option>
         <option value="SPA">SPA</option>
         <option value="LC">LC/TABLE</option>
-        <option value="LOUNGE">LOUNGE/KTV</option>
+        <option value="LOUNGE">LOUNGE/SOFA</option>
+        <option value="KTV">KTV</option>
       </select>
       <button class="btn-light" @click="fetchRooms">Refresh</button>
     </div>
@@ -68,7 +69,8 @@
             <select v-model="form.type">
               <option value="SPA">SPA</option>
               <option value="LC">LC/TABLE</option>
-              <option value="LOUNGE">LOUNGE/KTV</option>
+              <option value="LOUNGE">LOUNGE/SOFA</option>
+        <option value="KTV">KTV</option>
             </select>
           </label>
           <label>
