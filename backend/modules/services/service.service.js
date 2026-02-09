@@ -35,6 +35,7 @@ exports.list = async ({ branch_id, type, is_active }) => {
           AND COALESCE(fi.is_package, false) = false
           AND fi.happy_hour_enabled = true
           AND fi.happy_hour_price IS NOT NULL
+          AND fi.happy_hour_price <> COALESCE(fi.price, s.base_price)
           AND hh_active.active = true
         THEN fi.happy_hour_price
         WHEN s.type IN ('SPA', 'LC', 'LOUNGE')
@@ -51,6 +52,7 @@ exports.list = async ({ branch_id, type, is_active }) => {
           AND COALESCE(fi.is_package, false) = false
           AND fi.happy_hour_enabled = true
           AND fi.happy_hour_price IS NOT NULL
+          AND fi.happy_hour_price <> COALESCE(fi.price, s.base_price)
           AND hh_active.active = true
         THEN 'HH'
         WHEN s.type = 'FNB' AND fi.is_beverage = true THEN 'NON HH'
@@ -63,8 +65,8 @@ exports.list = async ({ branch_id, type, is_active }) => {
       fi.package_name,
       s.duration_minutes,
       s.is_active,
-      s.happy_hour_enabled,
-      s.happy_hour_price,
+      CASE WHEN s.type = 'FNB' THEN COALESCE(fi.happy_hour_enabled, false) ELSE s.happy_hour_enabled END AS happy_hour_enabled,
+      CASE WHEN s.type = 'FNB' THEN fi.happy_hour_price ELSE s.happy_hour_price END AS happy_hour_price,
       b.name AS branch
     FROM services s
     JOIN branches b ON b.id = s.branch_id
