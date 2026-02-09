@@ -392,8 +392,8 @@ exports.startTimer = async (req, res) => {
           finalOrderId,
           comboSelections[0].service.id,
           serviceNameSnapshot,
-          comboQty,
-          comboQty > 0 ? comboTotal / comboQty : comboTotal,
+          1,
+          comboTotal,
           comboTotal,
           comboTherapistNames.join(', ') || null
         ]
