@@ -70,11 +70,30 @@ onMounted(async () => {
   services.value = res.data.data || res.data
 })
 
+const regularPackageGroups = computed(() => {
+  const groups = new Set()
+  services.value
+    .filter(s => s.type === 'FNB' && !s.is_package && s.package_group)
+    .forEach(s => groups.add(s.package_group))
+  return groups
+})
+
+const sellableServices = computed(() =>
+  services.value.filter((s) => {
+    // Hide package variant only when regular variant in same group exists.
+    // If package is the only configured variant, keep it visible in kasir list.
+    if (s.type === 'FNB' && s.is_package && s.package_group) {
+      return !regularPackageGroups.value.has(s.package_group)
+    }
+    return true
+  })
+)
+
 const filteredServices = computed(() => {
   if (activeCategory.value === "ALL") {
-    return services.value
+    return sellableServices.value
   }
-  return services.value.filter(
+  return sellableServices.value.filter(
     s => s.type === activeCategory.value
   )
 })
@@ -87,17 +106,34 @@ const packageByGroup = computed(() => {
 })
 
 const enrichService = (service) => {
-  if (service.type !== 'FNB' || service.is_package) return service
-  if (!service.package_group || !Number(service.package_qty || 0)) return service
+  if (service.type !== 'FNB') return service
+  if (!service.package_group) return service
 
   const pkg = packageByGroup.value.get(service.package_group)
   if (!pkg) return service
 
+  const regular = services.value.find(
+    s => s.type === 'FNB' && !s.is_package && s.package_group === service.package_group
+  )
+
+  // Seed item in cart should stay editable (non-package) until converted.
+  // If cashier clicks package card directly, fallback to regular variant in the same group.
+  const seed = service.is_package
+    ? (regular
+        ? { ...regular }
+        : { ...service, is_package: false, price_label: null })
+    : { ...service }
+
+  const packageQty = Number(pkg.package_qty || seed.package_qty || 0)
+  if (!packageQty) return seed
+
   return {
-    ...service,
+    ...seed,
+    package_group: seed.package_group || pkg.package_group,
+    package_qty: packageQty,
     package_service_id: pkg.id,
-    package_price: Number(pkg.base_price || 0),
-    package_name: pkg.name || service.name,
+    package_price: Number(pkg.package_price || pkg.base_price || 0),
+    package_name: pkg.package_name || pkg.name || seed.name,
     package_label: 'PAKET'
   }
 }
