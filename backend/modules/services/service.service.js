@@ -1,6 +1,6 @@
 const db = require("../../config/db")
 
-exports.list = async ({ branch_id, type }) => {
+exports.list = async ({ branch_id, type, is_active }) => {
   const params = []
   let where = "s.deleted_at IS NULL"
 
@@ -12,6 +12,12 @@ exports.list = async ({ branch_id, type }) => {
   if (type) {
     params.push(type)
     where += ` AND s.type = $${params.length}`
+  }
+
+  if (is_active !== undefined) {
+    const activeValue = is_active === true || is_active === 'true' || is_active === 1 || is_active === '1'
+    params.push(activeValue)
+    where += ` AND s.is_active = $${params.length}`
   }
 
   const { rows } = await db.query(`
@@ -32,7 +38,7 @@ exports.list = async ({ branch_id, type }) => {
           AND s.happy_hour_price IS NOT NULL
           AND hh_active.active = true
         THEN s.happy_hour_price
-        ELSE s.base_price
+        ELSE COALESCE(fi.price, s.base_price)
       END AS base_price,
       CASE
         WHEN COALESCE(fi.is_package, false) = true THEN 'PAKET'
@@ -49,6 +55,8 @@ exports.list = async ({ branch_id, type }) => {
       COALESCE(fi.is_package, false) AS is_package,
       fi.package_qty,
       fi.package_group,
+      fi.package_price,
+      fi.package_name,
       s.duration_minutes,
       s.is_active,
       s.happy_hour_enabled,
@@ -133,6 +141,19 @@ exports.create = async (data, actor) => {
 //}
 
 exports.update = async (id, data) => {
+  const existingRes = await db.query(
+    `SELECT type, base_price FROM services WHERE id=$1`,
+    [id]
+  )
+
+  if (!existingRes.rows.length) {
+    throw new Error("Service not found")
+  }
+
+  const existing = existingRes.rows[0]
+  const keepFnbBasePrice = existing.type === 'FNB' && data.type === 'FNB'
+  const finalBasePrice = keepFnbBasePrice ? existing.base_price : data.base_price
+
   await db.query(`
     UPDATE services
     SET
@@ -147,7 +168,7 @@ exports.update = async (id, data) => {
   `, [
     data.name,
     data.type,
-    data.base_price,
+    finalBasePrice,
     data.duration_minutes,
     data.is_active,
     Boolean(data.happy_hour_enabled),

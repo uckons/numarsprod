@@ -478,9 +478,13 @@ exports.getKasirOrders = async (req, res) => {
       paramIndex++
     }
 
-    // Filter by therapist
+    // Filter by therapist (source of truth dari timers)
     if (therapist_id) {
-      whereConditions.push(`o.therapist_id = $${paramIndex}`)
+      whereConditions.push(`EXISTS (
+        SELECT 1 FROM timers tm
+        WHERE tm.order_id = o.id
+          AND tm.therapist_id = $${paramIndex}
+      )`)
       queryParams.push(therapist_id)
       paramIndex++
     }
@@ -515,7 +519,7 @@ exports.getKasirOrders = async (req, res) => {
         o.status,
         o.created_at,
         o.total,
-        th.name AS therapist_name,
+        COALESCE(ot.therapist_name, th.name) AS therapist_name,
         r.name AS room_name,
 
         json_agg(
@@ -530,10 +534,16 @@ exports.getKasirOrders = async (req, res) => {
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
       LEFT JOIN therapists th ON th.id = o.therapist_id
+      LEFT JOIN LATERAL (
+        SELECT string_agg(DISTINCT t.name, ', ' ORDER BY t.name) AS therapist_name
+        FROM timers tm
+        JOIN therapists t ON t.id = tm.therapist_id
+        WHERE tm.order_id = o.id
+      ) ot ON true
       LEFT JOIN rooms r ON r.id = o.room_id
 
       WHERE ${whereClause}
-      GROUP BY o.id, th.name, r.name
+      GROUP BY o.id, ot.therapist_name, th.name, r.name
       ORDER BY o.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `, queryParams)
