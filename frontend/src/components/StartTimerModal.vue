@@ -24,6 +24,15 @@
       <span v-if="loadingServices" class="loading-text">Memuat service…</span>
     </div>
 
+
+    <!-- COMBO QTY -->
+    <div class="field" v-if="['SPA', 'LC', 'LOUNGE'].includes(serviceType)">
+      <label>Qty Combo</label>
+      <select v-model.number="selectedComboQty">
+        <option v-for="n in comboQtyOptions" :key="n" :value="n">{{ n }}</option>
+      </select>
+    </div>
+
     <!-- THERAPIST -->
     <div class="field" v-if="serviceType && serviceType !== 'LOUNGE'">
       <label>
@@ -110,6 +119,7 @@ const rooms = ref([])
 const selectedServiceId = ref("")
 const selectedTherapistIds = ref([""])
 const selectedRoomId = ref("")
+const selectedComboQty = ref(1)
 const manualDuration = ref(0)
 
 const loadingServices = ref(false)
@@ -141,7 +151,13 @@ const duration = computed(() => {
 const effectiveDuration = computed(() => {
   return duration.value || manualDuration.value
 })
-const comboQty = computed(() => parseComboQty(selectedService.value))
+const comboQtyOptions = [1, 2, 3, 4, 5, 6]
+const inferredComboQty = computed(() => parseComboQty(selectedService.value))
+const comboQty = computed(() => {
+  if (!["SPA", "LC", "LOUNGE"].includes(serviceType.value)) return 1
+  const qty = Number(selectedComboQty.value || 1)
+  return Number.isInteger(qty) && qty > 1 ? qty : Number(inferredComboQty.value || 1)
+})
 // Methods
 const normalizeServicePayload = (payload) => {
   if (Array.isArray(payload)) return payload
@@ -233,6 +249,7 @@ const fetchRooms = async () => {
 
 const onServiceChange = () => {
   // Reset selections when service changes
+  selectedComboQty.value = parseComboQty(selectedService.value)
   selectedTherapistIds.value = Array(comboQty.value).fill("")
   selectedRoomId.value = ""
   manualDuration.value = 0
