@@ -65,7 +65,11 @@ const categories = [
 
 const loadServices = async () => {
   const res = await api.get("/services", {
-    params: { is_active: true, _ts: Date.now() }
+    params: { is_active: true, _ts: Date.now() },
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache"
+    }
   })
   services.value = res.data.data || res.data
 }

@@ -42,7 +42,7 @@ exports.list = async ({ branch_id, type, is_active }) => {
           AND s.happy_hour_price IS NOT NULL
           AND hh_active.active = true
         THEN s.happy_hour_price
-        ELSE s.base_price
+        ELSE COALESCE(fi.price, s.base_price)
       END AS base_price,
       CASE
         WHEN COALESCE(fi.is_package, false) = true THEN 'PAKET'
