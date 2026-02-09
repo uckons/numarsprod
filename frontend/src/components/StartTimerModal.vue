@@ -143,20 +143,36 @@ const effectiveDuration = computed(() => {
 })
 const comboQty = computed(() => parseComboQty(selectedService.value))
 // Methods
+const normalizeServicePayload = (payload) => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  return []
+}
+
 const fetchServices = async () => {
   try {
     loadingServices.value = true
     errorMessage.value = ""
-    
-    // Fetch all services (will be filtered by active services on backend)
-    const res = await api.get("/services")
-    //services.value = res.data.filter(s => s.is_active && s.duration_minutes > 0)
-    services.value = res.data.filter(
-      s => s.is_active && s.type !== "FNB"
+
+    const res = await api.get("/services", {
+      params: { is_active: true, _ts: Date.now() },
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache"
+      }
+    })
+
+    const allServices = normalizeServicePayload(res.data)
+    services.value = allServices.filter(
+      s => Boolean(s?.is_active) && s.type !== "FNB"
     )
+
+    if (!services.value.length) {
+      errorMessage.value = "Tidak ada service aktif yang bisa dipilih"
+    }
   } catch (err) {
     console.error("Error fetching services:", err)
-    errorMessage.value = "Gagal memuat daftar service"
+    errorMessage.value = err.response?.data?.message || "Gagal memuat daftar service"
   } finally {
     loadingServices.value = false
   }
