@@ -28,7 +28,7 @@ exports.list = async ({ branch_id, type, is_active }) => {
       CASE
         WHEN s.type = 'FNB'
           AND COALESCE(fi.is_package, false) = true
-        THEN COALESCE(fi.price, fi.package_price, s.base_price)
+        THEN COALESCE(fi.price, s.base_price)
         WHEN s.type = 'FNB'
           AND fi.is_beverage = true
           AND COALESCE(fi.is_package, false) = false
@@ -62,6 +62,7 @@ exports.list = async ({ branch_id, type, is_active }) => {
       fi.package_group,
       fi.package_price,
       fi.package_name,
+      COALESCE(fi.price, s.base_price) AS sell_price,
       s.duration_minutes,
       s.is_active,
       CASE WHEN s.type = 'FNB' THEN COALESCE(fi.happy_hour_enabled, false) ELSE s.happy_hour_enabled END AS happy_hour_enabled,
