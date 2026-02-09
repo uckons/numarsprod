@@ -206,6 +206,7 @@ const selectedType = ref("")
 
 const page = ref(1)
 const perPage = ref(30)
+const selectedIds = ref([])
 
 /* LOAD BRANCHES */
 const loadBranches = async () => {
@@ -266,6 +267,14 @@ const reload = async () => {
   showForm.value = false   // ?? WAJIB
   selected.value = null
   await loadServices()
+}
+
+const bulkToggle = async () => {
+  // Placeholder: avoid runtime error when bulk bar is visible.
+}
+
+const bulkDelete = async () => {
+  // Placeholder: avoid runtime error when bulk bar is visible.
 }
 const toggle = async (s) => {
   // optimistic UI (langsung berubah)

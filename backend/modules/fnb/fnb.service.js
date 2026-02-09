@@ -15,8 +15,10 @@ exports.getAll = async (db, user) => {
       fi.is_package,
       fi.package_qty,
       fi.package_group,
-      COALESCE(s.base_price, 0) AS sell_price,
-      COALESCE(s.base_price, 0) AS price,
+      fi.package_price,
+      fi.package_name,
+      COALESCE(fi.price, s.base_price, 0) AS sell_price,
+      COALESCE(fi.price, s.base_price, 0) AS price,
       s.is_active AS service_active
      FROM fnb_items fi
      LEFT JOIN services s ON s.id = fi.service_id
@@ -50,7 +52,9 @@ exports.create = async (db, user, data) => {
     happy_hour_price,
     is_package,
     package_qty,
-    package_group
+    package_group,
+    package_price,
+    package_name
   } = data
   if (Boolean(is_package) && Number(package_qty || 0) <= 0) {
     throw new Error("package_qty wajib diisi untuk item paket")
@@ -70,20 +74,23 @@ exports.create = async (db, user, data) => {
   //return rows[0]
   const { rows } = await db.query(
       `INSERT INTO fnb_items
-       (branch_id, service_id, name, cost_price, is_beverage, happy_hour_enabled, happy_hour_price, is_package, package_qty, package_group, stock, alert_stock)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       (branch_id, service_id, name, cost_price, price, is_beverage, happy_hour_enabled, happy_hour_price, is_package, package_qty, package_group, package_price, package_name, stock, alert_stock)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING *`,
       [
         user.branch_id,
         serviceId,
         name,
         cost_price ?? 0,
+        Number(sell_price ?? price ?? 0),
         Boolean(is_beverage),
         Boolean(happy_hour_enabled),
         happy_hour_price ?? null,
         Boolean(is_package),
         Number(package_qty || 0) || null,
         package_group || null,
+        package_price !== undefined && package_price !== null ? Number(package_price) : null,
+        package_name || null,
         stock,
         alert_stock
       ]
@@ -112,7 +119,9 @@ exports.update = async (db, id, data) => {
     happy_hour_price,
     is_package,
     package_qty,
-    package_group
+    package_group,
+    package_price,
+    package_name
   } = data  
   
    await db.query("BEGIN")
@@ -163,20 +172,24 @@ exports.update = async (db, id, data) => {
       `UPDATE fnb_items
        SET name=$1,
            cost_price=$2,
-           stock=$3,
-           alert_stock=$4,
-           service_id=$5,
-           is_beverage=$6,
-           happy_hour_enabled=$7,
-           happy_hour_price=$8,
-           is_package=$9,
-           package_qty=$10,
-           package_group=$11
-       WHERE id=$12
+           price=$3,
+           stock=$4,
+           alert_stock=$5,
+           service_id=$6,
+           is_beverage=$7,
+           happy_hour_enabled=$8,
+           happy_hour_price=$9,
+           is_package=$10,
+           package_qty=$11,
+           package_group=$12,
+           package_price=$13,
+           package_name=$14
+       WHERE id=$15
        RETURNING *`,
       [
         name,
         cost_price ?? 0,
+        Number(sell_price ?? price ?? 0),
         stock,
         alert_stock,
         serviceId,
@@ -186,6 +199,8 @@ exports.update = async (db, id, data) => {
         Boolean(is_package),
         Number(package_qty || 0) || null,
         package_group || null,
+        package_price !== undefined && package_price !== null ? Number(package_price) : null,
+        package_name || null,
         id
       ]
     ) 
