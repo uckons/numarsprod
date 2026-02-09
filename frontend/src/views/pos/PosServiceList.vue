@@ -44,7 +44,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue"
+import { ref, computed, onMounted, onUnmounted } from "vue"
 import Swal from "sweetalert2"
 import api from "@/services/api"
 import { usePosStore } from "@/store/pos.store"
@@ -63,11 +63,33 @@ const categories = [
   "KARAOKE"
 ]
 
-onMounted(async () => {
+const loadServices = async () => {
   const res = await api.get("/services", {
     params: { is_active: true }
   })
   services.value = res.data.data || res.data
+}
+
+let refreshTimer = null
+const handleWindowFocus = () => {
+  loadServices().catch(() => {})
+}
+
+onMounted(async () => {
+  await loadServices()
+  refreshTimer = setInterval(() => {
+    loadServices().catch(() => {})
+  }, 60000)
+  if (typeof window !== 'undefined') {
+    window.addEventListener('focus', handleWindowFocus)
+  }
+})
+
+onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('focus', handleWindowFocus)
+  }
 })
 
 const regularPackageGroups = computed(() => {
