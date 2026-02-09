@@ -33,6 +33,19 @@
       </select>
     </div>
 
+    <!-- COMBO SERVICES -->
+    <div class="field" v-if="comboQty > 1">
+      <label>Service per Combo</label>
+      <div class="therapist-grid">
+        <select v-for="idx in comboQty" :key="`svc-${idx}`" v-model="selectedComboServiceIds[idx - 1]">
+          <option value="">-- Pilih Service #{{ idx }} --</option>
+          <option v-for="svc in servicesByType" :key="`opt-${idx}-${svc.id}`" :value="svc.id">
+            {{ svc.name }} • {{ svc.duration_minutes ? `${svc.duration_minutes} menit` : 'Durasi manual' }}
+          </option>
+        </select>
+      </div>
+    </div>
+
     <!-- THERAPIST -->
     <div class="field" v-if="serviceType && serviceType !== 'LOUNGE'">
       <label>
@@ -106,7 +119,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue"
+import { ref, computed, onMounted, watch } from "vue"
 import api from "@/services/api"
 
 const emit = defineEmits(["close", "start"])
@@ -120,6 +133,7 @@ const selectedServiceId = ref("")
 const selectedTherapistIds = ref([""])
 const selectedRoomId = ref("")
 const selectedComboQty = ref(1)
+const selectedComboServiceIds = ref([])
 const manualDuration = ref(0)
 
 const loadingServices = ref(false)
@@ -158,6 +172,9 @@ const comboQty = computed(() => {
   const qty = Number(selectedComboQty.value || 1)
   return Number.isInteger(qty) && qty > 1 ? qty : Number(inferredComboQty.value || 1)
 })
+const servicesByType = computed(() =>
+  services.value.filter(s => s.type === serviceType.value)
+)
 // Methods
 const normalizeServicePayload = (payload) => {
   if (Array.isArray(payload)) return payload
@@ -247,15 +264,23 @@ const fetchRooms = async () => {
   }
 }
 
+const initComboSelections = () => {
+  const primaryId = Number(selectedServiceId.value || 0)
+  initComboSelections()
+  selectedComboServiceIds.value = Array(comboQty.value)
+    .fill(primaryId)
+    .map(v => (v > 0 ? v : ""))
+}
+
 const onServiceChange = () => {
   // Reset selections when service changes
   selectedComboQty.value = parseComboQty(selectedService.value)
-  selectedTherapistIds.value = Array(comboQty.value).fill("")
+  initComboSelections()
   selectedRoomId.value = ""
   manualDuration.value = 0
   // Fetch therapists and rooms for the new service type
   if (serviceType.value) {
-    selectedTherapistIds.value = Array(comboQty.value).fill("")
+    initComboSelections()
     fetchTherapists()
     fetchRooms()
   }
@@ -301,8 +326,21 @@ const submit = () => {
   }
   isSubmitting.value = true
   
+  const normalizedServiceIds = (comboQty.value > 1
+    ? selectedComboServiceIds.value
+    : [selectedServiceId.value]
+  )
+    .map(id => Number(id))
+    .filter(id => Number.isInteger(id) && id > 0)
+
+  if (normalizedServiceIds.length !== comboQty.value) {
+    errorMessage.value = "Semua service combo wajib dipilih"
+    return
+  }
+
   emit("start", {
     service_id: parseInt(selectedServiceId.value),
+    service_ids: normalizedServiceIds,
     service_type: serviceType.value,
     therapist_id: normalizedTherapistIds[0] || null,
     therapist_ids: normalizedTherapistIds,
@@ -316,6 +354,11 @@ const submit = () => {
     isSubmitting.value = false
   }, 1000)
 }
+
+watch([comboQty, selectedServiceId], () => {
+  if (!selectedServiceId.value) return
+  initComboSelections()
+})
 
 // Lifecycle
 onMounted(() => {
