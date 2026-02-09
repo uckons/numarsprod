@@ -37,6 +37,60 @@ exports.getActive = async (req, res) => {
 }
 
 exports.startTimer = async (req, res) => {
+  const parseComboQty = (serviceName, serviceType) => {
+    if (!['SPA', 'LC', 'LOUNGE'].includes(serviceType)) return 1
+    const match = String(serviceName || '').match(/combo\s*(\d+)/i)
+    const qty = match ? Number(match[1]) : 1
+    return Number.isInteger(qty) && qty > 1 ? qty : 1
+  }
+
+  const normalizeTherapistIds = (therapist_id, therapist_ids) => {
+    const raw = Array.isArray(therapist_ids) && therapist_ids.length
+      ? therapist_ids
+      : (therapist_id ? [therapist_id] : [])
+
+    return [...new Set(raw
+      .map(v => Number(v))
+      .filter(v => Number.isInteger(v) && v > 0))]
+  }
+
+  const allocateSlots = async (db, branchId, requestedSlot, neededCount) => {
+    if (!requestedSlot || requestedSlot < 1 || requestedSlot > 30) {
+      throw new Error('Nomor slot harus 1–30')
+    }
+
+    const { rows: occupiedRows } = await db.query(
+      `SELECT slot_number
+       FROM timers
+       WHERE branch_id = $1
+         AND end_time IS NULL
+         AND slot_number IS NOT NULL`,
+      [branchId]
+    )
+
+    const occupied = new Set(
+      occupiedRows
+        .map(r => Number(r.slot_number))
+        .filter(v => Number.isInteger(v) && v >= 1 && v <= 30)
+    )
+
+    if (occupied.has(requestedSlot)) {
+      throw new Error(`Slot ${requestedSlot} sudah terisi`)
+    }
+
+    const freeSlots = []
+    for (let i = 1; i <= 30; i += 1) {
+      if (!occupied.has(i) && i !== requestedSlot) freeSlots.push(i)
+    }
+
+    const assigned = [requestedSlot, ...freeSlots].slice(0, neededCount)
+    if (assigned.length < neededCount) {
+      throw new Error('Slot timer tidak cukup untuk combo ini')
+    }
+
+    return assigned
+  }
+
   try {
     const db = req.app.get("db")
     const user = req.user
@@ -58,20 +112,16 @@ exports.startTimer = async (req, res) => {
       order_id,
       service_id,
       therapist_id,
+      therapist_ids,
       room_id,
       duration_minutes,
       slot
     } = req.body
 
-        // 🔒 VALIDASI MINIMAL
-   // if (!service_id || !therapist_id || !room_id || !duration_minutes) {
-      if (!service_id || !room_id || !duration_minutes) {
+    if (!service_id || !room_id || !duration_minutes) {
       return res.status(400).json({ message: "Data timer tidak lengkap" })
     }
 
-    // =========================
-    // 🆕 1. AMBIL DATA SERVICE     
-    // =========================
     const { rows: serviceRows } = await db.query(
       `SELECT
          s.id,
@@ -130,152 +180,156 @@ exports.startTimer = async (req, res) => {
       return res.status(400).json({ message: "Service tidak ditemukan" })
     }
 
-    const service = serviceRows[0]
-    const requiresTherapist = service.type !== "LOUNGE"
+    const selectedService = serviceRows[0]
+    const requiresTherapist = selectedService.type !== "LOUNGE"
+    const comboQty = parseComboQty(selectedService.name, selectedService.type)
+    const selectedTherapistIds = normalizeTherapistIds(therapist_id, therapist_ids)
 
-    if (requiresTherapist && !therapist_id) {
-      return res.status(400).json({ message: "Data timer tidak lengkap" })
+    if (requiresTherapist) {
+      if (!selectedTherapistIds.length) {
+        return res.status(400).json({ message: "Silakan pilih terapis" })
+      }
+
+      if (comboQty > 1 && selectedTherapistIds.length !== comboQty) {
+        return res.status(400).json({ message: `Combo membutuhkan ${comboQty} terapis` })
+      }
+
+      if (comboQty === 1 && selectedTherapistIds.length !== 1) {
+        return res.status(400).json({ message: "Pilih 1 terapis" })
+      }
     }
 
-    // =========================
-    // 🔑 2. PASTIKAN ORDER ADA
-    // =========================
+    const therapistIds = requiresTherapist ? selectedTherapistIds : [null]
+
+    const slotNumbers = await allocateSlots(
+      db,
+      branchId,
+      Number(slot),
+      therapistIds.length
+    )
+
+    const durationNum = Number(duration_minutes)
+    if (!durationNum || durationNum <= 0) {
+      return res.status(400).json({ message: "Durasi service tidak valid" })
+    }
+
     let finalOrderId = order_id
 
-    if (!finalOrderId) {
-      const { rows } = await db.query(
-        `
-        INSERT INTO orders
-          (branch_id, user_id, status, total)
-        VALUES
-          ($1, $2, 'DRAFT', 0)
-        RETURNING id
-        `,
-        [branchId, user.id]
-      )
-      finalOrderId = rows[0].id
-    }
-    // 🆕 UPDATE ORDER dengan therapist_id & room_id
-    await db.query(
-      `UPDATE orders 
-       SET therapist_id = $1, room_id = $2 
-       WHERE id = $3`,
-       [therapist_id || null, room_id, finalOrderId] 
-    )
+    await db.query('BEGIN')
 
-    // Check if order_items already exists for this service
-    const { rows: existingItems } = await db.query(
-      `SELECT id, qty, subtotal 
-       FROM order_items 
-       WHERE order_id = $1 AND service_id = $2`,
-      [finalOrderId, service_id]
-    )
-
-    if (existingItems.length === 0) {
-      // Create new order_item
-      await db.query(
-        `
-        INSERT INTO order_items
-          (order_id, service_id, service_name, qty, price, subtotal)
-        VALUES
-          ($1, $2, $3, 1, $4, $4)
-        `,
-        [finalOrderId, service.id, service.name, service.base_price]
-      )
-
-      // Update order total
-      await db.query(
-        `UPDATE orders 
-         SET total = total + $1 
-         WHERE id = $2`,
-        [service.base_price, finalOrderId]
-      )
-    } else {
-      // Item already exists, increment qty (for extend case)
-      const newQty = existingItems[0].qty + 1
-      const newSubtotal = service.base_price * newQty
-
-      await db.query(
-        `UPDATE order_items 
-         SET qty = $1, subtotal = $2 
-         WHERE id = $3`,
-        [newQty, newSubtotal, existingItems[0].id]
-      )
-
-      // Update order total
-      await db.query(
-        `UPDATE orders 
-         SET total = total + $1 
-         WHERE id = $2`,
-        [service.base_price, finalOrderId]
-      )
-    }
-
-    // =========================
-    // 🔒 3. VALIDASI SLOT (JIKA ADA)
-    // =========================
-    let slot_number = slot ?? null
-    if (slot_number !== null) {
-      if (slot_number < 1 || slot_number > 30) {
-        return res.status(400).json({ message: "Nomor slot harus 1–30" })
-      }
-
-      const { rows: used } = await db.query(
-        `
-        SELECT 1 FROM timers
-        WHERE branch_id = $1
-          AND slot_number = $2
-          AND end_time IS NULL
-        `,
-        [branchId, slot_number]
-      )
-
-      if (used.length) {
-        return res.status(400).json({ message: `Slot ${slot_number} sudah terisi` })
-      }
-    }
-
-    // =========================
-    // ⏱️ 4. HITUNG WAKTU
-    // =========================
-    const start = new Date()
-    const plannedEnd = new Date(start.getTime() + duration_minutes * 60000)
-
-    // =========================
-    // 🧠 5. INSERT TIMER (LENGKAP)
-    // =========================
-    const { rows } = await db.query(
-      `
-      INSERT INTO timers
-        (
-          order_id,
-          therapist_id,
-          service_id,
-          room_id,
-          start_time,
-          planned_end_time,
-          paused,
-          branch_id,
-          slot_number,
-          status
+    try {
+      if (!finalOrderId) {
+        const { rows } = await db.query(
+          `
+          INSERT INTO orders
+            (branch_id, user_id, status, total)
+          VALUES
+            ($1, $2, 'DRAFT', 0)
+          RETURNING id
+          `,
+          [branchId, user.id]
         )
-      VALUES
-        ($1,$2,$3,$4,$5,$6,false,$7,$8,'RUNNING')
-      RETURNING *
-      `,
-      [
-        finalOrderId,
-        therapist_id,
-        service_id,
-        room_id,
-        start,
-        plannedEnd,
-        branchId,
-        slot_number
-      ]
-    )
+        finalOrderId = rows[0].id
+      }
 
-    res.json(rows[0])
+      await db.query(
+        `UPDATE orders
+         SET therapist_id = $1, room_id = $2
+         WHERE id = $3`,
+         [therapistIds[0], room_id, finalOrderId]
+      )
+
+      let therapistNameById = new Map()
+      if (requiresTherapist) {
+        const { rows: therapistRows } = await db.query(
+          `SELECT id, name FROM therapists WHERE id = ANY($1::int[])`,
+          [therapistIds]
+        )
+        therapistNameById = new Map(therapistRows.map(t => [Number(t.id), t.name]))
+
+        if (therapistNameById.size !== therapistIds.length) {
+          throw new Error('Terapis tidak ditemukan')
+        }
+      }
+
+      for (const tid of therapistIds) {
+        await db.query(
+          `
+          INSERT INTO order_items
+            (order_id, service_id, service_name, qty, price, subtotal, therapist_name)
+          VALUES
+            ($1, $2, $3, 1, $4, $4, $5)
+          `,
+          [
+            finalOrderId,
+            selectedService.id,
+            selectedService.name,
+            selectedService.base_price,
+            tid ? therapistNameById.get(tid) : null
+          ]
+        )
+      }
+
+      await db.query(
+        `UPDATE orders
+         SET total = total + $1
+         WHERE id = $2`,
+        [selectedService.base_price * therapistIds.length, finalOrderId]
+      )
+
+      const start = new Date()
+      const plannedEnd = new Date(start.getTime() + durationNum * 60000)
+
+      const createdTimers = []
+      for (let idx = 0; idx < therapistIds.length; idx += 1) {
+        const tid = therapistIds[idx]
+        const slotNumber = slotNumbers[idx]
+
+        const { rows } = await db.query(
+          `
+          INSERT INTO timers
+            (
+              order_id,
+              therapist_id,
+              service_id,
+              room_id,
+              start_time,
+              planned_end_time,
+              paused,
+              branch_id,
+              slot_number,
+              status
+            )
+          VALUES
+            ($1,$2,$3,$4,$5,$6,false,$7,$8,'RUNNING')
+          RETURNING *
+          `,
+          [
+            finalOrderId,
+            tid,
+            service_id,
+            room_id,
+            start,
+            plannedEnd,
+            branchId,
+            slotNumber
+          ]
+        )
+
+        createdTimers.push(rows[0])
+      }
+
+      await db.query('COMMIT')
+
+      res.json({
+        order_id: finalOrderId,
+        combo_qty: therapistIds.length,
+        timers: createdTimers
+      })
+    } catch (error) {
+      await db.query('ROLLBACK')
+      throw error
+    }
   } catch (err) {
     console.error("START TIMER ERROR:", err)
     res.status(500).json({ message: err.message })
