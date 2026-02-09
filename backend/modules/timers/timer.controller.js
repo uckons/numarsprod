@@ -311,7 +311,7 @@ exports.startTimer = async (req, res) => {
       db,
       branchId,
       Number(slot),
-      therapistIds.length
+      1
     )
 
     const durationNum = Number(duration_minutes)
@@ -358,25 +358,46 @@ exports.startTimer = async (req, res) => {
         }
       }
 
-      let comboTotal = 0
-      for (const selection of comboSelections) {
-        await db.query(
-          `
-          INSERT INTO order_items
-            (order_id, service_id, service_name, qty, price, subtotal, therapist_name)
-          VALUES
-            ($1, $2, $3, 1, $4, $4, $5)
-          `,
-          [
-            finalOrderId,
-            selection.service.id,
-            selection.service.name,
-            selection.service.base_price,
-            selection.therapistId ? therapistNameById.get(selection.therapistId) : null
-          ]
-        )
-        comboTotal += Number(selection.service.base_price || 0)
-      }
+      const comboTotal = comboSelections.reduce(
+        (sum, selection) => sum + Number(selection.service.base_price || 0),
+        0
+      )
+      const comboDurationMinutes = comboSelections.reduce(
+        (sum, selection) => sum + Number(selection.service.duration_minutes || durationNum || 0),
+        0
+      ) || durationNum
+      const comboTherapistNames = comboSelections
+        .map(selection => (selection.therapistId ? therapistNameById.get(selection.therapistId) : null))
+        .filter(Boolean)
+      const comboServiceNames = comboSelections
+        .map(selection => selection.service.name)
+        .filter(Boolean)
+
+      const comboLabel = comboQty > 1
+        ? `COMBO SERVICE (${comboQty})`
+        : (comboServiceNames[0] || selectedService.name)
+      const comboDetail = comboServiceNames.join(' + ')
+      const serviceNameSnapshot = comboDetail
+        ? `${comboLabel}: ${comboDetail}`
+        : comboLabel
+
+      await db.query(
+        `
+        INSERT INTO order_items
+          (order_id, service_id, service_name, qty, price, subtotal, therapist_name)
+        VALUES
+          ($1, $2, $3, $4, $5, $6, $7)
+        `,
+        [
+          finalOrderId,
+          comboSelections[0].service.id,
+          serviceNameSnapshot,
+          comboQty,
+          comboQty > 0 ? comboTotal / comboQty : comboTotal,
+          comboTotal,
+          comboTherapistNames.join(', ') || null
+        ]
+      )
 
       await db.query(
         `UPDATE orders
@@ -386,53 +407,48 @@ exports.startTimer = async (req, res) => {
       )
 
       const start = new Date()
-      const createdTimers = []
-      for (let idx = 0; idx < comboSelections.length; idx += 1) {
-        const selection = comboSelections[idx]
-        const slotNumber = slotNumbers[idx]
-        const timerDuration = Number(selection.service.duration_minutes || durationNum)
-        const plannedEndPerService = new Date(start.getTime() + timerDuration * 60000)
+      const plannedEnd = new Date(start.getTime() + comboDurationMinutes * 60000)
+      const slotNumber = slotNumbers[0]
 
-        const { rows } = await db.query(
-          `
-          INSERT INTO timers
-            (
-              order_id,
-              therapist_id,
-              service_id,
-              room_id,
-              start_time,
-              planned_end_time,
-              paused,
-              branch_id,
-              slot_number,
-              status
-            )
-          VALUES
-            ($1,$2,$3,$4,$5,$6,false,$7,$8,'RUNNING')
-          RETURNING *
-          `,
-          [
-            finalOrderId,
-            selection.therapistId,
-            selection.service.id,
+      const { rows: timerRows } = await db.query(
+        `
+        INSERT INTO timers
+          (
+            order_id,
+            therapist_id,
+            service_id,
             room_id,
-            start,
-            plannedEndPerService,
-            branchId,
-            slotNumber
-          ]
-        )
-
-        createdTimers.push(rows[0])
-      }
+            start_time,
+            planned_end_time,
+            paused,
+            branch_id,
+            slot_number,
+            status
+          )
+        VALUES
+          ($1,$2,$3,$4,$5,$6,false,$7,$8,'RUNNING')
+        RETURNING *
+        `,
+        [
+          finalOrderId,
+          comboSelections[0].therapistId,
+          comboSelections[0].service.id,
+          room_id,
+          start,
+          plannedEnd,
+          branchId,
+          slotNumber
+        ]
+      )
 
       await db.query('COMMIT')
 
       res.json({
         order_id: finalOrderId,
         combo_qty: therapistIds.length,
-        timers: createdTimers
+        timer: timerRows[0],
+        combo_duration_minutes: comboDurationMinutes,
+        combo_total: comboTotal
       })
     } catch (error) {
       await db.query('ROLLBACK')

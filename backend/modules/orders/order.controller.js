@@ -535,10 +535,21 @@ exports.getKasirOrders = async (req, res) => {
       LEFT JOIN order_items oi ON oi.order_id = o.id
       LEFT JOIN therapists th ON th.id = o.therapist_id
       LEFT JOIN LATERAL (
-        SELECT string_agg(DISTINCT t.name, ', ' ORDER BY t.name) AS therapist_name
-        FROM timers tm
-        JOIN therapists t ON t.id = tm.therapist_id
-        WHERE tm.order_id = o.id
+        SELECT COALESCE(
+          (
+            SELECT string_agg(DISTINCT oi2.therapist_name, ', ' ORDER BY oi2.therapist_name)
+            FROM order_items oi2
+            WHERE oi2.order_id = o.id
+              AND oi2.therapist_name IS NOT NULL
+              AND oi2.therapist_name <> ''
+          ),
+          (
+            SELECT string_agg(DISTINCT t.name, ', ' ORDER BY t.name)
+            FROM timers tm
+            JOIN therapists t ON t.id = tm.therapist_id
+            WHERE tm.order_id = o.id
+          )
+        ) AS therapist_name
       ) ot ON true
       LEFT JOIN rooms r ON r.id = o.room_id
 

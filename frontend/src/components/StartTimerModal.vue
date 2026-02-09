@@ -161,6 +161,10 @@ const selectedService = computed(() => selectedServices.value[0] || null)
 
 const serviceType = computed(() => selectedService.value?.type || "")
 
+const selectedService = computed(() => selectedServices.value[0] || null)
+
+const serviceType = computed(() => selectedService.value?.type || "")
+
 const duration = computed(() => {
   if (!selectedServices.value.length) return 0
   return Number(selectedServices.value[0].duration_minutes || 0)
