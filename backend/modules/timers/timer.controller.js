@@ -192,6 +192,10 @@ exports.startTimer = async (req, res) => {
       : comboQtyFromName
     const selectedTherapistIds = normalizeTherapistIds(therapist_id, therapist_ids)
 
+    if (comboQty > 1 && !['SPA', 'LC'].includes(selectedService.type)) {
+      return res.status(400).json({ message: 'Combo hanya berlaku untuk SPA dan LC' })
+    }
+
     if (requiresTherapist) {
       if (!selectedTherapistIds.length) {
         return res.status(400).json({ message: "Silakan pilih terapis" })
@@ -281,8 +285,15 @@ exports.startTimer = async (req, res) => {
     }
 
     const invalidTypeService = comboServiceRows.find(row => row.type !== selectedService.type)
+    const invalidComboTypeService = comboQty > 1
+      ? comboServiceRows.find(row => !['SPA', 'LC'].includes(row.type))
+      : null
     if (invalidTypeService) {
       return res.status(400).json({ message: 'Semua service combo harus 1 tipe layanan' })
+    }
+
+    if (invalidComboTypeService) {
+      return res.status(400).json({ message: 'Combo hanya berlaku untuk SPA dan LC' })
     }
 
     const comboSelections = normalizedServiceIds.map((sid, idx) => ({

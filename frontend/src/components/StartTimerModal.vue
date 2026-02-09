@@ -157,17 +157,29 @@ const selectedService = computed(() => selectedServices.value[0] || null)
 
 const serviceType = computed(() => selectedService.value?.type || "")
 
+const selectedService = computed(() => selectedServices.value[0] || null)
+
+const serviceType = computed(() => selectedService.value?.type || "")
+
 const duration = computed(() => {
   if (!selectedServices.value.length) return 0
   return Number(selectedServices.value[0].duration_minutes || 0)
 })
 
 const effectiveDuration = computed(() => duration.value || manualDuration.value)
+const isComboMode = computed(() => selectedOrderType.value === "COMBO" && Number(selectedServiceQty.value || 1) > 1)
 
 const selectableServices = computed(() => {
   if (!services.value.length) return []
-  if (!serviceType.value) return services.value
-  return services.value.filter(s => s.type === serviceType.value)
+
+  const source = isComboMode.value
+    ? services.value.filter(s => ["SPA", "LC"].includes(s.type))
+    : services.value
+
+  if (!serviceType.value) return source
+  if (isComboMode.value && !["SPA", "LC"].includes(serviceType.value)) return source
+
+  return source.filter(s => s.type === serviceType.value)
 })
 
 const normalizeServicePayload = (payload) => {
@@ -200,10 +212,23 @@ const initSelections = () => {
   selectedTherapistIds.value = Array(qty).fill("")
 }
 
+const ensureComboBaseService = () => {
+  if (selectedOrderType.value !== "COMBO" || Number(selectedServiceQty.value || 1) <= 1) return
+  const allowed = services.value.filter(s => ["SPA", "LC"].includes(s.type))
+  if (!allowed.length) return
+
+  const firstId = Number(selectedServiceIds.value[0] || 0)
+  const valid = allowed.some(s => Number(s.id) === firstId)
+  if (!valid) {
+    selectedServiceIds.value = [String(allowed[0].id)]
+  }
+}
+
 const onTypeChange = () => {
   if (selectedOrderType.value === "SINGLE") {
     selectedServiceQty.value = 1
   }
+  ensureComboBaseService()
   initSelections()
 }
 
@@ -211,6 +236,7 @@ const onQtyChange = () => {
   if (selectedOrderType.value === "SINGLE") {
     selectedServiceQty.value = 1
   }
+  ensureComboBaseService()
   initSelections()
 }
 
@@ -241,7 +267,7 @@ const fetchServices = async () => {
       return
     }
 
-    const first = services.value[0]
+    const first = services.value.find(s => ["SPA", "LC"].includes(s.type)) || services.value[0]
     selectedServiceIds.value = [String(first.id)]
     await onServiceSelectionChange()
   } catch (err) {
@@ -318,6 +344,11 @@ const submit = () => {
 
   if (selectedServices.value.some(s => s.type !== selectedType)) {
     errorMessage.value = "Semua service harus 1 tipe layanan"
+    return
+  }
+
+  if (qty > 1 && !["SPA", "LC"].includes(selectedType)) {
+    errorMessage.value = "Combo hanya berlaku untuk SPA dan LC"
     return
   }
 
