@@ -34,3 +34,4 @@ yarn-error.log*
 *.tmp
 .tmp/
 tmp/
+/frontend/node_modules/
