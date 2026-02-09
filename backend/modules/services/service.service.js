@@ -145,6 +145,19 @@ exports.create = async (data, actor) => {
 //}
 
 exports.update = async (id, data) => {
+  const existingRes = await db.query(
+    `SELECT type, base_price FROM services WHERE id=$1`,
+    [id]
+  )
+
+  if (!existingRes.rows.length) {
+    throw new Error("Service not found")
+  }
+
+  const existing = existingRes.rows[0]
+  const keepFnbBasePrice = existing.type === 'FNB' && data.type === 'FNB'
+  const finalBasePrice = keepFnbBasePrice ? existing.base_price : data.base_price
+
   await db.query(`
     UPDATE services
     SET
@@ -159,7 +172,7 @@ exports.update = async (id, data) => {
   `, [
     data.name,
     data.type,
-    data.base_price,
+    finalBasePrice,
     data.duration_minutes,
     data.is_active,
     Boolean(data.happy_hour_enabled),

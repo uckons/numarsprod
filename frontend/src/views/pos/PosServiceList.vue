@@ -65,7 +65,7 @@ const categories = [
 
 const loadServices = async () => {
   const res = await api.get("/services", {
-    params: { is_active: true }
+    params: { is_active: true, _ts: Date.now() }
   })
   services.value = res.data.data || res.data
 }
@@ -79,7 +79,7 @@ onMounted(async () => {
   await loadServices()
   refreshTimer = setInterval(() => {
     loadServices().catch(() => {})
-  }, 60000)
+  }, 15000)
   if (typeof window !== 'undefined') {
     window.addEventListener('focus', handleWindowFocus)
   }
