@@ -179,7 +179,7 @@ const items = computed(() => pos.items || [])
 const maybeOfferPackage = async (cartItem) => {
   if (!cartItem || cartItem.is_package) return
 
-const packageQty = Number(cartItem.package_qty || 0)
+  const packageQty = Number(cartItem.package_qty || 0)
   if (!packageQty || cartItem.qty % packageQty !== 0) return
 
   const res = await SwalTheme.fire({
@@ -230,6 +230,40 @@ const grandTotal = computed(() =>
   items.value.reduce((sum, i) => sum + Number(i.base_price) * i.qty, 0)
 )
 
+const normalizeLabel = (value) => String(value || "")
+  .toLowerCase()
+  .replace(/[^a-z0-9\s]/g, " ")
+  .replace(/\s+/g, " ")
+  .trim()
+
+const extractServiceGradeRule = (serviceName, therapists) => {
+  const normalizedServiceName = normalizeLabel(serviceName)
+  if (!normalizedServiceName) return null
+
+  const gradeCandidates = [...new Set(
+    therapists
+      .map(t => String(t?.grade_name || '').trim())
+      .filter(Boolean)
+  )]
+
+  const sortedCandidates = gradeCandidates.sort((a, b) => b.length - a.length)
+  for (const gradeName of sortedCandidates) {
+    const normalizedGrade = normalizeLabel(gradeName)
+    if (!normalizedGrade) continue
+
+    const matchByWord = normalizedServiceName.split(' ').includes(normalizedGrade)
+    const matchByPhrase = normalizedServiceName.includes(normalizedGrade)
+    if (matchByWord || matchByPhrase) {
+      return {
+        gradeName,
+        normalizedGrade
+      }
+    }
+  }
+
+  return null
+}
+
 const toPayloadItems = () => {
   const normalized = []
 
@@ -247,7 +281,9 @@ const toPayloadItems = () => {
         base_price: packagePrice,
         name: i.package_name || i.name,
         price_label: "PAKET",
-        is_package: true
+        is_package: true,
+        type: String(i.type || '').toUpperCase(),
+        therapist_name: String(i.therapist_name || '').trim() || null
       })
       continue
     }
@@ -258,11 +294,154 @@ const toPayloadItems = () => {
       base_price: i.base_price,
       name: i.name,
       price_label: i.price_label,
-      is_package: Boolean(i.is_package)
+      is_package: Boolean(i.is_package),
+      type: String(i.type || '').toUpperCase(),
+      therapist_name: String(i.therapist_name || '').trim() || null
     })
   }
 
   return normalized
+}
+
+const isServiceLC = (item) => String(item?.type || '').toUpperCase() === 'LC'
+
+const collectLcAssignments = async () => {
+  const payload = toPayloadItems()
+  const lcItems = payload.filter(isServiceLC)
+
+  if (!lcItems.length) {
+    return {
+      payload,
+      therapistAssignments: [],
+      therapistNamesByService: new Map()
+    }
+  }
+
+  const therapistsRes = await api.get('/timers/therapists')
+  const therapists = Array.isArray(therapistsRes.data) ? therapistsRes.data : []
+  if (!therapists.length) {
+    throw new Error('Daftar terapis kosong. Tidak bisa menyimpan service LC tanpa terapis.')
+  }
+
+  const occupiedIds = new Set(
+    therapists
+      .filter(t => Boolean(t.is_occupied))
+      .map(t => Number(t.id))
+      .filter(Number.isFinite)
+  )
+
+  const availableTherapists = therapists.filter(t => !occupiedIds.has(Number(t.id)))
+  if (!availableTherapists.length) {
+    throw new Error('Semua terapis sedang terpakai. Tidak ada terapis tersedia untuk service LC.')
+  }
+
+  const therapistAssignments = []
+  const therapistNamesByService = new Map()
+
+  for (const item of lcItems) {
+    const qty = Number(item.qty || 1)
+    for (let idx = 0; idx < qty; idx += 1) {
+      const slotNo = idx + 1
+      const options = availableTherapists
+        .map((t) => {
+          const therapistId = Number(t.id)
+          const selected = therapistAssignments.some(a => Number(a.therapist_id) === therapistId)
+          const grade = String(t.grade_name || '').trim()
+          const occ = t.is_occupied ? ' (Terpakai)' : ''
+          const used = selected ? ' (Sudah dipilih)' : ''
+          return `<option value="${therapistId}" ${selected ? 'disabled' : ''}>${t.name}${grade ? ` — Grade ${grade}` : ''}${occ}${used}</option>`
+        })
+        .join('')
+
+      const prompt = await SwalTheme.fire({
+        title: `Pilih terapis LC`,
+        html: `
+          <div style="text-align:left;margin-bottom:8px;color:#ddd;">
+            Service: <strong>${item.name}</strong><br/>
+            Slot: <strong>#${slotNo}</strong> dari ${qty}
+          </div>
+          <select id="swal-therapist-select" class="swal2-input" style="width:100%;margin:0;">
+            <option value="">-- Pilih Terapis --</option>
+            ${options}
+          </select>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Pilih',
+        cancelButtonText: 'Batal',
+        preConfirm: () => {
+          const selectEl = document.getElementById('swal-therapist-select')
+          const selectedId = Number(selectEl?.value || 0)
+          if (!selectedId) {
+            Swal.showValidationMessage('Terapis wajib dipilih untuk service LC')
+            return false
+          }
+
+          if (therapistAssignments.some(a => Number(a.therapist_id) === selectedId)) {
+            Swal.showValidationMessage('Terapis yang sama tidak boleh dipilih untuk slot berbeda')
+            return false
+          }
+
+          const therapist = therapists.find(t => Number(t.id) === selectedId)
+          if (!therapist) {
+            Swal.showValidationMessage('Terapis tidak ditemukan')
+            return false
+          }
+
+          if (Boolean(therapist.is_occupied)) {
+            Swal.showValidationMessage('Terapis sedang aktif di timer lain. Pilih terapis lain')
+            return false
+          }
+
+          const rule = extractServiceGradeRule(item.name, therapists)
+          if (rule) {
+            const therapistGrade = normalizeLabel(therapist.grade_name)
+            if (!therapistGrade || therapistGrade !== rule.normalizedGrade) {
+              Swal.showValidationMessage(
+                `Service ${item.name} wajib terapis grade ${rule.gradeName}. Grade terapis terpilih: ${therapist.grade_name || 'Tanpa Grade'}`
+              )
+              return false
+            }
+          }
+
+          return {
+            therapist_id: selectedId,
+            therapist_name: therapist.name
+          }
+        }
+      })
+
+      if (!prompt.isConfirmed || !prompt.value) {
+        return null
+      }
+
+      therapistAssignments.push({
+        service_id: Number(item.id),
+        therapist_id: Number(prompt.value.therapist_id),
+        therapist_name: prompt.value.therapist_name
+      })
+
+      const previousNames = therapistNamesByService.get(Number(item.id)) || []
+      previousNames.push(prompt.value.therapist_name)
+      therapistNamesByService.set(Number(item.id), previousNames)
+    }
+  }
+
+  const normalizedPayload = payload.map((item) => {
+    if (!isServiceLC(item)) return item
+
+    const names = therapistNamesByService.get(Number(item.id)) || []
+    return {
+      ...item,
+      therapist_name: names.join(', ') || null
+    }
+  })
+
+  return {
+    payload: normalizedPayload,
+    therapistAssignments,
+    therapistNamesByService
+  }
 }
 
 const loading = ref(false)
@@ -338,10 +517,9 @@ const checkout = async () => {
       items: toPayloadItems(),
       payment_method: "CASH"
     }
-    
+
     let res
-    
-    // 🆕 Kalau ada currentOrderId, UPDATE order existing
+
     if (pos.currentOrderId) {
       console.log('Updating existing order:', pos.currentOrderId)
       res = await api.post(`/orders/${pos.currentOrderId}/close`, payload)
@@ -350,7 +528,7 @@ const checkout = async () => {
       res = await api.post("/orders/pos", payload)
     }
 
-     lastOrder.value = {
+    lastOrder.value = {
       order_id: res.data.order_id,
       total: res.data.total,
       items: JSON.parse(JSON.stringify(items.value))
@@ -358,17 +536,14 @@ const checkout = async () => {
 
     console.log('✅ Checkout success, order_id:', lastOrder.value.order_id)
 
-    // Clear local cart
     pos.clear()
 
     console.log('🖨️ Calling showReceiptPreview...')
-    
-    // 🖨️ SHOW RECEIPT PREVIEW MODAL (WAIT for modal to close)
+
     await showReceiptPreview(lastOrder.value.order_id)
 
     console.log('Modal closed, creating timers...')
 
-    // After closing receipt modal, create timers and navigate
     try {
       await api.post(`/timers/from-order/${lastOrder.value.order_id}`)
     } catch (e) {
@@ -389,10 +564,9 @@ const checkout = async () => {
   }
 }
 
-// 🖨️ SHOW RECEIPT PREVIEW
 const showReceiptPreview = async (orderId) => {
   console.log('🖨️ showReceiptPreview called, orderId:', orderId)
-  
+
   return new Promise(async (resolve) => {
     try {
       receiptLoading.value = true
@@ -402,8 +576,7 @@ const showReceiptPreview = async (orderId) => {
       receiptData.value = res.data
       showReceiptModal.value = true
       console.log('Modal should show now, showReceiptModal:', showReceiptModal.value)
-      
-      // Wait for modal to close
+
       const checkModalClosed = setInterval(() => {
         if (!showReceiptModal.value) {
           clearInterval(checkModalClosed)
@@ -411,7 +584,7 @@ const showReceiptPreview = async (orderId) => {
           resolve()
         }
       }, 100)
-      
+
     } catch (err) {
       console.error("Failed to load receipt:", err)
       await SwalTheme.fire({
@@ -427,18 +600,15 @@ const showReceiptPreview = async (orderId) => {
   })
 }
 
-// 🖨️ CLOSE RECEIPT MODAL
 const closeReceiptModal = () => {
   showReceiptModal.value = false
   receiptData.value = null
 }
 
-// 🖨️ PRINT RECEIPT
 const printReceipt = () => {
   window.print()
 }
 
-// 🖨️ PRINT TO THERMAL PRINTER (existing function - optional)
 const printOrder = async (order_id = lastOrder.value.order_id) => {
   try {
     await api.post(`/printers/print-order`, { order_id })
@@ -457,6 +627,7 @@ const printOrder = async (order_id = lastOrder.value.order_id) => {
     })
   }
 }
+
 const saveDraft = async () => {
   if (items.value.length === 0) {
     await SwalTheme.fire({
@@ -481,14 +652,27 @@ const saveDraft = async () => {
 
   loading.value = true
   try {
-    const payload = {
-      items: toPayloadItems()
+    const assignmentResult = await collectLcAssignments()
+    if (!assignmentResult) {
+      loading.value = false
+      return
     }
 
-    if (pos.currentOrderId) {
-      await api.post(`/orders/${pos.currentOrderId}/draft`, payload)
+    const payload = {
+      items: assignmentResult.payload,
+      therapist_assignments: assignmentResult.therapistAssignments
+    }
+
+    let orderId = pos.currentOrderId
+    if (orderId) {
+      await api.post(`/orders/${orderId}/draft`, payload)
     } else {
-      await api.post("/orders/pos/draft", payload)
+      const createRes = await api.post("/orders/pos/draft", payload)
+      orderId = Number(createRes?.data?.order_id || 0)
+    }
+
+    if (orderId && assignmentResult.therapistAssignments.length) {
+      await api.post(`/timers/from-order/${orderId}`)
     }
 
     pos.clear()
@@ -496,7 +680,7 @@ const saveDraft = async () => {
     await SwalTheme.fire({
       icon: "success",
       title: "Draft tersimpan",
-      text: "Order masuk ke daftar order.",
+      text: "Order masuk ke daftar order dan slot timer LC sudah disiapkan.",
       confirmButtonText: "OK"
     })
 
