@@ -230,13 +230,17 @@ const maybeOfferPackage = async (cartKey) => {
 
 const select = async (service) => {
   const enriched = enrichService(service)
-  pos.addService(enriched)
+  pos.addService({
+    ...enriched,
+    type: String(enriched.type || '').toUpperCase()
+  })
 
   const key = [
     enriched.id,
     Number(enriched.base_price || 0),
     enriched.price_label || "",
-    enriched.is_package ? "P" : "N"
+    enriched.is_package ? "P" : "N",
+    ""
   ].join(":")
 
   await maybeOfferPackage(key)
