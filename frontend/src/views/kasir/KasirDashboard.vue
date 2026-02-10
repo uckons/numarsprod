@@ -42,8 +42,8 @@
         📋 Daftar Order
       </router-link>
 
-      <router-link to="/kasir/payments" class="action">
-        💳 Pembayaran
+      <router-link to="/kasir/reports" class="action">
+        📊 Laporan
       </router-link>
     </section>
  
