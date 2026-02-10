@@ -172,9 +172,9 @@ exports.kasirAnalytics = async (user, query = {}) => {
   const breakdownRes = await db.query(
     `SELECT
        CASE
-         WHEN s.type IN ('KARAOKE', 'KTV') THEN 'KTV'
-         WHEN s.type = 'LOUNGE' THEN 'LC'
-         ELSE s.type
+         WHEN s.type::text IN ('KARAOKE', 'KTV') THEN 'KTV'
+         WHEN s.type::text = 'LOUNGE' THEN 'LC'
+         ELSE s.type::text
        END AS category,
        COALESCE(SUM(oi.subtotal), 0) AS revenue,
        COALESCE(SUM(oi.qty), 0) AS qty

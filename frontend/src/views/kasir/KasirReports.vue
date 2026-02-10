@@ -44,17 +44,12 @@
 
     <section class="chart-panel">
       <h3>Grafik Pendapatan</h3>
-      <div class="line-chart">
-        <div
-          v-for="point in analytics.trend"
-          :key="point.label"
-          class="line-col"
-          :title="`${point.label} • Rp ${format(point.revenue)}`"
-        >
-          <div class="bar" :style="{ height: `${trendHeight(point.revenue)}%` }" />
-          <small>{{ shortLabel(point.label) }}</small>
-        </div>
-      </div>
+      <Line :data="trendChartData" :options="trendChartOptions" />
+    </section>
+
+    <section class="chart-panel">
+      <h3>Grafik Pendapatan per Kategori (SPA / LC / FNB / KTV)</h3>
+      <Bar :data="breakdownChartData" :options="breakdownChartOptions" />
     </section>
 
     <section class="two-col">
@@ -116,6 +111,31 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api'
 import Swal from 'sweetalert2'
+import { Line, Bar } from 'vue-chartjs'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js'
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+)
 
 const router = useRouter()
 
@@ -168,10 +188,6 @@ const loadAnalytics = async () => {
   }
 }
 
-const trendMax = computed(() => Math.max(...analytics.value.trend.map((x) => x.revenue), 1))
-const trendHeight = (value) => Math.max((Number(value || 0) / trendMax.value) * 100, 5)
-const shortLabel = (label) => String(label || '').slice(5)
-
 const normalizedBreakdown = computed(() => {
   const base = { SPA: 0, LC: 0, FNB: 0, KTV: 0 }
   const qty = { SPA: 0, LC: 0, FNB: 0, KTV: 0 }
@@ -188,6 +204,87 @@ const normalizedBreakdown = computed(() => {
     revenue: base[category]
   }))
 })
+
+const trendChartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: (ctx) => `Rp ${format(ctx.parsed.y || 0)}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      ticks: { color: '#94a2b8' },
+      grid: { color: '#273043', borderDash: [4, 4] }
+    },
+    y: {
+      ticks: {
+        color: '#94a2b8',
+        callback: (value) => `Rp ${format(value)}`
+      },
+      grid: { color: '#273043', borderDash: [4, 4] }
+    }
+  }
+}))
+
+const trendChartData = computed(() => ({
+  labels: (analytics.value.trend || []).map((row) => row.label),
+  datasets: [
+    {
+      label: 'Pendapatan',
+      data: (analytics.value.trend || []).map((row) => Number(row.revenue || 0)),
+      borderColor: '#f0c46a',
+      backgroundColor: 'rgba(240,196,106,0.2)',
+      fill: true,
+      tension: 0.35,
+      pointRadius: 3,
+      pointHoverRadius: 5
+    }
+  ]
+}))
+
+const breakdownChartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: (ctx) => `Rp ${format(ctx.parsed.y || 0)}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      ticks: { color: '#94a2b8' },
+      grid: { color: '#273043', borderDash: [4, 4] }
+    },
+    y: {
+      ticks: {
+        color: '#94a2b8',
+        callback: (value) => `Rp ${format(value)}`
+      },
+      grid: { color: '#273043', borderDash: [4, 4] }
+    }
+  }
+}))
+
+const breakdownChartData = computed(() => ({
+  labels: normalizedBreakdown.value.map((row) => row.category),
+  datasets: [
+    {
+      label: 'Pendapatan',
+      data: normalizedBreakdown.value.map((row) => Number(row.revenue || 0)),
+      backgroundColor: ['#8b5cf6', '#f0c46a', '#22c55e', '#3b82f6'],
+      borderRadius: 8,
+      borderSkipped: false
+    }
+  ]
+}))
 
 onMounted(loadAnalytics)
 </script>
@@ -211,10 +308,11 @@ onMounted(loadAnalytics)
 
 .chart-panel, .table-card { background:#111; border:1px solid #232323; border-radius:12px; padding:14px; margin-bottom:14px; }
 .chart-panel h3, .table-card h3 { margin:0 0 12px; }
-.line-chart { height:220px; display:grid; grid-template-columns: repeat(auto-fit, minmax(36px, 1fr)); gap:8px; align-items:end; }
-.line-col { display:flex; flex-direction:column; align-items:center; gap:6px; }
-.bar { width:100%; min-height:8px; border-radius:8px 8px 4px 4px; background:linear-gradient(180deg, #f0c46a 0%, #c08f2f 100%); }
-.line-col small { color:#94a2b8; font-size:11px; }
+
+:deep(canvas) {
+  min-height: 280px;
+}
+
 
 .two-col { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
 table { width:100%; border-collapse: collapse; }
