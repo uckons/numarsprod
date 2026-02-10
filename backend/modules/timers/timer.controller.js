@@ -56,6 +56,38 @@ exports.startTimer = async (req, res) => {
       .filter(v => Number.isInteger(v) && v > 0))]
   }
 
+
+  const normalizeLabel = (value) => String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const extractServiceGradeRule = (serviceName, therapistRows) => {
+    const normalizedServiceName = normalizeLabel(serviceName)
+    if (!normalizedServiceName) return null
+
+    const gradeCandidates = [...new Set(
+      therapistRows
+        .map((row) => String(row?.grade_name || '').trim())
+        .filter(Boolean)
+    )]
+
+    const sortedCandidates = gradeCandidates.sort((a, b) => b.length - a.length)
+    for (const gradeName of sortedCandidates) {
+      const normalizedGrade = normalizeLabel(gradeName)
+      if (!normalizedGrade) continue
+      if (normalizedServiceName.includes(normalizedGrade)) {
+        return {
+          gradeName,
+          normalizedGrade
+        }
+      }
+    }
+
+    return null
+  }
+
   const allocateSlots = async (db, branchId, requestedSlot, neededCount) => {
     if (!requestedSlot || requestedSlot < 1 || requestedSlot > 30) {
       throw new Error('Nomor slot harus 1–30')
@@ -184,7 +216,7 @@ exports.startTimer = async (req, res) => {
     }
 
     const selectedService = serviceRows[0]
-    const requiresTherapist = selectedService.type !== "LOUNGE"
+    const requiresTherapist = !['LOUNGE', 'KARAOKE'].includes(selectedService.type)
     const requestedComboQty = Number(req.body.combo_qty || 0)
     const comboQtyFromName = parseComboQtyFromName(selectedService.name, selectedService.type)
     const comboQtyFromPayload = Math.max(
@@ -307,11 +339,12 @@ exports.startTimer = async (req, res) => {
       service: serviceMap.get(sid)
     }))
 
+    const neededSlots = comboQty > 1 ? comboQty : 1
     const slotNumbers = await allocateSlots(
       db,
       branchId,
       Number(slot),
-      1
+      neededSlots
     )
 
     const durationNum = Number(duration_minutes)
@@ -348,7 +381,10 @@ exports.startTimer = async (req, res) => {
       let therapistNameById = new Map()
       if (requiresTherapist) {
         const { rows: therapistRows } = await db.query(
-          `SELECT id, name FROM therapists WHERE id = ANY($1::int[])`,
+          `SELECT t.id, t.name, tg.name AS grade_name
+           FROM therapists t
+           LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
+           WHERE t.id = ANY($1::int[])`,
           [therapistIds]
         )
         therapistNameById = new Map(therapistRows.map(t => [Number(t.id), t.name]))
@@ -356,48 +392,65 @@ exports.startTimer = async (req, res) => {
         if (therapistNameById.size !== therapistIds.length) {
           throw new Error('Terapis tidak ditemukan')
         }
+
+        const therapistById = new Map(therapistRows.map(t => [Number(t.id), t]))
+        for (let idx = 0; idx < comboSelections.length; idx += 1) {
+          const selection = comboSelections[idx]
+          if (!selection?.therapistId || !selection?.service) continue
+
+          const gradeRule = extractServiceGradeRule(selection.service.name, therapistRows)
+          if (!gradeRule) continue
+
+          const therapist = therapistById.get(Number(selection.therapistId))
+          const therapistGrade = normalizeLabel(therapist?.grade_name)
+          if (!therapistGrade || therapistGrade !== gradeRule.normalizedGrade) {
+            throw new Error(
+              `Terapis slot #${idx + 1} harus grade ${gradeRule.gradeName} sesuai service ${selection.service.name}`
+            )
+          }
+        }
       }
 
-      const comboTotal = comboSelections.reduce(
+      const comboTotalRaw = comboSelections.reduce(
         (sum, selection) => sum + Number(selection.service.base_price || 0),
         0
       )
+      const comboTotal = Math.round(comboTotalRaw)
       const comboDurationMinutes = comboSelections.reduce(
         (sum, selection) => sum + Number(selection.service.duration_minutes || durationNum || 0),
         0
       ) || durationNum
-      const comboTherapistNames = comboSelections
-        .map(selection => (selection.therapistId ? therapistNameById.get(selection.therapistId) : null))
-        .filter(Boolean)
       const comboServiceNames = comboSelections
         .map(selection => selection.service.name)
         .filter(Boolean)
 
-      const comboLabel = comboQty > 1
-        ? `COMBO SERVICE (${comboQty})`
-        : (comboServiceNames[0] || selectedService.name)
-      const comboDetail = comboServiceNames.join(' + ')
-      const serviceNameSnapshot = comboDetail
-        ? `${comboLabel}: ${comboDetail}`
-        : comboLabel
+      const comboLabel = comboQty > 1 ? `COMBO SERVICE (${comboQty})` : null
 
-      await db.query(
-        `
-        INSERT INTO order_items
-          (order_id, service_id, service_name, qty, price, subtotal, therapist_name)
-        VALUES
-          ($1, $2, $3, $4, $5, $6, $7)
-        `,
-        [
-          finalOrderId,
-          comboSelections[0].service.id,
-          serviceNameSnapshot,
-          comboQty,
-          comboQty > 0 ? comboTotal / comboQty : comboTotal,
-          comboTotal,
-          comboTherapistNames.join(', ') || null
-        ]
-      )
+      for (const selection of comboSelections) {
+        const unitPrice = Math.round(Number(selection.service.base_price || 0))
+        const baseServiceName = selection.service.name || selectedService.name
+        const serviceNameSnapshot = comboLabel
+          ? `${comboLabel}: ${baseServiceName}`
+          : baseServiceName
+
+        await db.query(
+          `
+          INSERT INTO order_items
+            (order_id, service_id, service_name, qty, price, subtotal, therapist_name)
+          VALUES
+            ($1, $2, $3, $4, $5, $6, $7)
+          `,
+          [
+            finalOrderId,
+            selection.service.id,
+            serviceNameSnapshot,
+            1,
+            unitPrice,
+            unitPrice,
+            selection.therapistId ? therapistNameById.get(selection.therapistId) || null : null
+          ]
+        )
+      }
 
       await db.query(
         `UPDATE orders
@@ -406,47 +459,56 @@ exports.startTimer = async (req, res) => {
         [comboTotal, finalOrderId]
       )
 
-      const start = new Date()
-      const plannedEnd = new Date(start.getTime() + comboDurationMinutes * 60000)
-      const slotNumber = slotNumbers[0]
+      const createdTimers = []
+      for (let idx = 0; idx < comboSelections.length; idx += 1) {
+        const selection = comboSelections[idx]
+        const start = new Date()
+        const plannedEnd = new Date(start.getTime() + comboDurationMinutes * 60000)
+        const slotNumber = slotNumbers[idx] || slotNumbers[0]
 
-      const { rows: timerRows } = await db.query(
-        `
-        INSERT INTO timers
-          (
-            order_id,
-            therapist_id,
-            service_id,
+        const { rows: timerRows } = await db.query(
+          `
+          INSERT INTO timers
+            (
+              order_id,
+              therapist_id,
+              service_id,
+              room_id,
+              start_time,
+              planned_end_time,
+              paused,
+              branch_id,
+              slot_number,
+              status
+            )
+          VALUES
+            ($1,$2,$3,$4,$5,$6,false,$7,$8,'RUNNING')
+          RETURNING *
+          `,
+          [
+            finalOrderId,
+            selection.therapistId,
+            selection.service.id,
             room_id,
-            start_time,
-            planned_end_time,
-            paused,
-            branch_id,
-            slot_number,
-            status
-          )
-        VALUES
-          ($1,$2,$3,$4,$5,$6,false,$7,$8,'RUNNING')
-        RETURNING *
-        `,
-        [
-          finalOrderId,
-          comboSelections[0].therapistId,
-          comboSelections[0].service.id,
-          room_id,
-          start,
-          plannedEnd,
-          branchId,
-          slotNumber
-        ]
-      )
+            start,
+            plannedEnd,
+            branchId,
+            slotNumber
+          ]
+        )
+
+        if (timerRows[0]) {
+          createdTimers.push(timerRows[0])
+        }
+      }
 
       await db.query('COMMIT')
 
       res.json({
         order_id: finalOrderId,
         combo_qty: therapistIds.length,
-        timer: timerRows[0],
+        timer: createdTimers[0] || null,
+        timers: createdTimers,
         combo_duration_minutes: comboDurationMinutes,
         combo_total: comboTotal
       })
@@ -595,14 +657,21 @@ exports.getTherapists = async (req, res) => {
   try {
     const db = req.app.get("db")
     const branch_id = req.query.branch_id || req.user.branch_id
-    const service_type = req.query.service_type
-
     let query = `
       SELECT 
         t.id,
         t.name,
         t.grade_id,
-        tg.name AS grade_name
+        tg.name AS grade_name,
+        CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM timers tm
+            WHERE tm.therapist_id = t.id
+              AND tm.end_time IS NULL
+          ) THEN true
+          ELSE false
+        END AS is_occupied
       FROM therapists t
       LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
       WHERE t.active = true
@@ -650,11 +719,15 @@ exports.getRooms = async (req, res) => {
     const params = [branch_id]
     
     if (service_type) {
-       if (service_type === "LOUNGE") {
-        query += ` AND r.type IN ('LOUNGE','LC')`
-      } else {
+      if (service_type === "SPA") {
         query += ` AND r.type = $2`
-        params.push(service_type)
+        params.push('SPA')
+      } else if (service_type === "LC") {
+        query += ` AND r.type IN ('LC','LOUNGE')`
+      } else if (service_type === "LOUNGE") {
+        query += ` AND r.type IN ('LC','LOUNGE')`
+      } else if (service_type === "KARAOKE") {
+        query += ` AND r.type IN ('KTV','KARAOKE')`
       }
     }
     
