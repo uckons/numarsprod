@@ -69,6 +69,43 @@ const formatDateOnly = (date) => {
   return `${year}-${month}-${day}`
 }
 
+const parseTimeToMinutes = (value, fallback) => {
+  const raw = String(value || fallback || "00:00:00")
+  const [h = "0", m = "0", s = "0"] = raw.split(":")
+  const hh = Number(h)
+  const mm = Number(m)
+  const ss = Number(s)
+  if ([hh, mm, ss].some((v) => Number.isNaN(v))) return 0
+  return hh * 60 + mm + ss / 60
+}
+
+const shiftDateOnly = (date, days) => {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+const getCurrentBusinessDate = (now, openTime, closeTime) => {
+  const openMinutes = parseTimeToMinutes(openTime, "10:00:00")
+  const closeMinutes = parseTimeToMinutes(closeTime, "03:00:00")
+  const nowMinutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60
+  const overnight = closeMinutes <= openMinutes
+  const businessDate = new Date(now)
+  businessDate.setHours(0, 0, 0, 0)
+
+  if (overnight) {
+    if (nowMinutes < closeMinutes) {
+      businessDate.setDate(businessDate.getDate() - 1)
+    }
+    return businessDate
+  }
+
+  if (nowMinutes < openMinutes) {
+    businessDate.setDate(businessDate.getDate() - 1)
+  }
+  return businessDate
+}
+
 const parseDateInput = (raw) => {
   if (!raw) return null
   const value = String(raw).trim()
@@ -92,30 +129,21 @@ const parseDateInput = (raw) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-const resolveRange = ({ preset, date_from, date_to }) => {
+const resolveRange = ({ preset, date_from, date_to, open_time, close_time }) => {
   const now = new Date()
+  const currentBusinessDate = getCurrentBusinessDate(now, open_time, close_time)
   let from
   let to
 
   if (preset === "daily") {
-    from = new Date(now)
-    from.setHours(0, 0, 0, 0)
-    to = new Date(from)
-    to.setDate(to.getDate() + 1)
+    from = new Date(currentBusinessDate)
+    to = shiftDateOnly(from, 1)
   } else if (preset === "weekly") {
-    from = new Date(now)
-    from.setDate(from.getDate() - 6)
-    from.setHours(0, 0, 0, 0)
-    to = new Date(now)
-    to.setHours(23, 59, 59, 999)
-    to = new Date(to.getTime() + 1)
+    from = shiftDateOnly(currentBusinessDate, -6)
+    to = shiftDateOnly(currentBusinessDate, 1)
   } else {
-    from = new Date(now)
-    from.setDate(from.getDate() - 29)
-    from.setHours(0, 0, 0, 0)
-    to = new Date(now)
-    to.setHours(23, 59, 59, 999)
-    to = new Date(to.getTime() + 1)
+    from = shiftDateOnly(currentBusinessDate, -29)
+    to = shiftDateOnly(currentBusinessDate, 1)
   }
 
   if (date_from) {
@@ -127,9 +155,8 @@ const resolveRange = ({ preset, date_from, date_to }) => {
   if (date_to) {
     const parsedTo = parseDateInput(date_to)
     if (!parsedTo) throw new Error("Invalid date_to")
-    to = parsedTo
-    to.setHours(23, 59, 59, 999)
-    to = new Date(to.getTime() + 1)
+    parsedTo.setHours(0, 0, 0, 0)
+    to = shiftDateOnly(parsedTo, 1)
   }
 
   if (!(from instanceof Date) || Number.isNaN(from.getTime())) {
@@ -149,28 +176,70 @@ const resolveRange = ({ preset, date_from, date_to }) => {
 exports.kasirAnalytics = async (user, query = {}) => {
   const branchId = user.branch_id
   const preset = String(query.preset || "monthly").toLowerCase()
+
+  const scheduleRes = await db.query(
+    `SELECT open_time, close_time FROM branches WHERE id = $1`,
+    [branchId]
+  )
+  const schedule = scheduleRes.rows[0] || { open_time: "10:00:00", close_time: "03:00:00" }
+
   const { from, to } = resolveRange({
     preset,
     date_from: query.date_from,
-    date_to: query.date_to
+    date_to: query.date_to,
+    open_time: schedule.open_time,
+    close_time: schedule.close_time
   })
 
+  const scopedOrderCte = `WITH branch_schedule AS (
+      SELECT
+        COALESCE(open_time, '10:00:00'::time) AS open_time,
+        COALESCE(close_time, '03:00:00'::time) AS close_time
+      FROM branches
+      WHERE id = $1
+    ),
+    business_windows AS (
+      SELECT
+        day::date AS business_date,
+        (day::timestamp + bs.open_time) AS window_start,
+        CASE
+          WHEN bs.close_time <= bs.open_time THEN (day::timestamp + INTERVAL '1 day' + bs.close_time)
+          ELSE (day::timestamp + bs.close_time)
+        END AS window_end
+      FROM branch_schedule bs
+      CROSS JOIN LATERAL generate_series(($2::date - INTERVAL '1 day')::timestamp, $3::date::timestamp, INTERVAL '1 day') AS day
+    ),
+    orders_scoped AS (
+      SELECT
+        o.id,
+        o.total,
+        o.created_at,
+        bw.business_date
+      FROM orders o
+      JOIN business_windows bw
+        ON o.created_at >= bw.window_start
+       AND o.created_at < bw.window_end
+      WHERE o.status = 'PAID'
+        AND o.branch_id = $1
+        AND bw.business_date >= $2::date
+        AND bw.business_date < $3::date
+    )`
+
   const summaryRes = await db.query(
-    `SELECT
+    `${scopedOrderCte}
+     SELECT
        COUNT(DISTINCT o.id) AS paid_orders,
        COALESCE(SUM(o.total), 0) AS revenue,
        COALESCE(SUM(oi.qty), 0) AS items_sold
-     FROM orders o
+     FROM orders_scoped o
      LEFT JOIN order_items oi ON oi.order_id = o.id
-     WHERE o.status = 'PAID'
-       AND o.branch_id = $1
-       AND o.created_at >= $2
-       AND o.created_at < $3`,
+     `,
     [branchId, from, to]
   )
 
   const breakdownRes = await db.query(
-    `SELECT
+    `${scopedOrderCte}
+     SELECT
        CASE
          WHEN s.type::text IN ('KARAOKE', 'KTV') THEN 'KTV'
          WHEN s.type::text = 'LOUNGE' THEN 'LC'
@@ -179,30 +248,23 @@ exports.kasirAnalytics = async (user, query = {}) => {
        COALESCE(SUM(oi.subtotal), 0) AS revenue,
        COALESCE(SUM(oi.qty), 0) AS qty
      FROM order_items oi
-     JOIN orders o ON o.id = oi.order_id
+     JOIN orders_scoped o ON o.id = oi.order_id
      JOIN services s ON s.id = oi.service_id
-     WHERE o.status = 'PAID'
-       AND o.branch_id = $1
-       AND o.created_at >= $2
-       AND o.created_at < $3
      GROUP BY 1`,
     [branchId, from, to]
   )
 
   const topFnbRes = await db.query(
-    `SELECT
+    `${scopedOrderCte}
+     SELECT
        oi.service_id,
        oi.service_name,
        COALESCE(SUM(oi.qty), 0) AS qty,
        COALESCE(SUM(oi.subtotal), 0) AS revenue
      FROM order_items oi
-     JOIN orders o ON o.id = oi.order_id
+     JOIN orders_scoped o ON o.id = oi.order_id
      JOIN services s ON s.id = oi.service_id
-     WHERE o.status = 'PAID'
-       AND o.branch_id = $1
-       AND o.created_at >= $2
-       AND o.created_at < $3
-       AND s.type = 'FNB'
+     WHERE s.type = 'FNB'
      GROUP BY oi.service_id, oi.service_name
      ORDER BY qty DESC, revenue DESC
      LIMIT 5`,
@@ -210,18 +272,15 @@ exports.kasirAnalytics = async (user, query = {}) => {
   )
 
   const topTherapistRes = await db.query(
-    `WITH therapist_rows AS (
+    `${scopedOrderCte},
+     therapist_rows AS (
        SELECT
          o.id AS order_id,
          oi.subtotal,
          BTRIM(raw_name) AS therapist_name
        FROM order_items oi
-       JOIN orders o ON o.id = oi.order_id
+       JOIN orders_scoped o ON o.id = oi.order_id
        CROSS JOIN LATERAL regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS raw_name
-       WHERE o.status = 'PAID'
-         AND o.branch_id = $1
-         AND o.created_at >= $2
-         AND o.created_at < $3
      )
      SELECT
        tr.therapist_name,
@@ -246,22 +305,19 @@ exports.kasirAnalytics = async (user, query = {}) => {
   )
 
   const categoryTrendRes = await db.query(
-    `WITH mapped AS (
+    `${scopedOrderCte},
+     mapped AS (
        SELECT
-         DATE(o.created_at) AS bucket,
+         o.business_date AS bucket,
          CASE
            WHEN s.type::text IN ('KARAOKE', 'KTV') THEN 'KTV'
            WHEN s.type::text = 'LOUNGE' THEN 'LC'
            ELSE s.type::text
          END AS category,
          COALESCE(oi.subtotal, 0) AS revenue
-       FROM order_items oi
-       JOIN orders o ON o.id = oi.order_id
-       JOIN services s ON s.id = oi.service_id
-       WHERE o.status = 'PAID'
-         AND o.branch_id = $1
-         AND o.created_at >= $2
-         AND o.created_at < $3
+      FROM order_items oi
+      JOIN orders_scoped o ON o.id = oi.order_id
+      JOIN services s ON s.id = oi.service_id
      )
      SELECT
        bucket,
@@ -276,17 +332,14 @@ exports.kasirAnalytics = async (user, query = {}) => {
   )
 
   const trendRes = await db.query(
-    `SELECT
-       DATE(o.created_at) AS bucket,
+    `${scopedOrderCte}
+     SELECT
+       o.business_date AS bucket,
        COUNT(*) AS orders,
        COALESCE(SUM(o.total), 0) AS revenue
-     FROM orders o
-     WHERE o.status = 'PAID'
-       AND o.branch_id = $1
-       AND o.created_at >= $2
-       AND o.created_at < $3
-     GROUP BY DATE(o.created_at)
-     ORDER BY DATE(o.created_at) ASC`,
+     FROM orders_scoped o
+     GROUP BY o.business_date
+     ORDER BY o.business_date ASC`,
     [branchId, from, to]
   )
 
