@@ -13,12 +13,15 @@
     </div>
 
     <div class="toolbar">
-      <input
-        v-model.trim="searchKeyword"
-        class="search"
-        type="text"
-        placeholder="Cari service..."
-      />
+      <div class="search-wrap">
+        <input
+          v-model.trim="searchKeyword"
+          class="search"
+          type="text"
+          placeholder="Cari service..."
+        />
+        <button v-if="searchKeyword" class="btn-reset" @click="resetSearch">Reset</button>
+      </div>
       <select v-model.number="pageSize" class="page-size">
         <option :value="8">8 / halaman</option>
         <option :value="12">12 / halaman</option>
@@ -239,6 +242,10 @@ const select = async (service) => {
   await maybeOfferPackage(key)
 }
 
+const resetSearch = () => {
+  searchKeyword.value = ""
+}
+
 const format = (v) => Number(v || 0).toLocaleString("id-ID")
 </script>
 
@@ -248,9 +255,12 @@ const format = (v) => Number(v || 0).toLocaleString("id-ID")
 .tabs button { padding: 10px 18px; border-radius: 14px; border: 1px solid #222; background: #111; color: #aaa; font-weight: 600; cursor: pointer; transition: all .2s ease; }
 .tabs button:hover { color: #fff; border-color: #c9a24d; }
 .tabs button.active { background: #c9a24d; color: #000; border-color: #c9a24d; }
-.toolbar { display: flex; gap: 10px; margin-bottom: 12px; }
+.toolbar { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+.search-wrap { display:flex; gap:8px; flex: 0 1 520px; min-width: 280px; }
 .search, .page-size { height: 40px; border-radius: 10px; border: 1px solid #2a2a2a; background:#101010; color:#fff; padding:0 12px; }
-.search { flex: 1; }
+.search { flex: 1; max-width: 420px; }
+.btn-reset { height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #3a3a3a; background: #1b1b1b; color: #ddd; cursor: pointer; }
+.btn-reset:hover { border-color:#c9a24d; color:#fff; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
 .service-card { background: linear-gradient(145deg, #0e0e0e, #151515); border-radius: 18px; padding: 16px; box-shadow: 0 12px 35px rgba(0,0,0,.45); cursor: pointer; transition: all .25s ease; display: flex; flex-direction: column; justify-content: space-between; }
 .service-card:hover { transform: translateY(-4px); box-shadow: 0 22px 60px rgba(0,0,0,.7); }
@@ -264,4 +274,10 @@ const format = (v) => Number(v || 0).toLocaleString("id-ID")
 .pagination { display:flex; align-items:center; justify-content:center; gap:12px; margin-top: 14px; }
 .pagination button { background:#222; color:#fff; border:1px solid #333; border-radius:8px; padding:6px 12px; cursor:pointer; }
 .pagination button:disabled { opacity:.4; cursor:not-allowed; }
+@media (max-width: 900px) {
+  .toolbar { flex-wrap: wrap; }
+  .search-wrap { flex: 1 1 100%; }
+  .search { max-width: none; }
+}
+
 </style>
