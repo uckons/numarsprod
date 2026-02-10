@@ -581,7 +581,7 @@ exports.startManual = async (req, res) => {
       [
         order_id,
         service_id,
-        user.branch_id,
+        branchId,
         `${rows[0].duration_minutes} minutes`
       ]
     )
@@ -598,21 +598,15 @@ exports.createFromOrder = async (req, res) => {
     const db = req.app.get("db")
     const { orderId } = req.params
     const user = req.user
-    const branchId = user.branch_id
 
+    // ambil item order yg punya durasi
     const itemsRes = await db.query(
       `
-      SELECT
-        oi.service_id,
-        oi.qty,
-        oi.therapist_name,
-        s.duration_minutes,
-        s.type
+      SELECT oi.service_id, s.duration_minutes
       FROM order_items oi
       JOIN services s ON s.id = oi.service_id
       WHERE oi.order_id = $1
         AND s.duration_minutes IS NOT NULL
-      ORDER BY oi.id ASC
       `,
       [orderId]
     )
@@ -621,73 +615,29 @@ exports.createFromOrder = async (req, res) => {
       return res.json({ success: true, created: 0 })
     }
 
-    const therapistMap = new Map()
-    const therapistNamePool = new Set()
-    for (const row of itemsRes.rows) {
-      const rawNames = String(row.therapist_name || '')
-        .split(',')
-        .map(name => name.trim())
-        .filter(Boolean)
-
-      for (const therapistName of rawNames) {
-        therapistNamePool.add(therapistName)
-      }
-    }
-
-    if (therapistNamePool.size) {
-      const nameList = [...therapistNamePool]
-      const therapistRes = await db.query(
-        `SELECT id, name FROM therapists WHERE branch_id = $1 AND name = ANY($2::text[])`,
-        [branchId, nameList]
-      )
-      therapistRes.rows.forEach((row) => {
-        therapistMap.set(String(row.name).trim().toLowerCase(), Number(row.id))
-      })
-    }
-
-    await db.query(`DELETE FROM timers WHERE order_id = $1`, [orderId])
-
     let created = 0
 
-    for (const row of itemsRes.rows) {
-      const qty = Math.max(1, Number(row.qty || 1))
-      const duration = Number(row.duration_minutes || 0)
-      if (!duration) continue
+    for (const i of itemsRes.rows) {
+      const start = new Date()
+      const end = new Date(start.getTime() + i.duration_minutes * 60000)
 
-      const therapistNames = String(row.therapist_name || '')
-        .split(',')
-        .map(name => name.trim())
-        .filter(Boolean)
+      await db.query(
+        `
+        INSERT INTO timers
+          (order_id, service_id, branch_id, start_time, planned_end_time)
+        VALUES
+          ($1,$2,$3,$4,$5)
+        `,
+        [
+          orderId,
+          i.service_id,
+          branchId,
+          start,
+          end
+        ]
+      )
 
-      for (let idx = 0; idx < qty; idx += 1) {
-        const start = new Date()
-        const end = new Date(start.getTime() + duration * 60000)
-
-        let therapistId = null
-        const therapistName = therapistNames[idx] || therapistNames[0] || ''
-        if (therapistName) {
-          therapistId = therapistMap.get(therapistName.toLowerCase()) || null
-        }
-
-        await db.query(
-          `
-          INSERT INTO timers
-            (order_id, service_id, branch_id, therapist_id, start_time, planned_end_time)
-          VALUES
-            ($1,$2,$3,$4,$5,$6)
-          `,
-          [
-            orderId,
-            Number(row.service_id),
-            branchId,
-            therapistId,
-            start,
-            end
-          ]
-        )
-
-        created += 1
-      }
+      created++
     }
 
     res.json({ success: true, created })
