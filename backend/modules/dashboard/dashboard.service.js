@@ -210,19 +210,26 @@ exports.kasirAnalytics = async (user, query = {}) => {
   )
 
   const topTherapistRes = await db.query(
-    `SELECT
-       oi.therapist_name,
-       COUNT(DISTINCT o.id) AS orders,
-       COALESCE(SUM(oi.subtotal), 0) AS revenue
-     FROM order_items oi
-     JOIN orders o ON o.id = oi.order_id
-     WHERE o.status = 'PAID'
-       AND o.branch_id = $1
-       AND o.created_at >= $2
-       AND o.created_at < $3
-       AND oi.therapist_name IS NOT NULL
-       AND oi.therapist_name <> ''
-     GROUP BY oi.therapist_name
+    `WITH therapist_rows AS (
+       SELECT
+         o.id AS order_id,
+         oi.subtotal,
+         BTRIM(raw_name) AS therapist_name
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       CROSS JOIN LATERAL regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS raw_name
+       WHERE o.status = 'PAID'
+         AND o.branch_id = $1
+         AND o.created_at >= $2
+         AND o.created_at < $3
+     )
+     SELECT
+       therapist_name,
+       COUNT(DISTINCT order_id) AS orders,
+       COALESCE(SUM(subtotal), 0) AS revenue
+     FROM therapist_rows
+     WHERE therapist_name <> ''
+     GROUP BY therapist_name
      ORDER BY revenue DESC, orders DESC
      LIMIT 5`,
     [branchId, from, to]

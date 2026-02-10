@@ -17,10 +17,30 @@
       </select>
 
       <label>Dari</label>
-      <input class="date-input" type="date" v-model="filters.date_from" :disabled="loading" />
+      <input
+        ref="dateFromEl"
+        class="date-input"
+        type="date"
+        v-model="filters.date_from"
+        :disabled="loading"
+        @focus="openDatePicker('from')"
+        @click="openDatePicker('from')"
+        @keydown.prevent
+        @paste.prevent
+      />
 
       <label>Sampai</label>
-      <input class="date-input" type="date" v-model="filters.date_to" :disabled="loading" />
+      <input
+        ref="dateToEl"
+        class="date-input"
+        type="date"
+        v-model="filters.date_to"
+        :disabled="loading"
+        @focus="openDatePicker('to')"
+        @click="openDatePicker('to')"
+        @keydown.prevent
+        @paste.prevent
+      />
 
       <button class="apply-btn" @click="loadAnalytics" :disabled="loading">
         {{ loading ? 'Memuat...' : 'Terapkan' }}
@@ -54,17 +74,11 @@
       </div>
     </section>
 
-    <section class="category-grid">
-      <article v-for="card in categoryCards" :key="card.key" class="category-card">
-        <div class="category-head">
-          <h4>{{ card.key }}</h4>
-          <span>Rp {{ format(card.revenue) }}</span>
-        </div>
-        <p>{{ card.qty }} item</p>
-        <div class="progress-track">
-          <div class="progress-fill" :style="{ width: `${card.percent}%` }" />
-        </div>
-      </article>
+    <section class="chart-panel compact-panel">
+      <h3>Grafik Kategori (SPA / LC / FNB / KTV)</h3>
+      <div class="chart-wrap small">
+        <Bar :data="categoryBarData" :options="categoryBarOptions" />
+      </div>
     </section>
 
     <section class="two-col">
@@ -126,13 +140,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api'
 import Swal from 'sweetalert2'
-import { Line } from 'vue-chartjs'
+import { Line, Bar } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
@@ -144,6 +159,7 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
@@ -152,6 +168,8 @@ ChartJS.register(
 
 const router = useRouter()
 const loading = ref(false)
+const dateFromEl = ref(null)
+const dateToEl = ref(null)
 
 const filters = ref({
   preset: 'daily',
@@ -169,6 +187,13 @@ const analytics = ref({
 })
 
 const format = (n) => new Intl.NumberFormat('id-ID').format(Number(n || 0))
+
+const openDatePicker = (field) => {
+  const target = field === 'from' ? dateFromEl.value : dateToEl.value
+  if (target?.showPicker) {
+    target.showPicker()
+  }
+}
 
 const onPresetChange = () => {
   filters.value.date_from = ''
@@ -222,20 +247,6 @@ const normalizedBreakdown = computed(() => {
   }))
 })
 
-const maxCategoryRevenue = computed(() => {
-  const max = Math.max(...normalizedBreakdown.value.map((x) => x.revenue), 0)
-  return max > 0 ? max : 1
-})
-
-const categoryCards = computed(() => (
-  normalizedBreakdown.value.map((item) => ({
-    key: item.category,
-    revenue: item.revenue,
-    qty: item.qty,
-    percent: Math.max(Math.round((item.revenue / maxCategoryRevenue.value) * 100), item.revenue > 0 ? 8 : 0)
-  }))
-))
-
 const trendChartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -279,6 +290,47 @@ const trendChartData = computed(() => ({
   ]
 }))
 
+const categoryBarData = computed(() => ({
+  labels: normalizedBreakdown.value.map((row) => row.category),
+  datasets: [
+    {
+      label: 'Pendapatan',
+      data: normalizedBreakdown.value.map((row) => Number(row.revenue || 0)),
+      backgroundColor: ['#f0c46a', '#8b5cf6', '#22c55e', '#3b82f6'],
+      borderRadius: 8,
+      barThickness: 22,
+      maxBarThickness: 28
+    }
+  ]
+}))
+
+const categoryBarOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: (ctx) => `Rp ${format(ctx.parsed.y || 0)}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      ticks: { color: '#94a2b8' },
+      grid: { display: false }
+    },
+    y: {
+      ticks: {
+        color: '#94a2b8',
+        callback: (value) => `Rp ${format(value)}`
+      },
+      grid: { color: '#273043', borderDash: [4, 4] }
+    }
+  }
+}))
+
 onMounted(loadAnalytics)
 </script>
 
@@ -287,7 +339,16 @@ onMounted(loadAnalytics)
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .page-header h1 { margin: 0 0 4px; color: #f0c46a; }
 .page-header p { margin: 0; color: #9aa0ae; }
-.back-btn { border: 1px solid #2e2e2e; background: #131313; color: #fff; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+.back-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  background: #c0392b;
+  border: 1px solid #333;
+  color: white;
+  cursor: pointer;
+}
 
 .filters { display: grid; grid-template-columns: auto 160px auto 160px auto 160px 110px 90px; gap: 10px; align-items: center; background:#121212; border:1px solid #242424; border-radius:12px; padding: 12px; margin-bottom: 14px; }
 .filters select, .filters input { background:#1a1a1a; border:1px solid #2f2f2f; color:#fff; border-radius:8px; padding:8px 10px; }
@@ -304,26 +365,8 @@ onMounted(loadAnalytics)
 .chart-panel, .table-card { background:#111; border:1px solid #232323; border-radius:12px; padding:14px; margin-bottom:14px; }
 .chart-panel h3, .table-card h3 { margin:0 0 12px; }
 .chart-wrap { height: 240px; }
+.chart-wrap.small { height: 220px; }
 :deep(canvas) { max-height: 240px !important; }
-
-.category-grid {
-  display:grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
-}
-.category-card {
-  background: #111;
-  border: 1px solid #232323;
-  border-radius: 12px;
-  padding: 12px;
-}
-.category-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-.category-head h4 { margin: 0; color: #f0c46a; font-size: 14px; }
-.category-head span { font-weight: 700; }
-.category-card p { margin:0 0 10px; color:#9aa0ae; font-size:12px; }
-.progress-track { height: 8px; border-radius: 999px; background:#1f2937; overflow:hidden; }
-.progress-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #8b5cf6, #f0c46a); }
 
 .two-col { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
 table { width:100%; border-collapse: collapse; }
@@ -334,7 +377,6 @@ th { color:#f0c46a; font-size:12px; }
 @media (max-width: 1024px) {
   .filters { grid-template-columns: 1fr 1fr; }
   .summary-grid { grid-template-columns: 1fr 1fr; }
-  .category-grid { grid-template-columns: 1fr 1fr; }
   .two-col { grid-template-columns: 1fr; }
 }
 </style>
