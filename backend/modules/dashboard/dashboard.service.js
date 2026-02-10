@@ -214,8 +214,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
        SELECT
          o.id AS order_id,
          oi.subtotal,
-         BTRIM(raw_name) AS therapist_name,
-         GREATEST(array_length(regexp_split_to_array(COALESCE(oi.therapist_name, ''), ','), 1), 1) AS therapist_count
+         BTRIM(raw_name) AS therapist_name
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        CROSS JOIN LATERAL regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS raw_name
@@ -228,7 +227,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
        tr.therapist_name,
        COALESCE(grade_info.grade_name, '-') AS grade_name,
        COUNT(DISTINCT tr.order_id) AS orders,
-       COALESCE(SUM(tr.subtotal / NULLIF(tr.therapist_count, 0)), 0) AS revenue
+       COALESCE(SUM(tr.subtotal), 0) AS revenue
      FROM therapist_rows tr
      LEFT JOIN LATERAL (
        SELECT tg.name AS grade_name
