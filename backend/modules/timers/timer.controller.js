@@ -367,38 +367,37 @@ exports.startTimer = async (req, res) => {
         (sum, selection) => sum + Number(selection.service.duration_minutes || durationNum || 0),
         0
       ) || durationNum
-      const comboTherapistNames = comboSelections
-        .map(selection => (selection.therapistId ? therapistNameById.get(selection.therapistId) : null))
-        .filter(Boolean)
       const comboServiceNames = comboSelections
         .map(selection => selection.service.name)
         .filter(Boolean)
 
-      const comboLabel = comboQty > 1
-        ? `COMBO SERVICE (${comboQty})`
-        : (comboServiceNames[0] || selectedService.name)
-      const comboDetail = comboServiceNames.join(' + ')
-      const serviceNameSnapshot = comboDetail
-        ? `${comboLabel}: ${comboDetail}`
-        : comboLabel
+      const comboLabel = comboQty > 1 ? `COMBO SERVICE (${comboQty})` : null
 
-      await db.query(
-        `
-        INSERT INTO order_items
-          (order_id, service_id, service_name, qty, price, subtotal, therapist_name)
-        VALUES
-          ($1, $2, $3, $4, $5, $6, $7)
-        `,
-        [
-          finalOrderId,
-          comboSelections[0].service.id,
-          serviceNameSnapshot,
-          1,
-          comboTotal,
-          comboTotal,
-          comboTherapistNames.join(', ') || null
-        ]
-      )
+      for (const selection of comboSelections) {
+        const unitPrice = Math.round(Number(selection.service.base_price || 0))
+        const baseServiceName = selection.service.name || selectedService.name
+        const serviceNameSnapshot = comboLabel
+          ? `${comboLabel}: ${baseServiceName}`
+          : baseServiceName
+
+        await db.query(
+          `
+          INSERT INTO order_items
+            (order_id, service_id, service_name, qty, price, subtotal, therapist_name)
+          VALUES
+            ($1, $2, $3, $4, $5, $6, $7)
+          `,
+          [
+            finalOrderId,
+            selection.service.id,
+            serviceNameSnapshot,
+            1,
+            unitPrice,
+            unitPrice,
+            selection.therapistId ? therapistNameById.get(selection.therapistId) || null : null
+          ]
+        )
+      }
 
       await db.query(
         `UPDATE orders
