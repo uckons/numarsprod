@@ -279,6 +279,68 @@ const isRoomDisabled = (room) => {
   return Boolean(room.is_occupied)
 }
 
+
+const normalizeLabel = (value) => String(value || "")
+  .toLowerCase()
+  .replace(/[^a-z0-9\s]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
+
+const extractServiceGradeRule = (service) => {
+  if (!service?.name) return null
+  const serviceName = normalizeLabel(service.name)
+  if (!serviceName) return null
+
+  const gradeCandidates = [...new Set(
+    therapists.value
+      .map(t => String(t?.grade_name || '').trim())
+      .filter(Boolean)
+  )]
+
+  const sortedCandidates = gradeCandidates.sort((a, b) => b.length - a.length)
+  for (const gradeName of sortedCandidates) {
+    const normalizedGrade = normalizeLabel(gradeName)
+    if (!normalizedGrade) continue
+
+    const matchByWord = serviceName.split(' ').includes(normalizedGrade)
+    const matchByPhrase = serviceName.includes(normalizedGrade)
+    if (matchByWord || matchByPhrase) {
+      return {
+        gradeName,
+        normalizedGrade
+      }
+    }
+  }
+
+  return null
+}
+
+const validateTherapistGradeMatch = (qty) => {
+  if (!['SPA', 'LC'].includes(serviceType.value)) return ''
+
+  for (let idx = 0; idx < qty; idx += 1) {
+    const serviceId = Number(selectedServiceIds.value[idx] || 0)
+    const therapistId = Number(selectedTherapistIds.value[idx] || 0)
+    if (!serviceId || !therapistId) continue
+
+    const service = services.value.find(s => Number(s.id) === serviceId)
+    const therapist = therapists.value.find(t => Number(t.id) === therapistId)
+    if (!service || !therapist) continue
+
+    const rule = extractServiceGradeRule(service)
+    if (!rule) continue
+
+    const therapistGrade = normalizeLabel(therapist.grade_name)
+    if (!therapistGrade || therapistGrade !== rule.normalizedGrade) {
+      const slotNo = idx + 1
+      const currentGradeLabel = therapist.grade_name || 'Tanpa Grade'
+      return `Terapis slot #${slotNo} harus grade ${rule.gradeName} sesuai service ${service.name}. Saat ini grade terapis: ${currentGradeLabel}`
+    }
+  }
+
+  return ''
+}
+
 const fetchServices = async () => {
   try {
     loadingServices.value = true
@@ -397,6 +459,12 @@ const submit = () => {
 
     if (new Set(normalizedTherapistIds).size !== normalizedTherapistIds.length) {
       errorMessage.value = "Terapis harus berbeda"
+      return
+    }
+
+    const gradeMismatchError = validateTherapistGradeMatch(qty)
+    if (gradeMismatchError) {
+      errorMessage.value = gradeMismatchError
       return
     }
   }

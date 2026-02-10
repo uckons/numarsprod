@@ -56,6 +56,38 @@ exports.startTimer = async (req, res) => {
       .filter(v => Number.isInteger(v) && v > 0))]
   }
 
+
+  const normalizeLabel = (value) => String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const extractServiceGradeRule = (serviceName, therapistRows) => {
+    const normalizedServiceName = normalizeLabel(serviceName)
+    if (!normalizedServiceName) return null
+
+    const gradeCandidates = [...new Set(
+      therapistRows
+        .map((row) => String(row?.grade_name || '').trim())
+        .filter(Boolean)
+    )]
+
+    const sortedCandidates = gradeCandidates.sort((a, b) => b.length - a.length)
+    for (const gradeName of sortedCandidates) {
+      const normalizedGrade = normalizeLabel(gradeName)
+      if (!normalizedGrade) continue
+      if (normalizedServiceName.includes(normalizedGrade)) {
+        return {
+          gradeName,
+          normalizedGrade
+        }
+      }
+    }
+
+    return null
+  }
+
   const allocateSlots = async (db, branchId, requestedSlot, neededCount) => {
     if (!requestedSlot || requestedSlot < 1 || requestedSlot > 30) {
       throw new Error('Nomor slot harus 1–30')
@@ -349,13 +381,33 @@ exports.startTimer = async (req, res) => {
       let therapistNameById = new Map()
       if (requiresTherapist) {
         const { rows: therapistRows } = await db.query(
-          `SELECT id, name FROM therapists WHERE id = ANY($1::int[])`,
+          `SELECT t.id, t.name, tg.name AS grade_name
+           FROM therapists t
+           LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
+           WHERE t.id = ANY($1::int[])`,
           [therapistIds]
         )
         therapistNameById = new Map(therapistRows.map(t => [Number(t.id), t.name]))
 
         if (therapistNameById.size !== therapistIds.length) {
           throw new Error('Terapis tidak ditemukan')
+        }
+
+        const therapistById = new Map(therapistRows.map(t => [Number(t.id), t]))
+        for (let idx = 0; idx < comboSelections.length; idx += 1) {
+          const selection = comboSelections[idx]
+          if (!selection?.therapistId || !selection?.service) continue
+
+          const gradeRule = extractServiceGradeRule(selection.service.name, therapistRows)
+          if (!gradeRule) continue
+
+          const therapist = therapistById.get(Number(selection.therapistId))
+          const therapistGrade = normalizeLabel(therapist?.grade_name)
+          if (!therapistGrade || therapistGrade !== gradeRule.normalizedGrade) {
+            throw new Error(
+              `Terapis slot #${idx + 1} harus grade ${gradeRule.gradeName} sesuai service ${selection.service.name}`
+            )
+          }
         }
       }
 
