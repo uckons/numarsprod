@@ -169,6 +169,12 @@
           + Item
         </button>
         <button
+          class="btn void"
+          @click="voidDraft(o)"
+        >
+          VOID
+        </button>
+        <button
           class="btn pay"
           @click="confirmPay(o)"
         >
@@ -542,6 +548,44 @@ const addItemToDraft = (order) => {
   })
 }
 
+
+const voidDraft = async (order) => {
+  const res = await Swal.fire({
+    title: 'Void draft ini?',
+    text: `Order #${order.id} akan dibatalkan. Stock FNB dikembalikan dan kerja terapis pada order ini dihapus.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Ya, Void',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#d33',
+    background: '#111',
+    color: '#fff'
+  })
+
+  if (!res.isConfirmed) return
+
+  try {
+    await api.delete(`/orders/${order.id}`)
+    await loadOrders()
+    await Swal.fire({
+      icon: 'success',
+      title: 'Draft berhasil di-void',
+      timer: 1200,
+      showConfirmButton: false,
+      background: '#111',
+      color: '#fff'
+    })
+  } catch (err) {
+    Swal.fire({
+      icon: 'error',
+      title: 'Gagal void draft',
+      text: err.response?.data?.message || 'Terjadi kesalahan',
+      background: '#111',
+      color: '#fff'
+    })
+  }
+}
+
 let poller = null
 
 // 🔙 GO BACK
@@ -794,8 +838,20 @@ th {
 .btn.pay {
   transition: all 0.3s ease-out;
 }
+.btn.void {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #5a1f1f;
+  background: #2a1111;
+  color: #ff7b7b;
+  font-weight: 700;
+  cursor: pointer;
+  margin-right: 6px;
+  transition: all 0.3s ease-out;
+}
 
 .orders-table tbody tr:hover .btn.add-item,
+.orders-table tbody tr:hover .btn.void,
 .orders-table tbody tr:hover .btn.pay {
   transform: scale(1.05);
   box-shadow: 0 4px 12px rgba(201, 162, 77, 0.4);
