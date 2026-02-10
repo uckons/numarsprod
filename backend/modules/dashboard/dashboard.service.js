@@ -69,6 +69,29 @@ const formatDateOnly = (date) => {
   return `${year}-${month}-${day}`
 }
 
+const parseDateInput = (raw) => {
+  if (!raw) return null
+  const value = String(raw).trim()
+  if (!value) return null
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const parsed = new Date(`${value}T00:00:00`)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+    const [a, b, y] = value.split("/")
+    const dayFirst = Number(a) > 12
+    const day = dayFirst ? a : b
+    const month = dayFirst ? b : a
+    const parsed = new Date(`${y}-${month}-${day}T00:00:00`)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
 const resolveRange = ({ preset, date_from, date_to }) => {
   const now = new Date()
   let from
@@ -96,11 +119,15 @@ const resolveRange = ({ preset, date_from, date_to }) => {
   }
 
   if (date_from) {
-    from = new Date(date_from)
+    const parsedFrom = parseDateInput(date_from)
+    if (!parsedFrom) throw new Error("Invalid date_from")
+    from = parsedFrom
     from.setHours(0, 0, 0, 0)
   }
   if (date_to) {
-    to = new Date(date_to)
+    const parsedTo = parseDateInput(date_to)
+    if (!parsedTo) throw new Error("Invalid date_to")
+    to = parsedTo
     to.setHours(23, 59, 59, 999)
     to = new Date(to.getTime() + 1)
   }
@@ -112,7 +139,8 @@ const resolveRange = ({ preset, date_from, date_to }) => {
     throw new Error("Invalid date_to")
   }
   if (from >= to) {
-    throw new Error("date_from must be before date_to")
+    to = new Date(from)
+    to.setDate(to.getDate() + 1)
   }
 
   return { from, to }

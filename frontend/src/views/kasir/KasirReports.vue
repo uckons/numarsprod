@@ -115,11 +115,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api'
+import Swal from 'sweetalert2'
 
 const router = useRouter()
 
 const filters = ref({
-  preset: 'monthly',
+  preset: 'daily',
   date_from: '',
   date_to: ''
 })
@@ -147,14 +148,24 @@ const resetRange = async () => {
 }
 
 const loadAnalytics = async () => {
-  const { data } = await api.get('/dashboard/kasir/analytics', {
-    params: {
-      preset: filters.value.preset,
-      date_from: filters.value.date_from || undefined,
-      date_to: filters.value.date_to || undefined
-    }
-  })
-  analytics.value = data
+  try {
+    const { data } = await api.get('/dashboard/kasir/analytics', {
+      params: {
+        preset: filters.value.preset,
+        date_from: filters.value.date_from || undefined,
+        date_to: filters.value.date_to || undefined
+      }
+    })
+    analytics.value = data
+  } catch (err) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Gagal memuat laporan',
+      text: err.response?.data?.message || 'Terjadi kesalahan saat mengambil data analytics.',
+      background: '#111',
+      color: '#fff'
+    })
+  }
 }
 
 const trendMax = computed(() => Math.max(...analytics.value.trend.map((x) => x.revenue), 1))
