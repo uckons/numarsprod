@@ -214,7 +214,8 @@ exports.kasirAnalytics = async (user, query = {}) => {
        SELECT
          o.id AS order_id,
          oi.subtotal,
-         BTRIM(raw_name) AS therapist_name
+         BTRIM(raw_name) AS therapist_name,
+         GREATEST(array_length(regexp_split_to_array(COALESCE(oi.therapist_name, ''), ','), 1), 1) AS therapist_count
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        CROSS JOIN LATERAL regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS raw_name
@@ -224,14 +225,54 @@ exports.kasirAnalytics = async (user, query = {}) => {
          AND o.created_at < $3
      )
      SELECT
-       therapist_name,
-       COUNT(DISTINCT order_id) AS orders,
-       COALESCE(SUM(subtotal), 0) AS revenue
-     FROM therapist_rows
-     WHERE therapist_name <> ''
-     GROUP BY therapist_name
+       tr.therapist_name,
+       COALESCE(grade_info.grade_name, '-') AS grade_name,
+       COUNT(DISTINCT tr.order_id) AS orders,
+       COALESCE(SUM(tr.subtotal / NULLIF(tr.therapist_count, 0)), 0) AS revenue
+     FROM therapist_rows tr
+     LEFT JOIN LATERAL (
+       SELECT tg.name AS grade_name
+       FROM therapists t
+       LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
+       WHERE LOWER(t.name) = LOWER(tr.therapist_name)
+         AND t.branch_id = $1
+       ORDER BY t.active DESC NULLS LAST, t.id DESC
+       LIMIT 1
+     ) grade_info ON true
+     WHERE tr.therapist_name <> ''
+     GROUP BY tr.therapist_name, grade_info.grade_name
      ORDER BY revenue DESC, orders DESC
      LIMIT 5`,
+    [branchId, from, to]
+  )
+
+  const categoryTrendRes = await db.query(
+    `WITH mapped AS (
+       SELECT
+         DATE(o.created_at) AS bucket,
+         CASE
+           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN 'KTV'
+           WHEN s.type::text = 'LOUNGE' THEN 'LC'
+           ELSE s.type::text
+         END AS category,
+         COALESCE(oi.subtotal, 0) AS revenue
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       JOIN services s ON s.id = oi.service_id
+       WHERE o.status = 'PAID'
+         AND o.branch_id = $1
+         AND o.created_at >= $2
+         AND o.created_at < $3
+     )
+     SELECT
+       bucket,
+       COALESCE(SUM(CASE WHEN category = 'SPA' THEN revenue END), 0) AS spa,
+       COALESCE(SUM(CASE WHEN category = 'LC' THEN revenue END), 0) AS lc,
+       COALESCE(SUM(CASE WHEN category = 'FNB' THEN revenue END), 0) AS fnb,
+       COALESCE(SUM(CASE WHEN category = 'KTV' THEN revenue END), 0) AS ktv
+     FROM mapped
+     GROUP BY bucket
+     ORDER BY bucket ASC`,
     [branchId, from, to]
   )
 
@@ -273,6 +314,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
     })),
     top_therapists: topTherapistRes.rows.map((row) => ({
       therapist_name: row.therapist_name,
+      grade_name: row.grade_name,
       orders: Number(row.orders || 0),
       revenue: Number(row.revenue || 0)
     })),
@@ -280,6 +322,13 @@ exports.kasirAnalytics = async (user, query = {}) => {
       label: formatDateOnly(row.bucket),
       orders: Number(row.orders || 0),
       revenue: Number(row.revenue || 0)
+    })),
+    category_trend: categoryTrendRes.rows.map((row) => ({
+      label: formatDateOnly(row.bucket),
+      spa: Number(row.spa || 0),
+      lc: Number(row.lc || 0),
+      fnb: Number(row.fnb || 0),
+      ktv: Number(row.ktv || 0)
     }))
   }
 }

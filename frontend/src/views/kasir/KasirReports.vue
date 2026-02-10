@@ -80,13 +80,13 @@
     </section>
 
     <section class="chart-panel compact-panel">
-      <h3>Grafik Kategori (SPA / LC / FNB / KTV)</h3>
+      <h3>Pergerakan Harian Kategori (SPA / LC / FNB / KTV)</h3>
       <div class="chart-wrap small">
         <ApexChart
-          type="bar"
+          type="line"
           :height="220"
-          :options="categoryBarOptions"
-          :series="categoryBarSeries"
+          :options="categoryTrendOptions"
+          :series="categoryTrendSeries"
         />
       </div>
     </section>
@@ -130,15 +130,16 @@
       <h3>Terapis Terlaris</h3>
       <table>
         <thead>
-          <tr><th>Nama Terapis</th><th>Order</th><th>Pendapatan</th></tr>
+          <tr><th>Nama Terapis</th><th>Grade</th><th>Order</th><th>Pendapatan</th></tr>
         </thead>
         <tbody>
-          <tr v-for="row in analytics.top_therapists" :key="row.therapist_name">
+          <tr v-for="row in analytics.top_therapists" :key="`${row.therapist_name}-${row.grade_name}`">
             <td>{{ row.therapist_name }}</td>
+            <td>{{ row.grade_name || '-' }}</td>
             <td>{{ row.orders }}</td>
             <td>Rp {{ format(row.revenue) }}</td>
           </tr>
-          <tr v-if="!analytics.top_therapists.length"><td colspan="3" class="muted">Belum ada data terapis</td></tr>
+          <tr v-if="!analytics.top_therapists.length"><td colspan="4" class="muted">Belum ada data terapis</td></tr>
         </tbody>
       </table>
     </section>
@@ -169,7 +170,8 @@ const analytics = ref({
   breakdown: [],
   top_fnb: [],
   top_therapists: [],
-  trend: []
+  trend: [],
+  category_trend: []
 })
 
 const format = (n) => new Intl.NumberFormat('id-ID').format(Number(n || 0))
@@ -285,20 +287,20 @@ const trendChartSeries = computed(() => ([
   }
 ]))
 
-const categoryBarOptions = computed(() => ({
+const categoryTrendOptions = computed(() => ({
   theme: { mode: 'dark' },
   colors: ['#f0c46a', '#8b5cf6', '#22c55e', '#3b82f6'],
-  plotOptions: {
-    bar: {
-      horizontal: false,
-      borderRadius: 8,
-      distributed: true,
-      columnWidth: '42%'
-    }
+  stroke: {
+    curve: 'smooth',
+    width: 2.5
+  },
+  markers: {
+    size: 3,
+    strokeWidth: 0
   },
   dataLabels: { enabled: false },
   xaxis: {
-    categories: normalizedBreakdown.value.map((row) => row.category),
+    categories: (analytics.value.category_trend || []).map((row) => row.label),
     labels: { style: { colors: '#94a2b8' } },
     axisBorder: { color: '#273043' },
     axisTicks: { color: '#273043' }
@@ -317,19 +319,34 @@ const categoryBarOptions = computed(() => ({
     theme: 'dark',
     y: {
       formatter: (value) => `Rp ${format(value)}`
-    },
+    }
   },
-  legend: { show: false },
+  legend: {
+    show: true,
+    labels: { colors: '#94a2b8' }
+  },
   noData: {
-    text: 'Belum ada data kategori',
+    text: 'Belum ada data pergerakan kategori',
     style: { color: '#94a2b8' }
   }
 }))
 
-const categoryBarSeries = computed(() => ([
+const categoryTrendSeries = computed(() => ([
   {
-    name: 'Pendapatan',
-    data: normalizedBreakdown.value.map((row) => Number(row.revenue || 0))
+    name: 'SPA',
+    data: (analytics.value.category_trend || []).map((row) => Number(row.spa || 0))
+  },
+  {
+    name: 'LC',
+    data: (analytics.value.category_trend || []).map((row) => Number(row.lc || 0))
+  },
+  {
+    name: 'FNB',
+    data: (analytics.value.category_trend || []).map((row) => Number(row.fnb || 0))
+  },
+  {
+    name: 'KTV',
+    data: (analytics.value.category_trend || []).map((row) => Number(row.ktv || 0))
   }
 ]))
 
