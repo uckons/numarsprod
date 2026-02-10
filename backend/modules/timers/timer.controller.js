@@ -665,7 +665,8 @@ exports.getRooms = async (req, res) => {
         query += ` AND r.type = $2`
         params.push('LC')
       } else if (service_type === "LOUNGE") {
-        query += ` AND r.type IN ('LOUNGE','LC')`
+        query += ` AND r.type = $2`
+        params.push('LC')
       } else if (service_type === "KARAOKE") {
         query += ` AND r.type = $2`
         params.push('KTV')

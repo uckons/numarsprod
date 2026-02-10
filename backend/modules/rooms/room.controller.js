@@ -3,7 +3,7 @@ const VALID_TYPES = new Set(['SPA', 'LC', 'LOUNGE', 'KTV'])
 
 const resolveBranchId = (req) => {
   const fromQuery = Number(req.query.branch_id)
-  const fromBody = Number(req.body.branch_id)
+  const fromBody = Number(req.body?.branch_id)
 
   if (Number.isInteger(fromQuery) && fromQuery > 0) return fromQuery
   if (Number.isInteger(fromBody) && fromBody > 0) return fromBody
