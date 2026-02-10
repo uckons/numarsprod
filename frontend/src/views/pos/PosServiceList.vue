@@ -12,10 +12,25 @@
       </button>
     </div>
 
+    <div class="toolbar">
+      <input
+        v-model.trim="searchKeyword"
+        class="search"
+        type="text"
+        placeholder="Cari service..."
+      />
+      <select v-model.number="pageSize" class="page-size">
+        <option :value="8">8 / halaman</option>
+        <option :value="12">12 / halaman</option>
+        <option :value="16">16 / halaman</option>
+        <option :value="24">24 / halaman</option>
+      </select>
+    </div>
+
     <!-- SERVICES GRID -->
     <div class="grid">
       <div
-        v-for="s in filteredServices"
+        v-for="s in paginatedServices"
         :key="s.id"
         class="service-card"
         @click="select(s)"
@@ -37,22 +52,30 @@
       </div>
 
       <div v-if="!filteredServices.length" class="empty">
-        No services available
+        Tidak ada service yang cocok
       </div>
+    </div>
+
+    <div v-if="filteredServices.length" class="pagination">
+      <button :disabled="page <= 1" @click="page -= 1">Prev</button>
+      <span>Halaman {{ page }} / {{ totalPages }}</span>
+      <button :disabled="page >= totalPages" @click="page += 1">Next</button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue"
+import { ref, computed, onMounted, onUnmounted, watch } from "vue"
 import Swal from "sweetalert2"
 import api from "@/services/api"
 import { usePosStore } from "@/store/pos.store"
 const pos = usePosStore()
-//const emit = defineEmits(["select"])
 
 const services = ref([])
 const activeCategory = ref("ALL")
+const searchKeyword = ref("")
+const page = ref(1)
+const pageSize = ref(12)
 
 const categories = [
   "ALL",
@@ -96,6 +119,10 @@ onUnmounted(() => {
   }
 })
 
+watch([activeCategory, searchKeyword, pageSize], () => {
+  page.value = 1
+})
+
 const regularPackageGroups = computed(() => {
   const groups = new Set()
   services.value
@@ -106,8 +133,6 @@ const regularPackageGroups = computed(() => {
 
 const sellableServices = computed(() =>
   services.value.filter((s) => {
-    // Hide package variant only when regular variant in same group exists.
-    // If package is the only configured variant, keep it visible in kasir list.
     if (s.type === 'FNB' && s.is_package && s.package_group) {
       return !regularPackageGroups.value.has(s.package_group)
     }
@@ -116,13 +141,27 @@ const sellableServices = computed(() =>
 )
 
 const filteredServices = computed(() => {
-  if (activeCategory.value === "ALL") {
-    return sellableServices.value
-  }
-  return sellableServices.value.filter(
-    s => s.type === activeCategory.value
+  const byCategory = activeCategory.value === "ALL"
+    ? sellableServices.value
+    : sellableServices.value.filter(s => s.type === activeCategory.value)
+
+  const keyword = searchKeyword.value.toLowerCase()
+  if (!keyword) return byCategory
+
+  return byCategory.filter(s =>
+    String(s.name || '').toLowerCase().includes(keyword) ||
+    String(s.type || '').toLowerCase().includes(keyword)
   )
 })
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredServices.value.length / pageSize.value)))
+
+const paginatedServices = computed(() => {
+  const safePage = Math.min(page.value, totalPages.value)
+  const start = (safePage - 1) * pageSize.value
+  return filteredServices.value.slice(start, start + pageSize.value)
+})
+
 const packageByGroup = computed(() => {
   const map = new Map()
   services.value
@@ -142,8 +181,6 @@ const enrichService = (service) => {
     s => s.type === 'FNB' && !s.is_package && s.package_group === service.package_group
   )
 
-  // Seed item in cart should stay editable (non-package) until converted.
-  // If cashier clicks package card directly, fallback to regular variant in the same group.
   const seed = service.is_package
     ? (regular
         ? { ...regular }
@@ -201,117 +238,30 @@ const select = async (service) => {
 
   await maybeOfferPackage(key)
 }
-const format = (v) =>
-  Number(v || 0).toLocaleString("id-ID")
+
+const format = (v) => Number(v || 0).toLocaleString("id-ID")
 </script>
 
 <style scoped>
-.service-list {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-/* TABS */
-.tabs {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.tabs button {
-  padding: 10px 18px;
-  border-radius: 14px;
-  border: 1px solid #222;
-  background: #111;
-  color: #aaa;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all .2s ease;
-}
-
-.tabs button:hover {
-  color: #fff;
-  border-color: #c9a24d;
-}
-
-.tabs button.active {
-  background: #c9a24d;
-  color: #000;
-  border-color: #c9a24d;
-}
-
-/* GRID */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
-}
-
-/* CARD */
-.service-card {
-  background: linear-gradient(145deg, #0e0e0e, #151515);
-  border-radius: 18px;
-  padding: 16px;
-  box-shadow: 0 12px 35px rgba(0,0,0,.45);
-  cursor: pointer;
-  transition: all .25s ease;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.service-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 22px 60px rgba(0,0,0,.7);
-}
-
-.card-top h4 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.badge {
-  margin-top: 6px;
-  display: inline-block;
-  background: rgba(201,162,77,.2);
-  color: #c9a24d;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-  width: fit-content;
-}
-
-
-.price-badge {
-  margin-left: 6px;
-  background: #f5c518;
-  color: #111;
-}
-
-.card-bottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 14px;
-}
-
-.duration {
-  font-size: 12px;
-  color: #888;
-}
-
-.price {
-  font-size: 16px;
-  font-weight: 700;
-  color: #2ecc71;
-}
-
-.empty {
-  grid-column: 1 / -1;
-  text-align: center;
-  color: #666;
-  padding: 30px;
-}
+.service-list { display: flex; flex-direction: column; height: 100%; }
+.tabs { display: flex; gap: 10px; margin-bottom: 12px; }
+.tabs button { padding: 10px 18px; border-radius: 14px; border: 1px solid #222; background: #111; color: #aaa; font-weight: 600; cursor: pointer; transition: all .2s ease; }
+.tabs button:hover { color: #fff; border-color: #c9a24d; }
+.tabs button.active { background: #c9a24d; color: #000; border-color: #c9a24d; }
+.toolbar { display: flex; gap: 10px; margin-bottom: 12px; }
+.search, .page-size { height: 40px; border-radius: 10px; border: 1px solid #2a2a2a; background:#101010; color:#fff; padding:0 12px; }
+.search { flex: 1; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.service-card { background: linear-gradient(145deg, #0e0e0e, #151515); border-radius: 18px; padding: 16px; box-shadow: 0 12px 35px rgba(0,0,0,.45); cursor: pointer; transition: all .25s ease; display: flex; flex-direction: column; justify-content: space-between; }
+.service-card:hover { transform: translateY(-4px); box-shadow: 0 22px 60px rgba(0,0,0,.7); }
+.card-top h4 { margin: 0; font-size: 16px; font-weight: 700; }
+.badge { margin-top: 6px; display: inline-block; background: rgba(201,162,77,.2); color: #c9a24d; padding: 4px 10px; border-radius: 12px; font-size: 12px; width: fit-content; }
+.price-badge { margin-left: 6px; background: #f5c518; color: #111; }
+.card-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+.duration { font-size: 12px; color: #888; }
+.price { font-size: 16px; font-weight: 700; color: #2ecc71; }
+.empty { grid-column: 1 / -1; text-align: center; color: #666; padding: 30px; }
+.pagination { display:flex; align-items:center; justify-content:center; gap:12px; margin-top: 14px; }
+.pagination button { background:#222; color:#fff; border:1px solid #333; border-radius:8px; padding:6px 12px; cursor:pointer; }
+.pagination button:disabled { opacity:.4; cursor:not-allowed; }
 </style>
