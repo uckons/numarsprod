@@ -307,11 +307,12 @@ exports.startTimer = async (req, res) => {
       service: serviceMap.get(sid)
     }))
 
+    const neededSlots = comboQty > 1 ? comboQty : 1
     const slotNumbers = await allocateSlots(
       db,
       branchId,
       Number(slot),
-      1
+      neededSlots
     )
 
     const durationNum = Number(duration_minutes)
@@ -406,47 +407,56 @@ exports.startTimer = async (req, res) => {
         [comboTotal, finalOrderId]
       )
 
-      const start = new Date()
-      const plannedEnd = new Date(start.getTime() + comboDurationMinutes * 60000)
-      const slotNumber = slotNumbers[0]
+      const createdTimers = []
+      for (let idx = 0; idx < comboSelections.length; idx += 1) {
+        const selection = comboSelections[idx]
+        const start = new Date()
+        const plannedEnd = new Date(start.getTime() + comboDurationMinutes * 60000)
+        const slotNumber = slotNumbers[idx] || slotNumbers[0]
 
-      const { rows: timerRows } = await db.query(
-        `
-        INSERT INTO timers
-          (
-            order_id,
-            therapist_id,
-            service_id,
+        const { rows: timerRows } = await db.query(
+          `
+          INSERT INTO timers
+            (
+              order_id,
+              therapist_id,
+              service_id,
+              room_id,
+              start_time,
+              planned_end_time,
+              paused,
+              branch_id,
+              slot_number,
+              status
+            )
+          VALUES
+            ($1,$2,$3,$4,$5,$6,false,$7,$8,'RUNNING')
+          RETURNING *
+          `,
+          [
+            finalOrderId,
+            selection.therapistId,
+            selection.service.id,
             room_id,
-            start_time,
-            planned_end_time,
-            paused,
-            branch_id,
-            slot_number,
-            status
-          )
-        VALUES
-          ($1,$2,$3,$4,$5,$6,false,$7,$8,'RUNNING')
-        RETURNING *
-        `,
-        [
-          finalOrderId,
-          comboSelections[0].therapistId,
-          comboSelections[0].service.id,
-          room_id,
-          start,
-          plannedEnd,
-          branchId,
-          slotNumber
-        ]
-      )
+            start,
+            plannedEnd,
+            branchId,
+            slotNumber
+          ]
+        )
+
+        if (timerRows[0]) {
+          createdTimers.push(timerRows[0])
+        }
+      }
 
       await db.query('COMMIT')
 
       res.json({
         order_id: finalOrderId,
         combo_qty: therapistIds.length,
-        timer: timerRows[0],
+        timer: createdTimers[0] || null,
+        timers: createdTimers,
         combo_duration_minutes: comboDurationMinutes,
         combo_total: comboTotal
       })
