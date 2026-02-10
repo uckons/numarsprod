@@ -184,7 +184,7 @@ exports.startTimer = async (req, res) => {
     }
 
     const selectedService = serviceRows[0]
-    const requiresTherapist = !['LOUNGE', 'KARAOKE'].includes(selectedService.type)
+    const requiresTherapist = !['LOUNGE', 'KARAOKE', 'FNB'].includes(selectedService.type)
     const requestedComboQty = Number(req.body.combo_qty || 0)
     const comboQtyFromName = parseComboQtyFromName(selectedService.name, selectedService.type)
     const comboQtyFromPayload = Math.max(
@@ -665,6 +665,9 @@ exports.getRooms = async (req, res) => {
         query += ` AND r.type = $2`
         params.push('LC')
       } else if (service_type === "LOUNGE") {
+        query += ` AND r.type = $2`
+        params.push('LC')
+      } else if (service_type === "FNB") {
         query += ` AND r.type = $2`
         params.push('LC')
       } else if (service_type === "KARAOKE") {
