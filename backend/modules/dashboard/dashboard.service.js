@@ -4,7 +4,7 @@ exports.kasir = async (user) => {
   const branchId = user.branch_id
 
   const activeOrders = await db.query(
-    `SELECT COUNT(*) FROM orders WHERE status='OPEN' AND branch_id=$1`,
+    `SELECT COUNT(*) FROM orders WHERE status='DRAFT' AND branch_id=$1`,
     [branchId]
   )
 
