@@ -46,7 +46,7 @@
       <span v-if="loadingServices" class="loading-text">Memuat service…</span>
     </div>
 
-    <div class="field" v-if="serviceType && !['LOUNGE', 'KARAOKE', 'FNB'].includes(serviceType)">
+    <div class="field" v-if="serviceType && !['LOUNGE', 'KARAOKE'].includes(serviceType)">
       <label>
         Nama Terapis
         <small v-if="selectedServiceQty > 1">(wajib {{ selectedServiceQty }} terapis)</small>
@@ -76,7 +76,7 @@
       <label>{{ roomLabel }}</label>
       <select v-model="selectedRoomId" :disabled="loadingRooms">
         <option value="">-- Pilih --</option>
-        <option v-for="r in rooms" :key="r.id" :value="r.id" :disabled="r.is_occupied">
+        <option v-for="r in rooms" :key="r.id" :value="r.id" :disabled="isRoomDisabled(r)">
           {{ r.name }} {{ r.is_occupied ? '• Occupied' : '' }}
         </option>
       </select>
@@ -169,7 +169,7 @@ const duration = computed(() => {
 
 const effectiveDuration = computed(() => duration.value || manualDuration.value)
 const isComboMode = computed(() => selectedOrderType.value === "COMBO" && Number(selectedServiceQty.value || 1) > 1)
-const timerServiceTypes = ['SPA', 'LC', 'LOUNGE', 'KARAOKE', 'FNB']
+const timerServiceTypes = ['SPA', 'LC', 'LOUNGE', 'KARAOKE']
 
 const roomLabel = computed(() => {
   if (serviceType.value === 'SPA') return 'Room'
@@ -273,6 +273,12 @@ const isTherapistDisabled = (therapistId, currentIndex) => {
   })
 }
 
+const isRoomDisabled = (room) => {
+  if (!room) return false
+  if (['LC', 'LOUNGE'].includes(serviceType.value)) return false
+  return Boolean(room.is_occupied)
+}
+
 const fetchServices = async () => {
   try {
     loadingServices.value = true
@@ -306,7 +312,7 @@ const fetchServices = async () => {
 }
 
 const fetchTherapists = async () => {
-  if (!serviceType.value || ['LOUNGE', 'KARAOKE', 'FNB'].includes(serviceType.value)) return
+  if (!serviceType.value || ['LOUNGE', 'KARAOKE'].includes(serviceType.value)) return
   try {
     loadingTherapists.value = true
     errorMessage.value = ""
@@ -383,7 +389,7 @@ const submit = () => {
     .map(id => Number(id))
     .filter(id => Number.isInteger(id) && id > 0)
 
-  if (!['LOUNGE', 'KARAOKE', 'FNB'].includes(selectedType)) {
+  if (!['LOUNGE', 'KARAOKE'].includes(selectedType)) {
     if (normalizedTherapistIds.length !== qty) {
       errorMessage.value = "Pilih terapis sesuai Qty Service"
       return
