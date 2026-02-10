@@ -70,14 +70,24 @@
     <section class="chart-panel compact-panel">
       <h3>Grafik Pendapatan</h3>
       <div class="chart-wrap">
-        <Line :data="trendChartData" :options="trendChartOptions" />
+        <ApexChart
+          type="area"
+          :height="240"
+          :options="trendChartOptions"
+          :series="trendChartSeries"
+        />
       </div>
     </section>
 
     <section class="chart-panel compact-panel">
       <h3>Grafik Kategori (SPA / LC / FNB / KTV)</h3>
       <div class="chart-wrap small">
-        <Bar :data="categoryBarData" :options="categoryBarOptions" />
+        <ApexChart
+          type="bar"
+          :height="220"
+          :options="categoryBarOptions"
+          :series="categoryBarSeries"
+        />
       </div>
     </section>
 
@@ -140,31 +150,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api'
 import Swal from 'sweetalert2'
-import { Line, Bar } from 'vue-chartjs'
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-} from 'chart.js'
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-)
+import ApexChart from '@/components/ApexChart.vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -248,88 +234,104 @@ const normalizedBreakdown = computed(() => {
 })
 
 const trendChartOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  animation: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      callbacks: {
-        label: (ctx) => `Rp ${format(ctx.parsed.y || 0)}`
-      }
+  theme: { mode: 'dark' },
+  colors: ['#f0c46a'],
+  dataLabels: { enabled: false },
+  stroke: {
+    curve: 'smooth',
+    width: 3
+  },
+  fill: {
+    type: 'gradient',
+    gradient: {
+      shadeIntensity: 1,
+      opacityFrom: 0.35,
+      opacityTo: 0.05,
+      stops: [0, 100]
     }
   },
-  scales: {
-    x: {
-      ticks: { color: '#94a2b8', maxTicksLimit: 8 },
-      grid: { color: '#273043', borderDash: [4, 4] }
-    },
-    y: {
-      ticks: {
-        color: '#94a2b8',
-        callback: (value) => `Rp ${format(value)}`
-      },
-      grid: { color: '#273043', borderDash: [4, 4] }
+  xaxis: {
+    categories: (analytics.value.trend || []).map((row) => row.label),
+    labels: { style: { colors: '#94a2b8' } },
+    axisBorder: { color: '#273043' },
+    axisTicks: { color: '#273043' }
+  },
+  yaxis: {
+    labels: {
+      style: { colors: '#94a2b8' },
+      formatter: (value) => `Rp ${format(value)}`
     }
+  },
+  grid: {
+    borderColor: '#273043',
+    strokeDashArray: 4
+  },
+  tooltip: {
+    theme: 'dark',
+    y: {
+      formatter: (value) => `Rp ${format(value)}`
+    }
+  },
+  noData: {
+    text: 'Belum ada data pendapatan',
+    style: { color: '#94a2b8' }
   }
 }))
 
-const trendChartData = computed(() => ({
-  labels: (analytics.value.trend || []).map((row) => row.label),
-  datasets: [
-    {
-      label: 'Pendapatan',
-      data: (analytics.value.trend || []).map((row) => Number(row.revenue || 0)),
-      borderColor: '#f0c46a',
-      backgroundColor: 'rgba(240,196,106,0.18)',
-      fill: true,
-      tension: 0.35,
-      pointRadius: 2,
-      pointHoverRadius: 4
-    }
-  ]
-}))
-
-const categoryBarData = computed(() => ({
-  labels: normalizedBreakdown.value.map((row) => row.category),
-  datasets: [
-    {
-      label: 'Pendapatan',
-      data: normalizedBreakdown.value.map((row) => Number(row.revenue || 0)),
-      backgroundColor: ['#f0c46a', '#8b5cf6', '#22c55e', '#3b82f6'],
-      borderRadius: 8,
-      barThickness: 22,
-      maxBarThickness: 28
-    }
-  ]
-}))
+const trendChartSeries = computed(() => ([
+  {
+    name: 'Pendapatan',
+    data: (analytics.value.trend || []).map((row) => Number(row.revenue || 0))
+  }
+]))
 
 const categoryBarOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  animation: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      callbacks: {
-        label: (ctx) => `Rp ${format(ctx.parsed.y || 0)}`
-      }
+  theme: { mode: 'dark' },
+  colors: ['#f0c46a', '#8b5cf6', '#22c55e', '#3b82f6'],
+  plotOptions: {
+    bar: {
+      horizontal: false,
+      borderRadius: 8,
+      distributed: true,
+      columnWidth: '42%'
     }
   },
-  scales: {
-    x: {
-      ticks: { color: '#94a2b8' },
-      grid: { display: false }
-    },
-    y: {
-      ticks: {
-        color: '#94a2b8',
-        callback: (value) => `Rp ${format(value)}`
-      },
-      grid: { color: '#273043', borderDash: [4, 4] }
+  dataLabels: { enabled: false },
+  xaxis: {
+    categories: normalizedBreakdown.value.map((row) => row.category),
+    labels: { style: { colors: '#94a2b8' } },
+    axisBorder: { color: '#273043' },
+    axisTicks: { color: '#273043' }
+  },
+  yaxis: {
+    labels: {
+      style: { colors: '#94a2b8' },
+      formatter: (value) => `Rp ${format(value)}`
     }
+  },
+  grid: {
+    borderColor: '#273043',
+    strokeDashArray: 4
+  },
+  tooltip: {
+    theme: 'dark',
+    y: {
+      formatter: (value) => `Rp ${format(value)}`
+    },
+  },
+  legend: { show: false },
+  noData: {
+    text: 'Belum ada data kategori',
+    style: { color: '#94a2b8' }
   }
 }))
+
+const categoryBarSeries = computed(() => ([
+  {
+    name: 'Pendapatan',
+    data: normalizedBreakdown.value.map((row) => Number(row.revenue || 0))
+  }
+]))
 
 onMounted(loadAnalytics)
 </script>
