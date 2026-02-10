@@ -402,18 +402,14 @@ exports.createFromPos = async (req, res) => {
 
       total += subtotal
 
-      const directTherapistName = String(i.therapist_name || '').trim()
-      const assignedTherapists = assignmentMap.get(Number(svc.id)) || []
-      const therapistName = directTherapistName || (assignedTherapists.length ? assignedTherapists.slice(0, qty).join(', ') : null)
-
       await db.query(
         `
         INSERT INTO order_items
-          (order_id, service_id, service_name, qty, price, subtotal, therapist_name, price_label, is_package_snapshot)
+          (order_id, service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
         VALUES
-          ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+          ($1,$2,$3,$4,$5,$6,$7,$8)
         `,
-        [orderId, svc.id, i.name || svc.name, qty, unitPrice, subtotal, therapistName, i.price_label || null, Boolean(i.is_package)]
+        [orderId, svc.id, i.name || svc.name, qty, unitPrice, subtotal, i.price_label || null, Boolean(i.is_package)]
       )
 
       if (svc.duration_minutes && svc.duration_minutes > 0) {
@@ -479,7 +475,7 @@ exports.createDraftFromPos = async (req, res) => {
   try {
     const db = req.app.get("db")
     const user = req.user
-    const { items, therapist_assignments = [] } = req.body
+    const { items } = req.body
 
     const userRes = await db.query(
       "SELECT branch_id FROM users WHERE id=$1",
@@ -494,18 +490,6 @@ exports.createDraftFromPos = async (req, res) => {
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Item kosong" })
-    }
-
-    const assignmentMap = new Map()
-    if (Array.isArray(therapist_assignments)) {
-      for (const row of therapist_assignments) {
-        const serviceId = Number(row?.service_id || 0)
-        const therapistName = String(row?.therapist_name || '').trim()
-        if (!serviceId || !therapistName) continue
-        const bucket = assignmentMap.get(serviceId) || []
-        bucket.push(therapistName)
-        assignmentMap.set(serviceId, bucket)
-      }
     }
 
     const orderRes = await db.query(
@@ -539,18 +523,14 @@ exports.createDraftFromPos = async (req, res) => {
 
       total += subtotal
 
-      const directTherapistName = String(i.therapist_name || '').trim()
-      const assignedTherapists = assignmentMap.get(Number(svc.id)) || []
-      const therapistName = directTherapistName || (assignedTherapists.length ? assignedTherapists.slice(0, qty).join(', ') : null)
-
       await db.query(
         `
         INSERT INTO order_items
-          (order_id, service_id, service_name, qty, price, subtotal, therapist_name, price_label, is_package_snapshot)
+          (order_id, service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
         VALUES
-          ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+          ($1,$2,$3,$4,$5,$6,$7,$8)
         `,
-        [orderId, svc.id, i.name || svc.name, qty, unitPrice, subtotal, therapistName, i.price_label || null, Boolean(i.is_package)]
+        [orderId, svc.id, i.name || svc.name, qty, unitPrice, subtotal, i.price_label || null, Boolean(i.is_package)]
       )
     }
 
@@ -596,22 +576,10 @@ exports.saveDraft = async (req, res) => {
 
   try {
     const idOrder = parseOrderId(req.params.id)
-    const { items, therapist_assignments = [] } = req.body
+    const { items } = req.body
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Item kosong" })
-    }
-
-    const assignmentMap = new Map()
-    if (Array.isArray(therapist_assignments)) {
-      for (const row of therapist_assignments) {
-        const serviceId = Number(row?.service_id || 0)
-        const therapistName = String(row?.therapist_name || '').trim()
-        if (!serviceId || !therapistName) continue
-        const bucket = assignmentMap.get(serviceId) || []
-        bucket.push(therapistName)
-        assignmentMap.set(serviceId, bucket)
-      }
     }
 
     await db.query("BEGIN")
@@ -633,14 +601,10 @@ exports.saveDraft = async (req, res) => {
       const subtotal = qty * unitPrice
       total += subtotal
 
-      const directTherapistName = String(item.therapist_name || '').trim()
-      const assignedTherapists = assignmentMap.get(Number(item.id)) || []
-      const therapistName = directTherapistName || (assignedTherapists.length ? assignedTherapists.slice(0, qty).join(', ') : null)
-
       await db.query(
-        `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal, therapist_name, price_label, is_package_snapshot)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [idOrder, item.id, item.name || svcRes.rows[0].name, qty, unitPrice, subtotal, therapistName, item.price_label || null, Boolean(item.is_package)]
+        `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [idOrder, item.id, item.name || svcRes.rows[0].name, qty, unitPrice, subtotal, item.price_label || null, Boolean(item.is_package)]
       )
     }
 
