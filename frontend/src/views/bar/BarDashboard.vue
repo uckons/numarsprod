@@ -4,11 +4,11 @@
   <div class="page">
     <section class="hero card-glass">
       <div>
-        <p class="eyebrow">Enterprise Control Panel</p>
-        <h1>Staff Bar Intelligence Dashboard</h1>
+        <p class="eyebrow">BAR Control Panel</p>
+        <h1>Staff Bar Dashboard.</h1>
         <p class="muted">Live stock FNB, order inbox realtime, dan approval stock workflow.</p>
       </div>
-      <button class="btn-primary" @click="loadAll">Refresh Data</button>
+      <button class="btn-primary" @click="loadAll({ silent: true })">Refresh Data</button>
     </section>
 
     <section class="kpi-grid">
@@ -35,12 +35,7 @@
         <h3>Live Stock Overview</h3>
         <small class="muted">Top 12 item untuk visual cepat.</small>
       </div>
-      <ApexChart
-        type="bar"
-        :height="280"
-        :series="stockSeries"
-        :options="stockChartOptions"
-      />
+      <ApexChart type="bar" :height="280" :series="stockSeries" :options="stockChartOptions" />
     </section>
 
     <section class="card-glass">
@@ -52,13 +47,16 @@
       <div v-if="!barInbox.length" class="empty">Belum ada inbox order.</div>
 
       <div v-for="order in barInbox" :key="order.id" class="inbox-item">
-        <div>
-          <div class="order-title">Order #{{ order.order_id }} <span class="status" :class="order.status.toLowerCase()">{{ order.status }}</span></div>
+        <button class="inbox-main" @click="openInboxDetail(order)">
+          <div class="order-title">
+            Order #{{ order.order_id }}
+            <span class="status" :class="order.status.toLowerCase()">{{ order.status }}</span>
+          </div>
           <small class="muted">{{ formatItems(order.items_snapshot) }}</small>
-        </div>
+        </button>
 
         <div class="actions" v-if="!['DELIVERED','CANCELLED'].includes(order.status)">
-          <button class="btn-light" @click="accept(order.id)">Accept</button>
+          <button class="btn-light" :disabled="order.status === 'ACCEPTED'" @click="accept(order.id)">Accept</button>
           <button class="btn-success" @click="deliver(order.id)">Deliver</button>
           <button class="btn-danger" @click="cancel(order.id)">Cancel</button>
         </div>
@@ -113,6 +111,29 @@
         <button class="btn-light" :disabled="stockPage>=stockTotalPages" @click="stockPage += 1">Next</button>
       </div>
     </section>
+
+    <div v-if="selectedInboxOrder" class="modal-backdrop" @click.self="closeInboxDetail">
+      <div class="modal card-glass">
+        <h3>Order #{{ selectedInboxOrder.order_id }}</h3>
+        <p class="muted">Status: {{ selectedInboxOrder.status }}</p>
+
+        <ul class="order-items">
+          <li v-for="item in selectedInboxOrder.items_snapshot || []" :key="`${item.service_id}-${item.service_name}`">
+            {{ item.service_name }} x{{ item.qty }}
+          </li>
+        </ul>
+
+        <div class="modal-actions" v-if="!['DELIVERED','CANCELLED'].includes(selectedInboxOrder.status)">
+          <button class="btn-light" :disabled="selectedInboxOrder.status === 'ACCEPTED'" @click="accept(selectedInboxOrder.id, true)">Accept</button>
+          <button class="btn-success" @click="deliver(selectedInboxOrder.id, true)">Deliver</button>
+          <button class="btn-danger" @click="cancel(selectedInboxOrder.id, true)">Cancel</button>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn-light" @click="closeInboxDetail">Tutup</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -131,6 +152,7 @@ const barInbox = ref([])
 const draftQty = ref({})
 const draftReason = ref({})
 const knownPendingInboxKeys = ref(new Set())
+const selectedInboxOrder = ref(null)
 let autoRefreshTimer = null
 const AUTO_REFRESH_MS = 5000
 
@@ -222,15 +244,33 @@ const loadAll = async (options = {}) => {
   knownPendingInboxKeys.value = nextPendingKeys
   fnbItems.value = fnbRes.data || []
   barInbox.value = nextInbox
+
+  if (selectedInboxOrder.value) {
+    const latestSelected = nextInbox.find(item => item.id === selectedInboxOrder.value.id)
+    selectedInboxOrder.value = latestSelected || null
+  }
 }
 
-const accept = async (id) => {
+const openInboxDetail = (order) => {
+  selectedInboxOrder.value = order
+}
+
+const closeInboxDetail = () => {
+  selectedInboxOrder.value = null
+}
+
+const accept = async (id, fromModal = false) => {
   await api.post(`/orders/bar/${id}/accept`)
-  await loadAll()
+  await loadAll({ silent: true })
   await Swal.fire({ icon: "success", title: "Order diterima bar" })
+
+  if (fromModal && selectedInboxOrder.value?.id === id) {
+    const latest = barInbox.value.find(item => item.id === id)
+    selectedInboxOrder.value = latest || selectedInboxOrder.value
+  }
 }
 
-const deliver = async (id) => {
+const deliver = async (id, fromModal = false) => {
   const confirm = await Swal.fire({
     icon: "question",
     title: "Deliver order sekarang?",
@@ -242,15 +282,22 @@ const deliver = async (id) => {
   if (!confirm.isConfirmed) return
 
   await api.post(`/orders/bar/${id}/deliver`)
-  await loadAll()
-  await Swal.fire({ icon: "success", title: "Order delivered", text: "Kasir sudah menerima notifikasi." })
+  await loadAll({ silent: true })
+
+  await Swal.fire({
+    icon: "success",
+    title: "Items delivered",
+    text: "Klik OK untuk kembali ke inbox"
+  })
+
+  if (fromModal) closeInboxDetail()
 }
 
-const cancel = async (id) => {
+const cancel = async (id, fromModal = false) => {
   const confirm = await Swal.fire({
     icon: "warning",
-    title: "Batalkan order bar?",
-    text: "Stock tidak akan berkurang dan order kasir akan cancelled by SB.",
+    title: "Batalkan item tambahan?",
+    text: "Yang dibatalkan hanya item tambahan dari inbox ini.",
     showCancelButton: true,
     confirmButtonText: "Ya, batalkan",
     cancelButtonText: "Kembali"
@@ -258,8 +305,10 @@ const cancel = async (id) => {
   if (!confirm.isConfirmed) return
 
   await api.post(`/orders/bar/${id}/cancel`, { note: "cancelled by SB" })
-  await loadAll()
-  await Swal.fire({ icon: "success", title: "Order dibatalkan" })
+  await loadAll({ silent: true })
+  await Swal.fire({ icon: "success", title: "Item tambahan dibatalkan" })
+
+  if (fromModal) closeInboxDetail()
 }
 
 const submitAdjustment = async (item) => {
@@ -322,6 +371,7 @@ onBeforeUnmount(() => {
 .badge.warn { background: rgba(231,76,60,.2); color:#ff7b7b; }
 .badge.ok { background: rgba(46,204,113,.2); color:#2ecc71; }
 .inbox-item, .stock-item { display:flex; justify-content:space-between; gap:12px; border-top:1px solid #262626; padding:12px 0; }
+.inbox-main { background: transparent; border: none; text-align: left; cursor: pointer; color: #fff; padding: 0; flex: 1; }
 .order-title { font-weight:700; display:flex; align-items:center; gap:8px; }
 .status { border-radius:999px; padding:2px 8px; font-size:11px; font-weight:600; }
 .status.pending { background:#5f4b19; color:#f5c518; }
@@ -336,8 +386,14 @@ onBeforeUnmount(() => {
 .btn-success { background:#2ecc71; color:#081b10; }
 .btn-danger { background:#c0392b; color:#fff; }
 .btn-light { background:#282828; color:#fff; }
+.btn-light:disabled { opacity: .5; cursor: not-allowed; }
 .empty { color:#8e95a6; padding:10px 0; }
 .pagination { justify-content:flex-end; margin-top:10px; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 999; }
+.modal { width: min(560px, 92vw); }
+.order-items { margin: 10px 0 0; padding-left: 18px; }
+.order-items li { margin-bottom: 6px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
 
 @media (max-width: 1100px) {
   .kpi-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
