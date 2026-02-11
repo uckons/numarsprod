@@ -179,6 +179,7 @@
 
 <script setup>
 import { ref, onMounted } from "vue"
+import Swal from "sweetalert2"
 import api from "../../services/api"
 import UserForm from "./UserForm.vue"
 
@@ -243,9 +244,18 @@ const openAdd = () => { selected.value=null; showForm.value=true }
 const edit = u => { selected.value={...u}; showForm.value=true }
 
 const reset = async u => {
-  if (!confirm(`Reset password ${u.username}?`)) return
+  const ask = await Swal.fire({
+    icon: "question",
+    title: `Reset password ${u.username}?`,
+    text: "Password akan diubah ke default 123456",
+    showCancelButton: true,
+    confirmButtonText: "Reset",
+    cancelButtonText: "Batal"
+  })
+  if (!ask.isConfirmed) return
+
   await api.put(`/users/${u.id}/reset-password`)
-  alert("Password reset to 123456")
+  await Swal.fire({ icon: "success", title: "Password reset", text: "Default password: 123456" })
 }
 
 const toggle = async u => {
@@ -269,19 +279,38 @@ const toggleAll = () => {
 }
 
 const bulkToggle = async () => {
-  if (!confirm("Toggle active selected users?")) return
+  const ask = await Swal.fire({
+    icon: "question",
+    title: "Toggle active selected users?",
+    showCancelButton: true,
+    confirmButtonText: "Ya",
+    cancelButtonText: "Batal"
+  })
+  if (!ask.isConfirmed) return
+
   for (const id of selectedIds.value) {
     await api.put(`/users/${id}/toggle`)
   }
-  load()
+  await load()
+  await Swal.fire({ icon: "success", title: "Status user berhasil diubah" })
 }
 
 const bulkDelete = async () => {
-  if (!confirm("Delete selected users?")) return
+  const ask = await Swal.fire({
+    icon: "warning",
+    title: "Delete selected users?",
+    text: "Aksi ini tidak bisa di-undo.",
+    showCancelButton: true,
+    confirmButtonText: "Hapus",
+    cancelButtonText: "Batal"
+  })
+  if (!ask.isConfirmed) return
+
   for (const id of selectedIds.value) {
     await api.delete(`/users/${id}`)
   }
-  load()
+  await load()
+  await Swal.fire({ icon: "success", title: "User terpilih berhasil dihapus" })
 }
 </script>
 
