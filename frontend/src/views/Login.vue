@@ -68,6 +68,8 @@ const handleLogin = async () => {
     if (role === "SuperAdmin") router.push("/superadmin")
     else if (role === "Owner") router.push("/owner")
     else if (role === "Manager") router.push("/manager")
+    else if (role === "Supervisor") router.push("/supervisor")
+    else if (role === "Staff Bar") router.push("/bar")
     else if (role === "Kasir") router.push("/kasir")
     else if (role === "Terapis") router.push("/terapis")
     else router.push("/login")

@@ -5,6 +5,8 @@ import Login from "../views/Login.vue"
 import SuperAdminDashboard from "../views/superadmin/SuperAdminDashboard.vue"
 import OwnerDashboard from "../views/owner/OwnerDashboard.vue"
 import ManagerDashboard from "../views/manager/ManagerDashboard.vue"
+import SupervisorDashboard from "../views/supervisor/SupervisorDashboard.vue"
+import BarDashboard from "../views/bar/BarDashboard.vue"
 import PosLayout from "@/views/pos/PosLayout.vue"
 import KasirDashboard from "@/views/kasir/KasirDashboard.vue"
 import TerapisDashboard from "../views/terapis/TerapisDashboard.vue"
@@ -36,6 +38,20 @@ const routes = [
   { path: "/manager",
     component: ManagerDashboard,
     meta: { auth: true, roles: ["Manager"] }
+  },
+
+  // SUPERVISOR
+  {
+    path: "/supervisor",
+    component: SupervisorDashboard,
+    meta: { auth: true, roles: ["Supervisor"] }
+  },
+
+  // STAFF BAR
+  {
+    path: "/bar",
+    component: BarDashboard,
+    meta: { auth: true, roles: ["Staff Bar"] }
   },
 
   // KASIR
