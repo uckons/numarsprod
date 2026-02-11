@@ -190,6 +190,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from "vue"
+import Swal from "sweetalert2"
 import api from "@/services/api"
 import ServiceForm from "./ServiceForm.vue"
 
@@ -286,7 +287,7 @@ const toggle = async (s) => {
   } catch (err) {
     s.is_active = !s.is_active
     console.error("Toggle failed", err)
-    alert("Gagal mengubah status service")
+    await Swal.fire({ icon: "error", title: "Gagal", text: "Gagal mengubah status service" })
   }
 }
 

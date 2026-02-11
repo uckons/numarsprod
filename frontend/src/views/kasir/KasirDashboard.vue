@@ -85,6 +85,7 @@ import api from "@/services/api"
 import { watch } from "vue"
 import StartTimerModal from "@/components/StartTimerModal.vue"
 import Swal from "sweetalert2"
+import socket from "../../services/socket"
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -280,6 +281,20 @@ const updateCountdown = () => {
 }
 
 onMounted(async () => {
+  socket.emit("join-branch", {
+    branch_id: auth.user?.branch_id,
+    role: auth.user?.role,
+    user_id: auth.user?.id
+  })
+
+  socket.on("bar:order:update", async (payload) => {
+    await Swal.fire({
+      icon: payload.status === "READY" ? "success" : "warning",
+      title: payload.status === "READY" ? `Order #${payload.order_id} siap dikirim` : `Order #${payload.order_id} dibatalkan`,
+      text: payload.message || "Update dari staff bar"
+    })
+  })
+
   await loadDashboard()
   await syncTimers()
   
@@ -291,6 +306,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  socket.off("bar:order:update")
   if (countdownInterval) clearInterval(countdownInterval)
   if (apiRefreshInterval) clearInterval(apiRefreshInterval)
 })
