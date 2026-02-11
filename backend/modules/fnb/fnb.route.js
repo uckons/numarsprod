@@ -30,4 +30,33 @@ module.exports = app => {
     rbac(["SuperAdmin", "Owner", "Supervisor", "Manager"]),
     controller.update
   )
+
+  app.post(
+    "/api/fnb/:id/stock-adjustments",
+    auth,
+    rbac(["SuperAdmin", "Owner", "Supervisor", "Manager", "Staff Bar"]),
+    controller.requestStockAdjustment
+  )
+
+  app.get(
+    "/api/fnb/stock/requests",
+    auth,
+    rbac(["SuperAdmin", "Owner", "Supervisor", "Manager"]),
+    controller.getStockAdjustmentRequests
+  )
+
+  app.post(
+    "/api/fnb/stock/requests/:requestId/approve",
+    auth,
+    rbac(["SuperAdmin", "Owner", "Supervisor", "Manager"]),
+    controller.approveStockAdjustment
+  )
+
+  app.post(
+    "/api/fnb/stock/requests/:requestId/reject",
+    auth,
+    rbac(["SuperAdmin", "Owner", "Supervisor", "Manager"]),
+    controller.rejectStockAdjustment
+  )
+
 }

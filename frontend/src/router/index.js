@@ -5,6 +5,8 @@ import Login from "../views/Login.vue"
 import SuperAdminDashboard from "../views/superadmin/SuperAdminDashboard.vue"
 import OwnerDashboard from "../views/owner/OwnerDashboard.vue"
 import ManagerDashboard from "../views/manager/ManagerDashboard.vue"
+import SupervisorDashboard from "../views/supervisor/SupervisorDashboard.vue"
+import BarDashboard from "../views/bar/BarDashboard.vue"
 import PosLayout from "@/views/pos/PosLayout.vue"
 import KasirDashboard from "@/views/kasir/KasirDashboard.vue"
 import TerapisDashboard from "../views/terapis/TerapisDashboard.vue"
@@ -15,6 +17,7 @@ import AuditLogs from "../views/superadmin/AuditLogs.vue"
 import Services from "@/views/superadmin/Services.vue"
 import Branches from "@/views/superadmin/Branches.vue"
 import PosCashier from "@/views/pos/PosCashier.vue"
+import KasirBarInbox from "@/views/kasir/KasirBarInbox.vue"
 const routes = [
   { path: "/login", component: Login },
 
@@ -36,6 +39,20 @@ const routes = [
   { path: "/manager",
     component: ManagerDashboard,
     meta: { auth: true, roles: ["Manager"] }
+  },
+
+  // SUPERVISOR
+  {
+    path: "/supervisor",
+    component: SupervisorDashboard,
+    meta: { auth: true, roles: ["Supervisor"] }
+  },
+
+  // STAFF BAR
+  {
+    path: "/bar",
+    component: BarDashboard,
+    meta: { auth: true, roles: ["Staff Bar"] }
   },
 
   // KASIR
@@ -71,6 +88,13 @@ const routes = [
   path: "/kasir/reports",
   name: "KasirReports",
   component: () => import("@/views/kasir/KasirReports.vue"),
+  meta: { requiresAuth: true }
+},
+
+{
+  path: "/kasir/bar-inbox",
+  name: "KasirBarInbox",
+  component: KasirBarInbox,
   meta: { requiresAuth: true }
 },
 

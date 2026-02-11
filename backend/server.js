@@ -36,6 +36,8 @@ const io = new Server(server, {
   }
 })
 
+app.set("io", io)
+
 // 3️⃣ LOAD SOCKET MODULE
 require("./sockets/timer.socket")(io)
 
