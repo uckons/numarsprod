@@ -17,6 +17,7 @@ import AuditLogs from "../views/superadmin/AuditLogs.vue"
 import Services from "@/views/superadmin/Services.vue"
 import Branches from "@/views/superadmin/Branches.vue"
 import PosCashier from "@/views/pos/PosCashier.vue"
+import KasirBarInbox from "@/views/kasir/KasirBarInbox.vue"
 const routes = [
   { path: "/login", component: Login },
 
@@ -87,6 +88,13 @@ const routes = [
   path: "/kasir/reports",
   name: "KasirReports",
   component: () => import("@/views/kasir/KasirReports.vue"),
+  meta: { requiresAuth: true }
+},
+
+{
+  path: "/kasir/bar-inbox",
+  name: "KasirBarInbox",
+  component: KasirBarInbox,
   meta: { requiresAuth: true }
 },
 

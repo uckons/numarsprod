@@ -45,23 +45,13 @@
       <router-link to="/kasir/reports" class="action">
         📊 Laporan
       </router-link>
+
+      <router-link to="/kasir/bar-inbox" class="action inbox-link">
+        📨 Inbox Bar
+        <span v-if="unreadBarCount" class="notif-dot">{{ unreadBarCount }}</span>
+      </router-link>
     </section>
 
-    <section class="bar-inbox" v-if="barMessages.length">
-      <div class="bar-inbox-head">
-        <h3>Inbox Message dari Bar</h3>
-        <span class="badge-unread" v-if="unreadBarCount">{{ unreadBarCount }} unread</span>
-      </div>
-
-      <div class="bar-message" v-for="msg in barMessages.slice(0, 8)" :key="msg.id" :class="{ unread: !msg.is_read }">
-        <div>
-          <strong>{{ msg.title }}</strong>
-          <p>{{ msg.message || '-' }}</p>
-          <small>{{ formatMessageDate(msg.created_at) }}</small>
-        </div>
-        <button v-if="!msg.is_read" class="mark-btn" @click="markBarMessageRead(msg.id)">Tandai Dibaca</button>
-      </div>
-    </section>
  
     <!-- TIMER GRID (AMAN) -->
     <section class="timers">
@@ -512,6 +502,27 @@ onUnmounted(() => {
   border-color: #c9a24d;
 }
 
+.inbox-link {
+  position: relative;
+}
+
+.notif-dot {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #e74c3c;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+
 /* ======================
    TIMERS
 ====================== */
@@ -606,55 +617,5 @@ onUnmounted(() => {
   box-shadow: 0 8px 20px rgba(0,0,0,.28);
 }
 
-.bar-inbox {
-  margin-bottom: 20px;
-  background: #111;
-  border: 1px solid #252525;
-  border-radius: 12px;
-  padding: 14px;
-}
-
-.bar-inbox-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.badge-unread {
-  background: #c0392b;
-  color: #fff;
-  border-radius: 999px;
-  padding: 4px 8px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.bar-message {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  border-top: 1px solid #272727;
-  padding: 10px 0;
-}
-
-.bar-message.unread {
-  background: rgba(245, 197, 24, 0.06);
-}
-
-.bar-message p {
-  margin: 4px 0;
-  color: #d2d2d2;
-}
-
-.mark-btn {
-  border: none;
-  border-radius: 8px;
-  background: #f5c518;
-  color: #111;
-  height: fit-content;
-  padding: 8px 10px;
-  cursor: pointer;
-}
 
 </style>
