@@ -297,14 +297,24 @@ const cancel = async (id, fromModal = false) => {
   const confirm = await Swal.fire({
     icon: "warning",
     title: "Batalkan item tambahan?",
+    input: "textarea",
+    inputLabel: "Alasan cancel",
+    inputPlaceholder: "Contoh: stok habis / item tidak tersedia",
+    inputValue: "",
+    inputAttributes: { maxlength: 300 },
     text: "Yang dibatalkan hanya item tambahan dari inbox ini.",
     showCancelButton: true,
     confirmButtonText: "Ya, batalkan",
-    cancelButtonText: "Kembali"
+    cancelButtonText: "Kembali",
+    inputValidator: (value) => {
+      if (!String(value || "").trim()) return "Alasan cancel wajib diisi"
+      return null
+    }
   })
   if (!confirm.isConfirmed) return
 
-  await api.post(`/orders/bar/${id}/cancel`, { note: "cancelled by SB" })
+  const note = String(confirm.value || "").trim()
+  await api.post(`/orders/bar/${id}/cancel`, { note })
   await loadAll({ silent: true })
   await Swal.fire({ icon: "success", title: "Item tambahan dibatalkan" })
 

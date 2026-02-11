@@ -46,6 +46,22 @@
         📊 Laporan
       </router-link>
     </section>
+
+    <section class="bar-inbox" v-if="barMessages.length">
+      <div class="bar-inbox-head">
+        <h3>Inbox Message dari Bar</h3>
+        <span class="badge-unread" v-if="unreadBarCount">{{ unreadBarCount }} unread</span>
+      </div>
+
+      <div class="bar-message" v-for="msg in barMessages.slice(0, 8)" :key="msg.id" :class="{ unread: !msg.is_read }">
+        <div>
+          <strong>{{ msg.title }}</strong>
+          <p>{{ msg.message || '-' }}</p>
+          <small>{{ formatMessageDate(msg.created_at) }}</small>
+        </div>
+        <button v-if="!msg.is_read" class="mark-btn" @click="markBarMessageRead(msg.id)">Tandai Dibaca</button>
+      </div>
+    </section>
  
     <!-- TIMER GRID (AMAN) -->
     <section class="timers">
@@ -82,7 +98,6 @@ import { useRouter } from "vue-router"
 import { useAuthStore } from "../../store/auth.store"
 import TimeCard from "@/components/TimeCard.vue"
 import api from "@/services/api"
-import { watch } from "vue"
 import StartTimerModal from "@/components/StartTimerModal.vue"
 import Swal from "sweetalert2"
 import socket from "../../services/socket"
@@ -95,6 +110,12 @@ const stats = ref({
   todayRevenue: 0,
   activeTherapists: 0
 })
+
+const barMessages = ref([])
+const unreadBarCount = computed(() => barMessages.value.filter(m => !m.is_read).length)
+let barMessageInterval = null
+let barPopupOpen = false
+const BAR_MESSAGE_REFRESH_INTERVAL = 5000
 
 const TIMER_SLOTS = 30
 
@@ -280,6 +301,47 @@ const updateCountdown = () => {
   })
 }
 
+const loadBarMessages = async () => {
+  try {
+    const res = await api.get('/orders/bar/messages')
+    barMessages.value = Array.isArray(res.data) ? res.data : []
+  } catch (err) {
+    console.error('Gagal load bar messages', err)
+  }
+}
+
+const markBarMessageRead = async (messageId) => {
+  await api.post(`/orders/bar/messages/${messageId}/read`)
+  await loadBarMessages()
+}
+
+const showUnreadBarRepopup = async () => {
+  if (barPopupOpen) return
+
+  const unread = barMessages.value.find(m => !m.is_read)
+  if (!unread) return
+
+  barPopupOpen = true
+  try {
+    const result = await Swal.fire({
+      icon: unread.type === 'CANCELLED' ? 'warning' : 'info',
+      title: unread.title || 'Message dari Staff Bar',
+      text: unread.message || 'Ada update baru dari bar',
+      showCancelButton: true,
+      confirmButtonText: 'Tandai Dibaca',
+      cancelButtonText: 'Nanti'
+    })
+
+    if (result.isConfirmed) {
+      await markBarMessageRead(unread.id)
+    }
+  } finally {
+    barPopupOpen = false
+  }
+}
+
+const formatMessageDate = (v) => new Date(v).toLocaleString('id-ID')
+
 onMounted(async () => {
   socket.emit("join-branch", {
     branch_id: auth.user?.branch_id,
@@ -288,27 +350,37 @@ onMounted(async () => {
   })
 
   socket.on("bar:order:update", async (payload) => {
+    await loadBarMessages()
     await Swal.fire({
       icon: payload.status === "READY" ? "success" : "warning",
       title: payload.status === "READY" ? `Order #${payload.order_id} siap dikirim` : `Order #${payload.order_id} dibatalkan`,
-      text: payload.message || "Update dari staff bar"
+      text: payload.note ? `${payload.message}
+Alasan: ${payload.note}` : (payload.message || "Update dari staff bar")
     })
+    await showUnreadBarRepopup()
   })
 
   await loadDashboard()
   await syncTimers()
+  await loadBarMessages()
+  await showUnreadBarRepopup()
   
   // Start countdown interval (every 1 second)
   countdownInterval = setInterval(updateCountdown, COUNTDOWN_INTERVAL)
   
   // Start API refresh interval (every 30 seconds)
   apiRefreshInterval = setInterval(syncTimers, API_REFRESH_INTERVAL)
+  barMessageInterval = setInterval(async () => {
+    await loadBarMessages()
+    await showUnreadBarRepopup()
+  }, BAR_MESSAGE_REFRESH_INTERVAL)
 })
 
 onUnmounted(() => {
   socket.off("bar:order:update")
   if (countdownInterval) clearInterval(countdownInterval)
   if (apiRefreshInterval) clearInterval(apiRefreshInterval)
+  if (barMessageInterval) clearInterval(barMessageInterval)
 })
 
 </script>
@@ -528,5 +600,61 @@ onUnmounted(() => {
   }
 }
 
+
+.action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0,0,0,.28);
+}
+
+.bar-inbox {
+  margin-bottom: 20px;
+  background: #111;
+  border: 1px solid #252525;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.bar-inbox-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.badge-unread {
+  background: #c0392b;
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bar-message {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #272727;
+  padding: 10px 0;
+}
+
+.bar-message.unread {
+  background: rgba(245, 197, 24, 0.06);
+}
+
+.bar-message p {
+  margin: 4px 0;
+  color: #d2d2d2;
+}
+
+.mark-btn {
+  border: none;
+  border-radius: 8px;
+  background: #f5c518;
+  color: #111;
+  height: fit-content;
+  padding: 8px 10px;
+  cursor: pointer;
+}
 
 </style>

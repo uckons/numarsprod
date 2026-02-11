@@ -79,6 +79,31 @@ router.post(
   controller.cancelBarOrder
 )
 
+
+router.get(
+  "/bar/messages",
+  auth,
+  (req, res, next) => {
+    if (!["Kasir", "Supervisor", "Manager", "SuperAdmin", "Owner"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Role not allowed" })
+    }
+    next()
+  },
+  controller.getKasirBarMessages
+)
+
+router.post(
+  "/bar/messages/:messageId/read",
+  auth,
+  (req, res, next) => {
+    if (!["Kasir", "Supervisor", "Manager", "SuperAdmin", "Owner"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Role not allowed" })
+    }
+    next()
+  },
+  controller.markKasirBarMessageRead
+)
+
 // CREATE EMPTY ORDER (kasir buka order)
 router.post("/", auth, controller.create)
 

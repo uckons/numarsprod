@@ -33,6 +33,22 @@ const ensureBarWorkflowTables = async (db) => {
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS bar_messages (
+      id SERIAL PRIMARY KEY,
+      branch_id INT NOT NULL,
+      order_id INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      bar_order_id INT REFERENCES bar_orders(id) ON DELETE SET NULL,
+      type VARCHAR(30) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      message TEXT,
+      payload JSONB,
+      is_read BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMP DEFAULT NOW(),
+      read_at TIMESTAMP
+    )
+  `)
 }
 
 const buildBarOrderSnapshot = async (db, orderId) => {
@@ -93,6 +109,26 @@ const emitKasirOrderUpdate = (req, payload) => {
   const io = req.app.get("io")
   if (!io) return
   io.to(roleRoom(payload.branch_id, "Kasir")).emit("bar:order:update", payload)
+}
+
+const createKasirBarMessage = async (db, payload = {}) => {
+  const { rows } = await db.query(
+    `INSERT INTO bar_messages
+      (branch_id, order_id, bar_order_id, type, title, message, payload, is_read)
+     VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,false)
+     RETURNING *`,
+    [
+      payload.branch_id,
+      payload.order_id,
+      payload.bar_order_id || null,
+      payload.type || "INFO",
+      payload.title || "Update dari Staff Bar",
+      payload.message || null,
+      JSON.stringify(payload.payload || {})
+    ]
+  )
+
+  return rows[0]
 }
 
 const writeAuditLog = async (db, userId, action, payload = {}) => {
@@ -1063,6 +1099,16 @@ exports.deliverBarOrder = async (req, res) => {
       [req.user.id, barOrderId]
     )
 
+    const kasirMessage = await createKasirBarMessage(db, {
+      branch_id: bo.branch_id,
+      order_id: bo.order_id,
+      bar_order_id: barOrderId,
+      type: "DELIVERED",
+      title: `Order #${bo.order_id} siap dikirim`,
+      message: "Items dari staff bar sudah delivered.",
+      payload: { items }
+    })
+
     await db.query("COMMIT")
 
     emitKasirOrderUpdate(req, {
@@ -1070,10 +1116,11 @@ exports.deliverBarOrder = async (req, res) => {
       branch_id: bo.branch_id,
       status: "READY",
       items,
-      message: `Order #${bo.order_id} siap dikirim`
+      message: `Order #${bo.order_id} siap dikirim`,
+      message_id: kasirMessage.id
     })
 
-    res.json({ success: true })
+    res.json({ success: true, message_id: kasirMessage.id })
   } catch (err) {
     try { await db.query("ROLLBACK") } catch (_) {}
     res.status(500).json({ message: err.message })
@@ -1103,54 +1150,8 @@ exports.cancelBarOrder = async (req, res) => {
       return res.status(400).json({ message: "Status order tidak valid" })
     }
 
-    const note = req.body?.note || "cancelled by SB"
+    const note = String(req.body?.note || "cancelled by SB").trim() || "cancelled by SB"
     const items = Array.isArray(bo.items_snapshot) ? bo.items_snapshot : []
-
-    for (const item of items) {
-      let remainingCancelQty = Number(item.qty || 0)
-      if (remainingCancelQty <= 0) continue
-
-      const orderItemRes = await db.query(
-        `SELECT id, qty, price
-         FROM order_items
-         WHERE order_id=$1 AND service_id=$2 AND qty > 0
-         ORDER BY id ASC`,
-        [bo.order_id, Number(item.service_id)]
-      )
-
-      for (const oi of orderItemRes.rows) {
-        if (remainingCancelQty <= 0) break
-
-        const currentQty = Number(oi.qty || 0)
-        if (currentQty <= 0) continue
-
-        const reduceQty = Math.min(currentQty, remainingCancelQty)
-        const newQty = currentQty - reduceQty
-        remainingCancelQty -= reduceQty
-
-        if (newQty <= 0) {
-          await db.query(`DELETE FROM order_items WHERE id=$1`, [oi.id])
-        } else {
-          await db.query(
-            `UPDATE order_items
-             SET qty=$1, subtotal=($2 * $1)
-             WHERE id=$3`,
-            [newQty, Number(oi.price || 0), oi.id]
-          )
-        }
-      }
-    }
-
-    const totalRes = await db.query(
-      `SELECT COALESCE(SUM(subtotal), 0) AS total FROM order_items WHERE order_id=$1`,
-      [bo.order_id]
-    )
-    const newTotal = Number(totalRes.rows[0]?.total || 0)
-
-    await db.query(
-      `UPDATE orders SET total=$2, total_amount=$2 WHERE id=$1`,
-      [bo.order_id, newTotal]
-    )
 
     await db.query(
       `UPDATE bar_orders
@@ -1158,6 +1159,16 @@ exports.cancelBarOrder = async (req, res) => {
        WHERE id=$3`,
       [note, req.user.id, barOrderId]
     )
+
+    const kasirMessage = await createKasirBarMessage(db, {
+      branch_id: bo.branch_id,
+      order_id: bo.order_id,
+      bar_order_id: barOrderId,
+      type: "CANCELLED",
+      title: `Item tambahan order #${bo.order_id} dibatalkan`,
+      message: `Alasan: ${note}`,
+      payload: { items, note }
+    })
 
     await db.query("COMMIT")
 
@@ -1167,12 +1178,58 @@ exports.cancelBarOrder = async (req, res) => {
       status: "CANCELLED",
       items,
       message: `Item tambahan order #${bo.order_id} dibatalkan oleh SB`,
-      note
+      note,
+      message_id: kasirMessage.id
     })
 
-    res.json({ success: true, order_id: bo.order_id, total: newTotal })
+    res.json({ success: true, order_id: bo.order_id, note, message_id: kasirMessage.id })
   } catch (err) {
     try { await db.query("ROLLBACK") } catch (_) {}
+    res.status(500).json({ message: err.message })
+  }
+}
+
+
+exports.getKasirBarMessages = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureBarWorkflowTables(db)
+
+    const { rows } = await db.query(
+      `SELECT id, order_id, bar_order_id, type, title, message, payload, is_read, created_at, read_at
+       FROM bar_messages
+       WHERE branch_id=$1
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      [req.user.branch_id]
+    )
+
+    res.json(rows)
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.markKasirBarMessageRead = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const messageId = Number(req.params.messageId)
+    await ensureBarWorkflowTables(db)
+
+    const { rows } = await db.query(
+      `UPDATE bar_messages
+       SET is_read=true, read_at=NOW()
+       WHERE id=$1 AND branch_id=$2
+       RETURNING *`,
+      [messageId, req.user.branch_id]
+    )
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Message not found" })
+    }
+
+    res.json(rows[0])
+  } catch (err) {
     res.status(500).json({ message: err.message })
   }
 }
