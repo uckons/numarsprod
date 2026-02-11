@@ -31,6 +31,54 @@ router.post(
   controller.createDraftFromPos
 )
 
+router.get(
+  "/bar/inbox",
+  auth,
+  (req, res, next) => {
+    if (!["Staff Bar", "Supervisor", "Manager", "SuperAdmin", "Owner"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Role not allowed" })
+    }
+    next()
+  },
+  controller.getBarInbox
+)
+
+router.post(
+  "/bar/:barOrderId/accept",
+  auth,
+  (req, res, next) => {
+    if (!["Staff Bar", "Supervisor", "Manager"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Role not allowed" })
+    }
+    next()
+  },
+  controller.acceptBarOrder
+)
+
+router.post(
+  "/bar/:barOrderId/deliver",
+  auth,
+  (req, res, next) => {
+    if (!["Staff Bar", "Supervisor", "Manager"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Role not allowed" })
+    }
+    next()
+  },
+  controller.deliverBarOrder
+)
+
+router.post(
+  "/bar/:barOrderId/cancel",
+  auth,
+  (req, res, next) => {
+    if (!["Staff Bar", "Supervisor", "Manager"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Role not allowed" })
+    }
+    next()
+  },
+  controller.cancelBarOrder
+)
+
 // CREATE EMPTY ORDER (kasir buka order)
 router.post("/", auth, controller.create)
 
