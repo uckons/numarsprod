@@ -130,6 +130,9 @@ const fnbItems = ref([])
 const barInbox = ref([])
 const draftQty = ref({})
 const draftReason = ref({})
+const knownPendingInboxKeys = ref(new Set())
+let autoRefreshTimer = null
+const AUTO_REFRESH_MS = 5000
 
 const stockSearch = ref("")
 const sortMode = ref("low-first")
@@ -188,13 +191,37 @@ const stockChartOptions = computed(() => {
   }
 })
 
-const loadAll = async () => {
+const loadAll = async (options = {}) => {
+  const { silent = false } = options
+
   const [fnbRes, inboxRes] = await Promise.all([
     api.get("/fnb"),
     api.get("/orders/bar/inbox")
   ])
+
+  const nextInbox = inboxRes.data || []
+  const nextPendingKeys = new Set(
+    nextInbox
+      .filter(item => item.status === "PENDING")
+      .map(item => `${item.id}-${item.order_id}`)
+  )
+
+  if (!silent) {
+    for (const item of nextInbox) {
+      const key = `${item.id}-${item.order_id}`
+      if (item.status === "PENDING" && !knownPendingInboxKeys.value.has(key)) {
+        await Swal.fire({
+          icon: "info",
+          title: `Order #${item.order_id} masuk dari kasir`,
+          text: "Silakan diproses di inbox Staff Bar"
+        })
+      }
+    }
+  }
+
+  knownPendingInboxKeys.value = nextPendingKeys
   fnbItems.value = fnbRes.data || []
-  barInbox.value = inboxRes.data || []
+  barInbox.value = nextInbox
 }
 
 const accept = async (id) => {
@@ -264,14 +291,21 @@ onMounted(async () => {
 
   socket.on("bar:order:new", async (payload) => {
     await Swal.fire({ icon: "info", title: `Order #${payload.order_id} masuk inbox bar` })
-    await loadAll()
+    await loadAll({ silent: true })
   })
 
-  await loadAll()
+  await loadAll({ silent: true })
+
+  autoRefreshTimer = setInterval(() => {
+    loadAll({ silent: false }).catch(err => {
+      console.error("Auto refresh bar dashboard gagal", err)
+    })
+  }, AUTO_REFRESH_MS)
 })
 
 onBeforeUnmount(() => {
   socket.off("bar:order:new")
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer)
 })
 </script>
 
