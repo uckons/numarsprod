@@ -93,6 +93,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import Swal from 'sweetalert2'
 import api from '@/services/api'
 
 const rooms = ref([])
@@ -198,20 +199,29 @@ const toggleRoom = async (room) => {
   try {
     await api.put(`/rooms/${room.id}/toggle`)
     await fetchRooms()
+    await Swal.fire({ icon: 'success', title: 'Status room berhasil diubah' })
   } catch (err) {
-    alert(err.response?.data?.message || 'Gagal mengubah status room')
+    await Swal.fire({ icon: 'error', title: 'Gagal', text: err.response?.data?.message || 'Gagal mengubah status room' })
   }
 }
 
 const removeRoom = async (room) => {
-  const ok = window.confirm(`Hapus room ${room.name}?`)
-  if (!ok) return
+  const ok = await Swal.fire({
+    icon: 'warning',
+    title: `Hapus room ${room.name}?`,
+    text: 'Aksi ini tidak bisa di-undo',
+    showCancelButton: true,
+    confirmButtonText: 'Hapus',
+    cancelButtonText: 'Batal'
+  })
+  if (!ok.isConfirmed) return
 
   try {
     await api.delete(`/rooms/${room.id}`)
     await fetchRooms()
+    await Swal.fire({ icon: 'success', title: 'Room berhasil dihapus' })
   } catch (err) {
-    alert(err.response?.data?.message || 'Gagal menghapus room')
+    await Swal.fire({ icon: 'error', title: 'Gagal', text: err.response?.data?.message || 'Gagal menghapus room' })
   }
 }
 

@@ -11,6 +11,90 @@ const parseOrderId = (rawId) => {
 
 const VOID_UNDO_WINDOW_MINUTES = 10
 
+const roleRoom = (branchId, role = "") => `branch:${branchId}:role:${String(role).toLowerCase().replace(/\s+/g, "-")}`
+
+const ensureBarWorkflowTables = async (db) => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS bar_orders (
+      id SERIAL PRIMARY KEY,
+      order_id INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      branch_id INT NOT NULL,
+      status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+      items_snapshot JSONB NOT NULL,
+      note TEXT,
+      requested_by INT,
+      accepted_by INT,
+      delivered_by INT,
+      cancelled_by INT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      accepted_at TIMESTAMP,
+      delivered_at TIMESTAMP,
+      cancelled_at TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `)
+}
+
+const buildBarOrderSnapshot = async (db, orderId) => {
+  const { rows } = await db.query(
+    [
+      "SELECT fi.id AS fnb_item_id, oi.service_id, oi.service_name, oi.qty",
+      "FROM order_items oi",
+      "JOIN services s ON s.id = oi.service_id",
+      "JOIN fnb_items fi ON fi.service_id = s.id",
+      "WHERE oi.order_id=$1 AND s.type='FNB'"
+    ].join(" "),
+    [orderId]
+  )
+  return rows.map(r => ({
+    fnb_item_id: Number(r.fnb_item_id),
+    service_id: Number(r.service_id),
+    service_name: r.service_name,
+    qty: Number(r.qty || 0)
+  }))
+}
+
+
+const mapQtyByService = (rows = []) => {
+  const map = new Map()
+  for (const row of rows) {
+    const key = Number(row.service_id)
+    const qty = Number(row.qty || 0)
+    map.set(key, (map.get(key) || 0) + qty)
+  }
+  return map
+}
+
+const buildIncrementalFnbSnapshot = async (db, orderId, previousRows = []) => {
+  const latestRows = await buildBarOrderSnapshot(db, orderId)
+  const prevQtyByService = mapQtyByService(previousRows)
+
+  return latestRows
+    .map(item => {
+      const prevQty = Number(prevQtyByService.get(Number(item.service_id)) || 0)
+      const deltaQty = Number(item.qty || 0) - prevQty
+      return {
+        ...item,
+        qty: deltaQty
+      }
+    })
+    .filter(item => Number(item.qty || 0) > 0)
+}
+
+const emitBarOrderNew = (req, payload) => {
+  const io = req.app.get("io")
+  if (!io) return
+  io.to(roleRoom(payload.branch_id, "Staff Bar")).emit("bar:order:new", payload)
+  io.to(roleRoom(payload.branch_id, "Supervisor")).emit("bar:order:new", payload)
+  io.to(roleRoom(payload.branch_id, "Manager")).emit("bar:order:new", payload)
+}
+
+const emitKasirOrderUpdate = (req, payload) => {
+  const io = req.app.get("io")
+  if (!io) return
+  io.to(roleRoom(payload.branch_id, "Kasir")).emit("bar:order:update", payload)
+}
+
 const writeAuditLog = async (db, userId, action, payload = {}) => {
   await db.query(
     `INSERT INTO audit_logs (user_id, action, target)
@@ -539,23 +623,21 @@ exports.createDraftFromPos = async (req, res) => {
       [total, orderId]
     )
 
-    const fnbItemsRes = await db.query(
-      [
-        "SELECT fi.id AS fnb_item_id, oi.qty",
-        "FROM order_items oi",
-        "JOIN services s ON s.id = oi.service_id",
-        "JOIN fnb_items fi ON fi.service_id = s.id",
-        "WHERE oi.order_id=$1 AND s.type='FNB'"
-      ].join(" "),
-      [orderId]
-    )
-
-    for (const item of fnbItemsRes.rows) {
-      await stockService.reduceFnbStock(
-        db,
-        item.fnb_item_id,
-        item.qty
+    await ensureBarWorkflowTables(db)
+    const fnbSnapshot = await buildBarOrderSnapshot(db, orderId)
+    if (fnbSnapshot.length) {
+      await db.query(
+        `INSERT INTO bar_orders (order_id, branch_id, status, items_snapshot, requested_by)
+         VALUES ($1,$2,'PENDING',$3::jsonb,$4)`,
+        [orderId, branchId, JSON.stringify(fnbSnapshot), user.id]
       )
+
+      emitBarOrderNew(req, {
+        order_id: orderId,
+        branch_id: branchId,
+        status: "PENDING",
+        items: fnbSnapshot
+      })
     }
 
     res.json({
@@ -584,6 +666,8 @@ exports.saveDraft = async (req, res) => {
 
     await db.query("BEGIN")
     inTransaction = true
+
+    const previousFnbRows = await buildBarOrderSnapshot(db, idOrder)
 
     await db.query("DELETE FROM order_items WHERE order_id = $1", [idOrder])
 
@@ -615,10 +699,35 @@ exports.saveDraft = async (req, res) => {
       [idOrder, total]
     )
 
+    await ensureBarWorkflowTables(db)
+    const incrementalFnbSnapshot = await buildIncrementalFnbSnapshot(db, idOrder, previousFnbRows)
+
+    if (incrementalFnbSnapshot.length) {
+      await db.query(
+        `INSERT INTO bar_orders (order_id, branch_id, status, items_snapshot, requested_by)
+         VALUES ($1,$2,'PENDING',$3::jsonb,$4)`,
+        [idOrder, req.user.branch_id, JSON.stringify(incrementalFnbSnapshot), req.user.id]
+      )
+
+      emitBarOrderNew(req, {
+        order_id: idOrder,
+        branch_id: req.user.branch_id,
+        status: "PENDING",
+        items: incrementalFnbSnapshot
+      })
+    }
+
     await db.query("COMMIT")
     inTransaction = false
 
-    res.json({ success: true, order_id: idOrder, status: "DRAFT", total })
+    res.json({
+      success: true,
+      order_id: idOrder,
+      status: "DRAFT",
+      total,
+      bar_queued: Boolean(incrementalFnbSnapshot.length),
+      queued_items: incrementalFnbSnapshot
+    })
   } catch (err) {
     try {
       if (inTransaction) {
@@ -870,6 +979,200 @@ exports.getOrderDetail = async (req, res) => {
     res.json(order)
   } catch (err) {
     console.error("GET ORDER DETAIL ERROR:", err)
+    res.status(500).json({ message: err.message })
+  }
+}
+
+
+exports.getBarInbox = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureBarWorkflowTables(db)
+
+    const { rows } = await db.query(
+      `SELECT bo.id, bo.order_id, bo.status, bo.items_snapshot, bo.note, bo.created_at,
+              o.status AS order_status
+       FROM bar_orders bo
+       JOIN orders o ON o.id = bo.order_id
+       WHERE bo.branch_id=$1
+       ORDER BY bo.created_at DESC
+       LIMIT 100`,
+      [req.user.branch_id]
+    )
+
+    res.json(rows)
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.acceptBarOrder = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const barOrderId = Number(req.params.barOrderId)
+    await ensureBarWorkflowTables(db)
+
+    const { rows } = await db.query(
+      `UPDATE bar_orders
+       SET status='ACCEPTED', accepted_by=$1, accepted_at=NOW(), updated_at=NOW()
+       WHERE id=$2 AND branch_id=$3
+       RETURNING *`,
+      [req.user.id, barOrderId, req.user.branch_id]
+    )
+
+    if (!rows.length) return res.status(404).json({ message: "Inbox order not found" })
+
+    res.json(rows[0])
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
+
+exports.deliverBarOrder = async (req, res) => {
+  const db = req.app.get("db")
+  try {
+    await db.query("BEGIN")
+    await ensureBarWorkflowTables(db)
+
+    const barOrderId = Number(req.params.barOrderId)
+    const { rows } = await db.query(
+      `SELECT * FROM bar_orders WHERE id=$1 AND branch_id=$2 FOR UPDATE`,
+      [barOrderId, req.user.branch_id]
+    )
+
+    if (!rows.length) {
+      await db.query("ROLLBACK")
+      return res.status(404).json({ message: "Inbox order not found" })
+    }
+
+    const bo = rows[0]
+    if (!["PENDING", "ACCEPTED"].includes(bo.status)) {
+      await db.query("ROLLBACK")
+      return res.status(400).json({ message: "Status order tidak valid" })
+    }
+
+    const items = Array.isArray(bo.items_snapshot) ? bo.items_snapshot : []
+    for (const item of items) {
+      await stockService.reduceFnbStock(db, item.fnb_item_id, Number(item.qty || 0))
+    }
+
+    await db.query(
+      `UPDATE bar_orders
+       SET status='DELIVERED', delivered_by=$1, delivered_at=NOW(), updated_at=NOW()
+       WHERE id=$2`,
+      [req.user.id, barOrderId]
+    )
+
+    await db.query("COMMIT")
+
+    emitKasirOrderUpdate(req, {
+      order_id: bo.order_id,
+      branch_id: bo.branch_id,
+      status: "READY",
+      items,
+      message: `Order #${bo.order_id} siap dikirim`
+    })
+
+    res.json({ success: true })
+  } catch (err) {
+    try { await db.query("ROLLBACK") } catch (_) {}
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.cancelBarOrder = async (req, res) => {
+  const db = req.app.get("db")
+  try {
+    await db.query("BEGIN")
+    await ensureBarWorkflowTables(db)
+
+    const barOrderId = Number(req.params.barOrderId)
+    const { rows } = await db.query(
+      `SELECT * FROM bar_orders WHERE id=$1 AND branch_id=$2 FOR UPDATE`,
+      [barOrderId, req.user.branch_id]
+    )
+
+    if (!rows.length) {
+      await db.query("ROLLBACK")
+      return res.status(404).json({ message: "Inbox order not found" })
+    }
+
+    const bo = rows[0]
+    if (!["PENDING", "ACCEPTED"].includes(bo.status)) {
+      await db.query("ROLLBACK")
+      return res.status(400).json({ message: "Status order tidak valid" })
+    }
+
+    const note = req.body?.note || "cancelled by SB"
+    const items = Array.isArray(bo.items_snapshot) ? bo.items_snapshot : []
+
+    for (const item of items) {
+      let remainingCancelQty = Number(item.qty || 0)
+      if (remainingCancelQty <= 0) continue
+
+      const orderItemRes = await db.query(
+        `SELECT id, qty, price
+         FROM order_items
+         WHERE order_id=$1 AND service_id=$2 AND qty > 0
+         ORDER BY id ASC`,
+        [bo.order_id, Number(item.service_id)]
+      )
+
+      for (const oi of orderItemRes.rows) {
+        if (remainingCancelQty <= 0) break
+
+        const currentQty = Number(oi.qty || 0)
+        if (currentQty <= 0) continue
+
+        const reduceQty = Math.min(currentQty, remainingCancelQty)
+        const newQty = currentQty - reduceQty
+        remainingCancelQty -= reduceQty
+
+        if (newQty <= 0) {
+          await db.query(`DELETE FROM order_items WHERE id=$1`, [oi.id])
+        } else {
+          await db.query(
+            `UPDATE order_items
+             SET qty=$1, subtotal=($2 * $1)
+             WHERE id=$3`,
+            [newQty, Number(oi.price || 0), oi.id]
+          )
+        }
+      }
+    }
+
+    const totalRes = await db.query(
+      `SELECT COALESCE(SUM(subtotal), 0) AS total FROM order_items WHERE order_id=$1`,
+      [bo.order_id]
+    )
+    const newTotal = Number(totalRes.rows[0]?.total || 0)
+
+    await db.query(
+      `UPDATE orders SET total=$2, total_amount=$2 WHERE id=$1`,
+      [bo.order_id, newTotal]
+    )
+
+    await db.query(
+      `UPDATE bar_orders
+       SET status='CANCELLED', note=$1, cancelled_by=$2, cancelled_at=NOW(), updated_at=NOW()
+       WHERE id=$3`,
+      [note, req.user.id, barOrderId]
+    )
+
+    await db.query("COMMIT")
+
+    emitKasirOrderUpdate(req, {
+      order_id: bo.order_id,
+      branch_id: bo.branch_id,
+      status: "CANCELLED",
+      items,
+      message: `Item tambahan order #${bo.order_id} dibatalkan oleh SB`,
+      note
+    })
+
+    res.json({ success: true, order_id: bo.order_id, total: newTotal })
+  } catch (err) {
+    try { await db.query("ROLLBACK") } catch (_) {}
     res.status(500).json({ message: err.message })
   }
 }
