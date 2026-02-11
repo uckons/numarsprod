@@ -212,3 +212,132 @@ exports.update = async (db, id, data) => {
     throw error
   }
 }
+
+const ensureStockApprovalTable = async (db) => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS fnb_stock_adjustment_requests (
+      id SERIAL PRIMARY KEY,
+      branch_id INT NOT NULL,
+      fnb_item_id INT NOT NULL REFERENCES fnb_items(id) ON DELETE CASCADE,
+      qty_change INT NOT NULL,
+      reason TEXT,
+      status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+      requested_by INT,
+      reviewed_by INT,
+      review_note TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      reviewed_at TIMESTAMP
+    )
+  `)
+}
+
+exports.requestStockAdjustment = async (db, user, fnbItemId, data = {}) => {
+  await ensureStockApprovalTable(db)
+
+  const qtyChange = Number(data.qty_change || 0)
+  if (!qtyChange) {
+    throw new Error("qty_change harus diisi")
+  }
+
+  const check = await db.query(
+    `SELECT id, branch_id, name FROM fnb_items WHERE id=$1`,
+    [Number(fnbItemId)]
+  )
+
+  if (!check.rows.length) {
+    throw new Error("Item FNB tidak ditemukan")
+  }
+
+  if (Number(check.rows[0].branch_id) !== Number(user.branch_id)) {
+    throw new Error("Item FNB bukan milik branch anda")
+  }
+
+  const { rows } = await db.query(
+    `INSERT INTO fnb_stock_adjustment_requests
+      (branch_id, fnb_item_id, qty_change, reason, status, requested_by)
+     VALUES ($1,$2,$3,$4,'PENDING',$5)
+     RETURNING *`,
+    [user.branch_id, Number(fnbItemId), qtyChange, data.reason || null, user.id]
+  )
+
+  return rows[0]
+}
+
+exports.getStockAdjustmentRequests = async (db, user) => {
+  await ensureStockApprovalTable(db)
+
+  const { rows } = await db.query(
+    `SELECT r.*, fi.name AS item_name,
+            req_user.name AS requested_by_name,
+            rev_user.name AS reviewed_by_name
+     FROM fnb_stock_adjustment_requests r
+     JOIN fnb_items fi ON fi.id = r.fnb_item_id
+     LEFT JOIN users req_user ON req_user.id = r.requested_by
+     LEFT JOIN users rev_user ON rev_user.id = r.reviewed_by
+     WHERE r.branch_id=$1
+     ORDER BY r.created_at DESC
+     LIMIT 150`,
+    [user.branch_id]
+  )
+
+  return rows
+}
+
+exports.approveStockAdjustment = async (db, user, requestId) => {
+  await ensureStockApprovalTable(db)
+  await db.query("BEGIN")
+
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM fnb_stock_adjustment_requests
+       WHERE id=$1 AND branch_id=$2
+       FOR UPDATE`,
+      [Number(requestId), user.branch_id]
+    )
+
+    if (!rows.length) throw new Error("Request tidak ditemukan")
+
+    const request = rows[0]
+    if (request.status !== "PENDING") throw new Error("Request sudah diproses")
+
+    await db.query(
+      `UPDATE fnb_items SET stock = stock + $1 WHERE id=$2`,
+      [Number(request.qty_change), Number(request.fnb_item_id)]
+    )
+
+    await db.query(
+      `INSERT INTO stock_logs (fnb_item_id, qty_change)
+       VALUES ($1,$2)`,
+      [Number(request.fnb_item_id), Number(request.qty_change)]
+    )
+
+    const updateRes = await db.query(
+      `UPDATE fnb_stock_adjustment_requests
+       SET status='APPROVED', reviewed_by=$1, reviewed_at=NOW(), review_note=$2
+       WHERE id=$3
+       RETURNING *`,
+      [user.id, null, Number(requestId)]
+    )
+
+    await db.query("COMMIT")
+    return updateRes.rows[0]
+  } catch (err) {
+    await db.query("ROLLBACK")
+    throw err
+  }
+}
+
+exports.rejectStockAdjustment = async (db, user, requestId, data = {}) => {
+  await ensureStockApprovalTable(db)
+
+  const { rows } = await db.query(
+    `UPDATE fnb_stock_adjustment_requests
+     SET status='REJECTED', reviewed_by=$1, reviewed_at=NOW(), review_note=$2
+     WHERE id=$3 AND branch_id=$4 AND status='PENDING'
+     RETURNING *`,
+    [user.id, data.review_note || data.reason || "Rejected", Number(requestId), user.branch_id]
+  )
+
+  if (!rows.length) throw new Error("Request tidak ditemukan / sudah diproses")
+  return rows[0]
+}
