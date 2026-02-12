@@ -40,10 +40,6 @@
           <div class="field"><label>Dari</label><input type="date" v-model="dateFrom" /></div>
           <div class="field"><label>Sampai</label><input type="date" v-model="dateTo" /></div>
           <div class="field">
-            <label>Gaji Terapis (%) dari pendapatan service</label>
-            <input type="number" min="0" max="100" step="1" v-model.number="therapistSalaryPct" />
-          </div>
-          <div class="field">
             <label>Gaji Karyawan Tetap</label>
             <input type="number" min="0" v-model.number="fixedSalaryCost" />
           </div>
@@ -53,7 +49,7 @@
         <section class="kpi-grid">
           <article class="card kpi"><p>Revenue</p><h3>Rp {{ formatCurrency(totalRevenue) }}</h3></article>
           <article class="card kpi"><p>Paid Orders</p><h3>{{ paidOrders }}</h3></article>
-          <article class="card kpi"><p>Simulasi Gaji Terapis</p><h3>Rp {{ formatCurrency(therapistSalaryCost) }}</h3></article>
+          <article class="card kpi"><p>Gaji Terapis (Kerja × Komisi)</p><h3>Rp {{ formatCurrency(therapistSalaryCost) }}</h3></article>
           <article class="card kpi"><p>Total Beban</p><h3>Rp {{ formatCurrency(totalExpense) }}</h3></article>
           <article class="card kpi"><p>Net Profit/Loss</p><h3 :class="netProfit>=0?'good':'bad'">Rp {{ formatCurrency(netProfit) }}</h3></article>
         </section>
@@ -67,6 +63,40 @@
             <h4>Breakdown Service</h4>
             <ApexChart type="donut" :height="280" :series="breakdownSeries" :options="breakdownOptions" />
           </div>
+        </section>
+
+        <section class="card">
+          <h4>Trend Pendapatan per Kategori (FNB, SPA, LC, KTV)</h4>
+          <ApexChart type="line" :height="320" :series="categoryTrendSeries" :options="categoryTrendOptions" />
+        </section>
+
+        <section class="card">
+          <div class="table-head">
+            <h4>Perhitungan Gaji Terapis (Terintegrasi Accounting)</h4>
+          </div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Terapis</th>
+                <th>Grade</th>
+                <th>Jumlah Kerja</th>
+                <th>Komisi Fix / Kerja</th>
+                <th>Total Gaji</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!therapistSalaryRows.length">
+                <td colspan="5" class="muted">Belum ada data kerja terapis pada rentang ini.</td>
+              </tr>
+              <tr v-for="row in therapistSalaryRows" :key="row.name">
+                <td>{{ row.name }}</td>
+                <td>{{ row.grade_name || '-' }}</td>
+                <td>{{ row.work_count }}</td>
+                <td class="num">Rp {{ formatCurrency(row.commission_amount) }}</td>
+                <td class="num">Rp {{ formatCurrency(row.salary) }}</td>
+              </tr>
+            </tbody>
+          </table>
         </section>
 
         <section class="card">
@@ -86,12 +116,23 @@
         </section>
 
         <section class="card">
-          <h4>Detail Orders (Accounting Drill-down)</h4>
+          <div class="table-head">
+            <h4>Detail Orders (Accounting Drill-down)</h4>
+            <div class="pagination-inline">
+              <label class="muted small">Per Halaman</label>
+              <select v-model.number="ordersPageSize" class="mini-select">
+                <option :value="10">10</option>
+                <option :value="25">25</option>
+                <option :value="50">50</option>
+                <option :value="100">100</option>
+              </select>
+            </div>
+          </div>
           <table class="table">
             <thead><tr><th>Order</th><th>Outlet</th><th>Status</th><th>Kategori</th><th>Total</th><th>Waktu</th></tr></thead>
             <tbody>
               <tr v-if="!filteredOrders.length"><td colspan="6" class="muted">Belum ada data order pada filter ini.</td></tr>
-              <tr v-for="o in filteredOrders.slice(0, 100)" :key="o.id">
+              <tr v-for="o in pagedFilteredOrders" :key="o.id">
                 <td>#{{ o.id }}</td>
                 <td>{{ o.branch_name || '-' }}</td>
                 <td>{{ o.status }}</td>
@@ -101,6 +142,11 @@
               </tr>
             </tbody>
           </table>
+          <div class="pagination" v-if="filteredOrders.length">
+            <button class="btn" @click="ordersPage = Math.max(1, ordersPage - 1)" :disabled="ordersPage===1">Prev</button>
+            <span>Halaman {{ ordersPage }} / {{ ordersTotalPages }}</span>
+            <button class="btn" @click="ordersPage = Math.min(ordersTotalPages, ordersPage + 1)" :disabled="ordersPage===ordersTotalPages">Next</button>
+          </div>
         </section>
       </section>
 
@@ -117,7 +163,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import Swal from "sweetalert2"
 import api from "../../services/api"
 import ApexChart from "../../components/ApexChart.vue"
@@ -133,27 +179,39 @@ import StockDashboard from "../stock/StockDashboard.vue"
 const tab = ref("report")
 const branches = ref([])
 const orders = ref([])
+const timers = ref([])
+const therapists = ref([])
+const grades = ref([])
 
 const selectedBranch = ref("ALL")
 const dateFrom = ref("")
 const dateTo = ref("")
 
-const therapistSalaryPct = ref(35)
 const fixedSalaryCost = ref(0)
 const manualExpenses = ref([])
 const loading = ref(false)
 const loadError = ref("")
 
+const ordersPage = ref(1)
+const ordersPageSize = ref(25)
+
 const loadReport = async () => {
   loading.value = true
   loadError.value = ""
   try {
-    const [ordersRes, branchRes] = await Promise.all([
+    const [ordersRes, branchRes, timersRes, therapistsRes, gradesRes] = await Promise.all([
       api.get("/superadmin/orders"),
-      api.get("/superadmin/branches")
+      api.get("/superadmin/branches"),
+      api.get("/superadmin/timers"),
+      api.get("/therapists", { params: { limit: 1000 } }),
+      api.get("/grades")
     ])
+
     orders.value = Array.isArray(ordersRes.data) ? ordersRes.data : []
     branches.value = Array.isArray(branchRes.data) ? branchRes.data : []
+    timers.value = Array.isArray(timersRes.data) ? timersRes.data : []
+    therapists.value = Array.isArray(therapistsRes.data?.data) ? therapistsRes.data.data : []
+    grades.value = Array.isArray(gradesRes.data) ? gradesRes.data : []
 
     if (!orders.value.length) {
       await Swal.fire({ icon: "info", title: "Data order kosong", text: "Belum ada transaksi untuk ditampilkan di filter saat ini." })
@@ -161,6 +219,9 @@ const loadReport = async () => {
   } catch (err) {
     orders.value = []
     branches.value = []
+    timers.value = []
+    therapists.value = []
+    grades.value = []
     loadError.value = err?.response?.data?.message || "Gagal memuat data manager"
     await Swal.fire({ icon: "error", title: "Load report gagal", text: loadError.value })
   } finally {
@@ -176,6 +237,10 @@ onMounted(() => {
   loadReport()
 })
 
+watch([selectedBranch, dateFrom, dateTo, ordersPageSize], () => {
+  ordersPage.value = 1
+})
+
 const filteredOrders = computed(() => orders.value.filter((o) => {
   if (selectedBranch.value !== "ALL" && String(o.branch_id) !== String(selectedBranch.value)) return false
   const dt = new Date(o.created_at)
@@ -184,10 +249,65 @@ const filteredOrders = computed(() => orders.value.filter((o) => {
   return true
 }))
 
+const ordersTotalPages = computed(() => Math.max(1, Math.ceil(filteredOrders.value.length / Number(ordersPageSize.value || 25))))
+const pagedFilteredOrders = computed(() => {
+  const start = (ordersPage.value - 1) * Number(ordersPageSize.value || 25)
+  return filteredOrders.value.slice(start, start + Number(ordersPageSize.value || 25))
+})
+
 const paidOrdersList = computed(() => filteredOrders.value.filter((o) => String(o.status || "").toUpperCase() === "PAID"))
 const totalRevenue = computed(() => paidOrdersList.value.reduce((a, o) => a + Number(o.total || 0), 0))
 const paidOrders = computed(() => paidOrdersList.value.length)
-const therapistSalaryCost = computed(() => (totalRevenue.value * Number(therapistSalaryPct.value || 0)) / 100)
+
+const therapistById = computed(() => {
+  const map = new Map()
+  for (const t of therapists.value) map.set(String(t.id), t)
+  return map
+})
+
+const gradeById = computed(() => {
+  const map = new Map()
+  for (const g of grades.value) map.set(String(g.id), g)
+  return map
+})
+
+const filteredFinishedTimers = computed(() => timers.value.filter((t) => {
+  if (!t.end_time) return false
+  if (selectedBranch.value !== "ALL" && String(t.branch_id) !== String(selectedBranch.value)) return false
+  const dt = new Date(t.end_time)
+  if (dateFrom.value && dt < new Date(dateFrom.value)) return false
+  if (dateTo.value && dt > new Date(`${dateTo.value}T23:59:59`)) return false
+  return true
+}))
+
+const therapistSalaryRows = computed(() => {
+  const workMap = new Map()
+  for (const timer of filteredFinishedTimers.value) {
+    const key = String(timer.therapist_id || "")
+    if (!key) continue
+    workMap.set(key, (workMap.get(key) || 0) + 1)
+  }
+
+  const rows = []
+  for (const [therapistId, workCount] of workMap.entries()) {
+    const therapist = therapistById.value.get(therapistId) || {}
+    const grade = gradeById.value.get(String(therapist.grade_id)) || {}
+    const commissionAmount = Number(grade.commission_amount ?? grade.commission_percent ?? therapist.commission_amount ?? therapist.commission_percent ?? 0)
+
+    rows.push({
+      therapist_id: therapistId,
+      name: therapist.name || `Therapist #${therapistId}`,
+      grade_name: grade.name || therapist.grade_name || "-",
+      work_count: workCount,
+      commission_amount: commissionAmount,
+      salary: workCount * commissionAmount
+    })
+  }
+
+  return rows.sort((a, b) => b.salary - a.salary)
+})
+
+const therapistSalaryCost = computed(() => therapistSalaryRows.value.reduce((a, row) => a + Number(row.salary || 0), 0))
 const manualExpenseTotal = computed(() => manualExpenses.value.reduce((a, e) => a + Number(e.amount || 0), 0))
 const totalExpense = computed(() => therapistSalaryCost.value + Number(fixedSalaryCost.value || 0) + manualExpenseTotal.value)
 const netProfit = computed(() => totalRevenue.value - totalExpense.value)
@@ -227,6 +347,56 @@ const breakdownOptions = computed(() => ({
   legend: { position: "bottom" }
 }))
 
+const categoryTrendData = computed(() => {
+  const keys = ["FNB", "SPA", "LC", "KTV"]
+  const dayMap = new Map()
+
+  for (const o of paidOrdersList.value) {
+    const day = new Date(o.created_at).toLocaleDateString("id-ID")
+    if (!dayMap.has(day)) {
+      dayMap.set(day, { FNB: 0, SPA: 0, LC: 0, KTV: 0 })
+    }
+
+    const categories = String(o.category || "")
+      .toUpperCase()
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean)
+
+    const matched = keys.filter((k) => categories.some((cat) => cat.includes(k)))
+    const divisor = matched.length || 1
+    const allocated = Number(o.total || 0) / divisor
+
+    for (const cat of matched) {
+      dayMap.get(day)[cat] += allocated
+    }
+  }
+
+  return dayMap
+})
+
+const categoryTrendSeries = computed(() => {
+  const days = [...categoryTrendData.value.keys()]
+  if (!days.length) {
+    return ["FNB", "SPA", "LC", "KTV"].map((name) => ({ name, data: [0] }))
+  }
+
+  return ["FNB", "SPA", "LC", "KTV"].map((name) => ({
+    name,
+    data: days.map((d) => Number(categoryTrendData.value.get(d)?.[name] || 0))
+  }))
+})
+
+const categoryTrendOptions = computed(() => ({
+  chart: { toolbar: { show: false }, background: "transparent" },
+  theme: { mode: "dark" },
+  xaxis: { categories: [...categoryTrendData.value.keys()].length ? [...categoryTrendData.value.keys()] : ["No Data"] },
+  dataLabels: { enabled: false },
+  stroke: { curve: "smooth", width: 2 },
+  legend: { position: "top" },
+  colors: ["#ff9f43", "#5f85ff", "#38d996", "#e056fd"]
+}))
+
 const addExpense = async () => {
   const { value: formValues } = await Swal.fire({
     title: "Tambah Beban Manual",
@@ -260,7 +430,9 @@ nav button.active { background:#c9a24d; color:#000; }
 .card { background:linear-gradient(120deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); border:1px solid rgba(255,255,255,.09); border-radius:14px; padding:14px; }
 .hero { display:flex; justify-content:space-between; align-items:center; }
 .muted { color:#a5adba; }
+.small { font-size: 12px; }
 .btn { background:transparent; border:1px solid #c9a24d; color:#c9a24d; border-radius:10px; padding:8px 14px; cursor:pointer; }
+.btn:disabled { opacity:.45; cursor:not-allowed; }
 .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
 .field { display:grid; gap:6px; }
 .field label { font-size:12px; color:#a5adba; }
@@ -273,5 +445,8 @@ nav button.active { background:#c9a24d; color:#000; }
 .table { width:100%; border-collapse:collapse; }
 .table th,.table td { padding:10px; border-bottom:1px solid rgba(255,255,255,.08); text-align:left; }
 .num { text-align:right; }
-.table-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.table-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap: 10px; }
+.pagination { display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-top:10px; }
+.pagination-inline { display:flex; align-items:center; gap:8px; }
+.mini-select { background:#090909; border:1px solid #2f3440; color:#fff; border-radius:8px; padding:6px 8px; }
 </style>
