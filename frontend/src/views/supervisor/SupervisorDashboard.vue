@@ -225,6 +225,26 @@
         <button class="btn-light" :disabled="stockPage>=stockTotalPages" @click="stockPage += 1">Next</button>
       </div>
     </section>
+
+    <section class="card">
+      <div class="section-head"><h3>Laporan Pendapatan Detail (PNL Base)</h3></div>
+      <div class="toolbar">
+        <input class="input" type="date" v-model="reportFilters.date_from" />
+        <input class="input" type="date" v-model="reportFilters.date_to" />
+        <button class="btn-primary" @click="loadReport">Terapkan</button>
+      </div>
+      <div class="summary-grid">
+        <div><p class="muted">Revenue</p><h4>Rp {{ formatCurrency(report.summary.revenue) }}</h4></div>
+        <div><p class="muted">Paid Orders</p><h4>{{ report.summary.paid_orders }}</h4></div>
+        <div><p class="muted">Items Sold</p><h4>{{ report.summary.items_sold }}</h4></div>
+      </div>
+      <table class="table">
+        <thead><tr><th>Kategori</th><th>Qty</th><th>Revenue</th></tr></thead>
+        <tbody>
+          <tr v-for="row in report.breakdown" :key="row.category"><td>{{ row.category }}</td><td>{{ row.qty }}</td><td>Rp {{ formatCurrency(row.revenue) }}</td></tr>
+        </tbody>
+      </table>
+    </section>
   </div>
 </template>
 
@@ -235,7 +255,6 @@ import api from "../../services/api"
 import socket from "../../services/socket"
 import { useAuthStore } from "../../store/auth.store"
 import UserBar from "../../components/UserBar.vue"
-import ApexChart from "../../components/ApexChart.vue"
 
 const auth = useAuthStore()
 const activeInboxTab = ref('bar')
