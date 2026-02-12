@@ -1,5 +1,6 @@
 const service = require("./order.service")
 const stockService = require("../stock/stock.service")
+const dashboardService = require("../dashboard/dashboard.service")
 
 const parseOrderId = (rawId) => {
   const orderId = Number(rawId)
@@ -47,6 +48,23 @@ const ensureBarWorkflowTables = async (db) => {
       is_read BOOLEAN NOT NULL DEFAULT false,
       created_at TIMESTAMP DEFAULT NOW(),
       read_at TIMESTAMP
+    )
+  `)
+}
+
+const ensureUndoVoidApprovalTable = async (db) => {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS undo_void_requests (
+      id SERIAL PRIMARY KEY,
+      order_id INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      branch_id INT NOT NULL,
+      requested_by INT NOT NULL,
+      reason TEXT,
+      status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+      reviewed_by INT,
+      review_note TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      reviewed_at TIMESTAMP
     )
   `)
 }
@@ -111,6 +129,13 @@ const emitKasirOrderUpdate = (req, payload) => {
   io.to(roleRoom(payload.branch_id, "Kasir")).emit("bar:order:update", payload)
 }
 
+const emitUndoVoidRequestNew = (req, payload) => {
+  const io = req.app.get("io")
+  if (!io) return
+  io.to(roleRoom(payload.branch_id, "Supervisor")).emit("orders:undo-void:request:new", payload)
+  io.to(roleRoom(payload.branch_id, "Manager")).emit("orders:undo-void:request:new", payload)
+}
+
 const createKasirBarMessage = async (db, payload = {}) => {
   const { rows } = await db.query(
     `INSERT INTO bar_messages
@@ -143,6 +168,7 @@ exports.create = async (req, res) => {
   try {
     const db = req.app.get("db")
     const user = req.user
+    await dashboardService.ensureOutletCanReceiveOrder(user)
 
     const order = await service.createOrder(db, user)
     res.json(order)
@@ -381,15 +407,41 @@ exports.cancel = async (req, res) => {
   }
 }
 
-exports.undoVoid = async (req, res) => {
+const performUndoVoid = async (db, { orderId, actorId }) => {
+  const { rows: fnbItems } = await db.query(
+    [
+      "SELECT fi.id AS fnb_item_id, oi.qty",
+      "FROM order_items oi",
+      "JOIN services s ON s.id = oi.service_id",
+      "JOIN fnb_items fi ON fi.service_id = s.id",
+      "WHERE oi.order_id=$1 AND s.type='FNB'"
+    ].join(" "),
+    [orderId]
+  )
+
+  for (const item of fnbItems) {
+    await stockService.reduceFnbStock(db, item.fnb_item_id, Number(item.qty || 0))
+  }
+
+  await db.query("UPDATE orders SET status='DRAFT' WHERE id=$1", [orderId])
+
+  await writeAuditLog(db, actorId, 'UNDO_VOID_DRAFT_ORDER', {
+    order_id: orderId,
+    at: new Date().toISOString(),
+    window_minutes: VOID_UNDO_WINDOW_MINUTES
+  })
+}
+
+exports.requestUndoVoid = async (req, res) => {
   const db = req.app.get("db")
   const orderId = parseOrderId(req.params.id)
 
   try {
+    await ensureUndoVoidApprovalTable(db)
     await db.query('BEGIN')
 
     const { rows: orderRows } = await db.query(
-      `SELECT id, status FROM orders WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, branch_id FROM orders WHERE id = $1 FOR UPDATE`,
       [orderId]
     )
 
@@ -426,50 +478,178 @@ exports.undoVoid = async (req, res) => {
       return res.status(400).json({ message: `Undo hanya bisa dalam ${VOID_UNDO_WINDOW_MINUTES} menit setelah void` })
     }
 
-    const { rows: fnbItems } = await db.query(
-      [
-        "SELECT fi.id AS fnb_item_id, oi.qty",
-        "FROM order_items oi",
-        "JOIN services s ON s.id = oi.service_id",
-        "JOIN fnb_items fi ON fi.service_id = s.id",
-        "WHERE oi.order_id=$1 AND s.type='FNB'"
-      ].join(" "),
-      [orderId]
+    const existingReq = await db.query(
+      `SELECT id FROM undo_void_requests
+       WHERE order_id=$1 AND branch_id=$2 AND status='PENDING'
+       LIMIT 1`,
+      [orderId, req.user.branch_id]
     )
 
-    for (const item of fnbItems) {
-      await stockService.reduceFnbStock(
-        db,
-        item.fnb_item_id,
-        Number(item.qty || 0)
-      )
+    if (existingReq.rows.length) {
+      await db.query('ROLLBACK')
+      return res.status(400).json({ message: 'Request undo untuk order ini masih menunggu approval' })
     }
 
-    await db.query(
-      "UPDATE orders SET status='DRAFT' WHERE id=$1",
-      [orderId]
+    const reason = String(req.body?.reason || 'Kasir meminta undo void').trim()
+    const { rows } = await db.query(
+      `INSERT INTO undo_void_requests
+       (order_id, branch_id, requested_by, reason, status)
+       VALUES ($1,$2,$3,$4,'PENDING')
+       RETURNING *`,
+      [orderId, req.user.branch_id, req.user.id, reason]
     )
 
-    await writeAuditLog(db, req.user.id, 'UNDO_VOID_DRAFT_ORDER', {
+    await db.query('COMMIT')
+
+    emitUndoVoidRequestNew(req, {
+      request_id: rows[0].id,
+      branch_id: req.user.branch_id,
       order_id: orderId,
-      at: new Date().toISOString(),
-      window_minutes: VOID_UNDO_WINDOW_MINUTES
+      requested_by: req.user.id,
+      reason
     })
 
-    await db.query('COMMIT')
-    res.json({ success: true, status: 'DRAFT' })
+    res.json({ success: true, message: 'Request undo dikirim ke supervisor/manager', request: rows[0] })
   } catch (err) {
     try { await db.query('ROLLBACK') } catch (_) {}
-    console.error('UNDO VOID ORDER ERROR:', err)
+    console.error('REQUEST UNDO VOID ERROR:', err)
     res.status(500).json({ message: err.message })
   }
 }
+
+exports.getUndoVoidRequests = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureUndoVoidApprovalTable(db)
+
+    const page = Math.max(1, Number(req.query.page) || 1)
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.page_size) || 20))
+    const offset = (page - 1) * pageSize
+    const status = String(req.query.status || 'PENDING').toUpperCase()
+
+    const whereStatus = ['PENDING', 'APPROVED', 'REJECTED', 'ALL'].includes(status) ? status : 'PENDING'
+    const whereClause = whereStatus === 'ALL' ? 'r.branch_id=$1' : 'r.branch_id=$1 AND r.status=$2'
+    const baseParams = whereStatus === 'ALL' ? [req.user.branch_id] : [req.user.branch_id, whereStatus]
+
+    const [{ rows }, countRes] = await Promise.all([
+      db.query(
+        `SELECT r.*, o.total AS order_total, o.created_at AS order_created_at,
+                req_user.name AS requested_by_name,
+                rev_user.name AS reviewed_by_name
+         FROM undo_void_requests r
+         JOIN orders o ON o.id = r.order_id
+         LEFT JOIN users req_user ON req_user.id = r.requested_by
+         LEFT JOIN users rev_user ON rev_user.id = r.reviewed_by
+         WHERE ${whereClause}
+         ORDER BY r.created_at DESC
+         LIMIT $${baseParams.length + 1} OFFSET $${baseParams.length + 2}`,
+        [...baseParams, pageSize, offset]
+      ),
+      db.query(`SELECT COUNT(*)::int AS total FROM undo_void_requests r WHERE ${whereClause}`, baseParams)
+    ])
+
+    const total = Number(countRes.rows[0]?.total || 0)
+    res.json({
+      data: rows,
+      pagination: { page, page_size: pageSize, total, total_pages: Math.max(1, Math.ceil(total / pageSize)) }
+    })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.approveUndoVoidRequest = async (req, res) => {
+  const db = req.app.get("db")
+  const requestId = Number(req.params.requestId)
+
+  try {
+    await ensureUndoVoidApprovalTable(db)
+    await db.query('BEGIN')
+
+    const { rows } = await db.query(
+      `SELECT * FROM undo_void_requests
+       WHERE id=$1 AND branch_id=$2
+       FOR UPDATE`,
+      [requestId, req.user.branch_id]
+    )
+
+    if (!rows.length) {
+      await db.query('ROLLBACK')
+      return res.status(404).json({ message: 'Request tidak ditemukan' })
+    }
+
+    const reqRow = rows[0]
+    if (reqRow.status !== 'PENDING') {
+      await db.query('ROLLBACK')
+      return res.status(400).json({ message: 'Request sudah diproses' })
+    }
+
+    const { rows: orderRows } = await db.query(`SELECT id, status FROM orders WHERE id=$1 FOR UPDATE`, [reqRow.order_id])
+
+    if (!orderRows.length) {
+      await db.query('ROLLBACK')
+      return res.status(404).json({ message: 'Order tidak ditemukan' })
+    }
+
+    if (String(orderRows[0].status || '').toUpperCase() !== 'CANCELLED') {
+      await db.query('ROLLBACK')
+      return res.status(400).json({ message: 'Order tidak lagi berstatus CANCELLED' })
+    }
+
+    await performUndoVoid(db, { orderId: reqRow.order_id, actorId: req.user.id })
+
+    const updated = await db.query(
+      `UPDATE undo_void_requests
+       SET status='APPROVED', reviewed_by=$1, reviewed_at=NOW(), review_note=$2
+       WHERE id=$3
+       RETURNING *`,
+      [req.user.id, String(req.body?.review_note || 'Approved').trim(), requestId]
+    )
+
+    await db.query('COMMIT')
+    res.json({ success: true, request: updated.rows[0], order_status: 'DRAFT' })
+  } catch (err) {
+    try { await db.query('ROLLBACK') } catch (_) {}
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.rejectUndoVoidRequest = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureUndoVoidApprovalTable(db)
+
+    const { rows } = await db.query(
+      `UPDATE undo_void_requests
+       SET status='REJECTED', reviewed_by=$1, reviewed_at=NOW(), review_note=$2
+       WHERE id=$3 AND branch_id=$4 AND status='PENDING'
+       RETURNING *`,
+      [req.user.id, String(req.body?.review_note || 'Rejected').trim(), Number(req.params.requestId), req.user.branch_id]
+    )
+
+    if (!rows.length) {
+      return res.status(404).json({ message: 'Request tidak ditemukan / sudah diproses' })
+    }
+
+    res.json({ success: true, request: rows[0] })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}
+
+exports.undoVoid = async (req, res) => {
+  return res.status(400).json({
+    message: 'Undo void harus melalui approval supervisor/manager. Silakan kirim request undo terlebih dahulu.'
+  })
+}
+
 
 
 exports.createFromPos = async (req, res) => {
   try {
     const db = req.app.get("db")
     const user = req.user
+    await dashboardService.ensureOutletCanReceiveOrder(user)
     const { items, payment_method } = req.body
 
     // 1️⃣ ambil branch
@@ -595,6 +775,7 @@ exports.createDraftFromPos = async (req, res) => {
   try {
     const db = req.app.get("db")
     const user = req.user
+    await dashboardService.ensureOutletCanReceiveOrder(user)
     const { items } = req.body
 
     const userRes = await db.query(
@@ -1025,18 +1206,34 @@ exports.getBarInbox = async (req, res) => {
     const db = req.app.get("db")
     await ensureBarWorkflowTables(db)
 
-    const { rows } = await db.query(
-      `SELECT bo.id, bo.order_id, bo.status, bo.items_snapshot, bo.note, bo.created_at,
-              o.status AS order_status
-       FROM bar_orders bo
-       JOIN orders o ON o.id = bo.order_id
-       WHERE bo.branch_id=$1
-       ORDER BY bo.created_at DESC
-       LIMIT 100`,
-      [req.user.branch_id]
-    )
+    const page = Math.max(1, Number(req.query.page) || 1)
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.page_size) || 20))
+    const offset = (page - 1) * pageSize
 
-    res.json(rows)
+    const [{ rows }, countRes] = await Promise.all([
+      db.query(
+        `SELECT bo.id, bo.order_id, bo.status, bo.items_snapshot, bo.note, bo.created_at,
+                o.status AS order_status
+         FROM bar_orders bo
+         JOIN orders o ON o.id = bo.order_id
+         WHERE bo.branch_id=$1
+         ORDER BY bo.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [req.user.branch_id, pageSize, offset]
+      ),
+      db.query(`SELECT COUNT(*)::int AS total FROM bar_orders WHERE branch_id=$1`, [req.user.branch_id])
+    ])
+
+    const total = Number(countRes.rows[0]?.total || 0)
+    res.json({
+      data: rows,
+      pagination: {
+        page,
+        page_size: pageSize,
+        total,
+        total_pages: Math.max(1, Math.ceil(total / pageSize))
+      }
+    })
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
@@ -1195,16 +1392,32 @@ exports.getKasirBarMessages = async (req, res) => {
     const db = req.app.get("db")
     await ensureBarWorkflowTables(db)
 
-    const { rows } = await db.query(
-      `SELECT id, order_id, bar_order_id, type, title, message, payload, is_read, created_at, read_at
-       FROM bar_messages
-       WHERE branch_id=$1
-       ORDER BY created_at DESC
-       LIMIT 200`,
-      [req.user.branch_id]
-    )
+    const page = Math.max(1, Number(req.query.page) || 1)
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.page_size) || 20))
+    const offset = (page - 1) * pageSize
 
-    res.json(rows)
+    const [{ rows }, countRes] = await Promise.all([
+      db.query(
+        `SELECT id, order_id, bar_order_id, type, title, message, payload, is_read, created_at, read_at
+         FROM bar_messages
+         WHERE branch_id=$1
+         ORDER BY created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [req.user.branch_id, pageSize, offset]
+      ),
+      db.query(`SELECT COUNT(*)::int AS total FROM bar_messages WHERE branch_id=$1`, [req.user.branch_id])
+    ])
+
+    const total = Number(countRes.rows[0]?.total || 0)
+    res.json({
+      data: rows,
+      pagination: {
+        page,
+        page_size: pageSize,
+        total,
+        total_pages: Math.max(1, Math.ceil(total / pageSize))
+      }
+    })
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
