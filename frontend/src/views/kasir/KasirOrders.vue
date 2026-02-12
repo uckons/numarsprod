@@ -39,6 +39,11 @@
       </select>
     </div>
 
+    <div class="filter-item">
+      <label>Tanggal (Kalender)</label>
+      <input type="date" v-model="filters.specificDate" />
+    </div>
+
     <!-- Custom Date Range -->
     <div v-if="filters.dateRange === 'custom'" class="filter-item">
       <label>Dari</label>
@@ -416,7 +421,8 @@ const filters = ref({
   dateFrom: '',
   dateTo: '',
   therapistId: '',
-  roomId: ''
+  roomId: '',
+  specificDate: ''
 })
 // 📄 PAGINATION STATE
 const pagination = ref({
@@ -446,8 +452,11 @@ const loadOrders = async () => {
     
     // Date range filter
     const today = new Date().toISOString().split('T')[0]
-    
-    if (filters.value.dateRange === 'today') {
+
+    if (filters.value.specificDate) {
+      params.date_from = filters.value.specificDate
+      params.date_to = filters.value.specificDate
+    } else if (filters.value.dateRange === 'today') {
       params.date_from = today
       params.date_to = today
     } else if (filters.value.dateRange === '7days') {
@@ -624,11 +633,12 @@ const undoVoid = async (order) => {
   if (!confirm.isConfirmed) return
 
   try {
-    await api.post(`/orders/${order.id}/undo-void`)
+    await api.post(`/orders/${order.id}/undo-void/request`, { reason: 'Kasir meminta undo void' })
     await loadOrders()
     await Swal.fire({
       icon: 'success',
-      title: 'Undo berhasil',
+      title: 'Request undo terkirim',
+      text: 'Menunggu approval supervisor / manager',
       timer: 1200,
       showConfirmButton: false,
       background: '#111',
@@ -660,7 +670,8 @@ const resetFilters = () => {
     dateFrom: '',
     dateTo: '',
     therapistId: '',
-    roomId: ''
+    roomId: '',
+    specificDate: ''
   }
 }
 

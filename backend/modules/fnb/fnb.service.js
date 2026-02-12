@@ -263,24 +263,47 @@ exports.requestStockAdjustment = async (db, user, fnbItemId, data = {}) => {
   return rows[0]
 }
 
-exports.getStockAdjustmentRequests = async (db, user) => {
+exports.getStockAdjustmentRequests = async (db, user, query = {}) => {
   await ensureStockApprovalTable(db)
 
-  const { rows } = await db.query(
-    `SELECT r.*, fi.name AS item_name,
-            req_user.name AS requested_by_name,
-            rev_user.name AS reviewed_by_name
-     FROM fnb_stock_adjustment_requests r
-     JOIN fnb_items fi ON fi.id = r.fnb_item_id
-     LEFT JOIN users req_user ON req_user.id = r.requested_by
-     LEFT JOIN users rev_user ON rev_user.id = r.reviewed_by
-     WHERE r.branch_id=$1
-     ORDER BY r.created_at DESC
-     LIMIT 150`,
-    [user.branch_id]
-  )
+  const page = Math.max(1, Number(query.page) || 1)
+  const pageSize = Math.min(100, Math.max(1, Number(query.page_size) || 20))
+  const offset = (page - 1) * pageSize
+  const status = String(query.status || 'PENDING').toUpperCase()
 
-  return rows
+  const whereStatus = ['PENDING', 'APPROVED', 'REJECTED', 'ALL'].includes(status) ? status : 'PENDING'
+  const whereClause = whereStatus === 'ALL' ? 'r.branch_id=$1' : 'r.branch_id=$1 AND r.status=$2'
+  const baseParams = whereStatus === 'ALL' ? [user.branch_id] : [user.branch_id, whereStatus]
+
+  const [{ rows }, countRes] = await Promise.all([
+    db.query(
+      `SELECT r.*, fi.name AS item_name,
+              fi.stock AS current_stock,
+              req_user.name AS requested_by_name,
+              rev_user.name AS reviewed_by_name
+       FROM fnb_stock_adjustment_requests r
+       JOIN fnb_items fi ON fi.id = r.fnb_item_id
+       LEFT JOIN users req_user ON req_user.id = r.requested_by
+       LEFT JOIN users rev_user ON rev_user.id = r.reviewed_by
+       WHERE ${whereClause}
+       ORDER BY r.created_at DESC
+       LIMIT $${baseParams.length + 1} OFFSET $${baseParams.length + 2}`,
+      [...baseParams, pageSize, offset]
+    ),
+    db.query(`SELECT COUNT(*)::int AS total FROM fnb_stock_adjustment_requests r WHERE ${whereClause}`, baseParams)
+  ])
+
+  const total = Number(countRes.rows[0]?.total || 0)
+
+  return {
+    data: rows,
+    pagination: {
+      page,
+      page_size: pageSize,
+      total,
+      total_pages: Math.max(1, Math.ceil(total / pageSize))
+    }
+  }
 }
 
 exports.approveStockAdjustment = async (db, user, requestId) => {
