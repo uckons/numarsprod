@@ -633,14 +633,12 @@ const undoVoid = async (order) => {
   if (!confirm.isConfirmed) return
 
   try {
-    await api.post(`/orders/${order.id}/undo-void/request`, { reason: 'Kasir meminta undo void' })
+    const { data } = await api.post(`/orders/${order.id}/undo-void/request`, { reason: 'Kasir meminta undo void' })
     await loadOrders()
     await Swal.fire({
       icon: 'success',
       title: 'Request undo terkirim',
-      text: 'Menunggu approval supervisor / manager',
-      timer: 1200,
-      showConfirmButton: false,
+      text: `Request #${data?.request?.id || '-'} menunggu approval supervisor / manager`,
       background: '#111',
       color: '#fff'
     })

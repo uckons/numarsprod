@@ -13,3 +13,31 @@ exports.kasirAnalytics = async (req, res) => {
     res.status(400).json({ message: err.message })
   }
 }
+
+
+exports.getOutletSessionStatus = async (req, res) => {
+  try {
+    const data = await service.getOutletSessionStatus(req.user)
+    res.json(data || {})
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
+
+exports.openOutletSession = async (req, res) => {
+  try {
+    const data = await service.openOutletSession(req.user, req.body)
+    res.json(data)
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
+
+exports.closeOutletSession = async (req, res) => {
+  try {
+    const data = await service.closeOutletSession(req.user, req.body)
+    res.json(data)
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}

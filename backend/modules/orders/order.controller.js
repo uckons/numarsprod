@@ -1,5 +1,6 @@
 const service = require("./order.service")
 const stockService = require("../stock/stock.service")
+const dashboardService = require("../dashboard/dashboard.service")
 
 const parseOrderId = (rawId) => {
   const orderId = Number(rawId)
@@ -167,6 +168,7 @@ exports.create = async (req, res) => {
   try {
     const db = req.app.get("db")
     const user = req.user
+    await dashboardService.ensureOutletCanReceiveOrder(user)
 
     const order = await service.createOrder(db, user)
     res.json(order)
@@ -647,6 +649,7 @@ exports.createFromPos = async (req, res) => {
   try {
     const db = req.app.get("db")
     const user = req.user
+    await dashboardService.ensureOutletCanReceiveOrder(user)
     const { items, payment_method } = req.body
 
     // 1️⃣ ambil branch
@@ -772,6 +775,7 @@ exports.createDraftFromPos = async (req, res) => {
   try {
     const db = req.app.get("db")
     const user = req.user
+    await dashboardService.ensureOutletCanReceiveOrder(user)
     const { items } = req.body
 
     const userRes = await db.query(
