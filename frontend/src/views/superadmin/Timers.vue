@@ -42,10 +42,10 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="!filteredTimers.length">
+          <tr v-if="!pagedTimers.length">
             <td colspan="5" class="empty">Tidak ada timer.</td>
           </tr>
-          <tr v-for="t in filteredTimers" :key="t.id">
+          <tr v-for="t in pagedTimers" :key="t.id">
             <td>#{{ t.order_id }}</td>
             <td>{{ t.therapist || '-' }}</td>
             <td>{{ formatDateTime(t.start_time) }}</td>
@@ -56,17 +56,34 @@
           </tr>
         </tbody>
       </table>
+      <div class="pagination">
+        <div class="pager-left">
+          <label>Per Halaman</label>
+          <select v-model.number="pageSize">
+            <option :value="10">10</option>
+            <option :value="20">20</option>
+            <option :value="50">50</option>
+          </select>
+        </div>
+        <div class="pager-right">
+          <button @click="page -= 1" :disabled="page === 1">Prev</button>
+          <span>Page {{ page }} / {{ totalPages }}</span>
+          <button @click="page += 1" :disabled="page >= totalPages">Next</button>
+        </div>
+      </div>
     </section>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import api from "@/services/api"
 
 const timers = ref([])
 const query = ref("")
 const statusFilter = ref("ALL")
+const page = ref(1)
+const pageSize = ref(20)
 
 const loadTimers = async () => {
   const res = await api.get("/superadmin/timers")
@@ -87,6 +104,10 @@ const runningCount = computed(() => timers.value.filter((t) => statusLabel(t) ==
 const pausedCount = computed(() => timers.value.filter((t) => statusLabel(t) === "PAUSE").length)
 const stoppedCount = computed(() => timers.value.filter((t) => statusLabel(t) === "STOPPED").length)
 
+watch([query, statusFilter, pageSize], () => {
+  page.value = 1
+})
+
 const filteredTimers = computed(() => {
   const key = query.value.toLowerCase()
   return timers.value.filter((t) => {
@@ -98,6 +119,12 @@ const filteredTimers = computed(() => {
     const order = String(t.order_id || "").toLowerCase()
     return therapist.includes(key) || order.includes(key)
   })
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredTimers.value.length / pageSize.value)))
+const pagedTimers = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return filteredTimers.value.slice(start, start + pageSize.value)
 })
 
 const formatDateTime = (v) => {
@@ -133,4 +160,10 @@ td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,.07); }
 .status.paused { background: rgba(245,161,74,.14); color: #f5a14a; }
 .status.stopped { background: rgba(255,255,255,.1); color: #e5e7eb; }
 .empty { text-align: center; color: var(--text-muted); padding: 26px; }
+.pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; gap: 12px; flex-wrap: wrap; }
+.pager-left, .pager-right { display: flex; align-items: center; gap: 8px; }
+.pager-left label { font-size: 12px; color: var(--text-muted); }
+.pager-left select { min-width: 80px; }
+.pager-right button { background: transparent; border: 1px solid var(--gold); color: var(--gold); border-radius: 10px; padding: 6px 14px; cursor: pointer; }
+.pager-right button:disabled { opacity: .5; cursor: not-allowed; }
 </style>
