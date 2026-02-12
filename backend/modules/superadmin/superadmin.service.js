@@ -79,15 +79,19 @@ exports.orders = async () => {
   const { rows } = await db.query(`
     SELECT
       o.id,
-      COALESCE(SUM(oi.price), 0) AS total,
+      o.branch_id,
+      b.name AS branch_name,
+      o.status,
+      COALESCE(SUM(oi.subtotal), 0) AS total,
       o.created_at,
-      STRING_AGG(s.type::text, ', ') AS category
+      STRING_AGG(DISTINCT s.type::text, ', ') AS category
     FROM orders o
+    LEFT JOIN branches b ON b.id = o.branch_id
     LEFT JOIN order_items oi ON oi.order_id = o.id
     LEFT JOIN services s ON s.id = oi.service_id
-    GROUP BY o.id, o.created_at
+    GROUP BY o.id, o.branch_id, b.name, o.status, o.created_at
     ORDER BY o.created_at DESC
-    LIMIT 500
+    LIMIT 2000
   `)
 
   return rows
