@@ -14,12 +14,12 @@
     <section class="card">
       <div class="section-head">
         <h3>Open / Close Outlet</h3>
-        <span class="badge" :class="outletSession?.closed_at ? 'closed' : 'open'">{{ outletSession?.closed_at ? 'CLOSED' : (outletSession?.id ? 'OPEN' : 'NOT STARTED') }}</span>
+        <span class="badge" :class="outletIsOpen ? 'open' : 'closed'">{{ outletIsOpen ? 'OPEN' : 'CLOSED' }}</span>
       </div>
       <div class="toolbar">
         <input class="input" type="date" v-model="outletBusinessDate" />
-        <button class="btn-success" @click="openOutlet">Open Outlet</button>
-        <button class="btn-danger" @click="closeOutlet">Close Outlet</button>
+        <button class="btn-success" :disabled="outletIsOpen" @click="openOutlet">Open Outlet</button>
+        <button class="btn-danger" :disabled="!outletIsOpen" @click="closeOutlet">Close Outlet</button>
       </div>
       <small class="muted" v-if="outletSession?.id">
         Session: {{ formatDate(outletSession.opened_at) }}
@@ -35,7 +35,7 @@
     </section>
 
     <section class="card">
-      <div class="section-head"><h3>Laporan Pendapatan Detail</h3></div>
+      <div class="section-head"><h3>Laporan Pendapatan Detail (PNL Based)</h3></div>
       <div class="toolbar">
         <input class="input" type="date" v-model="reportFilters.date_from" />
         <input class="input" type="date" v-model="reportFilters.date_to" />
@@ -48,10 +48,39 @@
       </div>
 
       <table class="table">
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>Kategori</th>
+            <th>Qty</th>
+            <th>Happy Hour</th>
+            <th>Non Happy Hour</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in report.pnl_services || []" :key="`pnl-${row.service_id}`">
+            <td>{{ row.service_name }}</td>
+            <td>{{ row.category }}</td>
+            <td>{{ row.qty }}</td>
+            <td>Rp {{ formatCurrency(row.happy_hour_revenue) }}</td>
+            <td>Rp {{ formatCurrency(row.non_happy_hour_revenue) }}</td>
+            <td>Rp {{ formatCurrency(row.total_revenue) }}</td>
+          </tr>
+          <tr v-if="!(report.pnl_services || []).length"><td colspan="6" class="muted">Belum ada data service.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <div class="section-head"><h3>Laporan Pendapatan Detail</h3></div>
+      <table class="table">
         <thead><tr><th>Kategori</th><th>Qty</th><th>Revenue</th><th>Aksi</th></tr></thead>
         <tbody>
           <tr v-for="row in report.breakdown" :key="row.category">
-            <td>{{ row.category }}</td><td>{{ row.qty }}</td><td>Rp {{ formatCurrency(row.revenue) }}</td>
+            <td>{{ row.category }}</td>
+            <td>{{ row.qty }}</td>
+            <td>Rp {{ formatCurrency(row.revenue) }}</td>
             <td><button class="btn-light" @click="toggleCategory(row.category)">{{ selectedCategory===row.category ? 'Tutup' : 'Detail' }}</button></td>
           </tr>
         </tbody>
@@ -63,19 +92,54 @@
           <thead><tr><th>Service</th><th>Qty</th><th>Revenue</th></tr></thead>
           <tbody>
             <tr v-for="item in selectedCategoryServices" :key="`${selectedCategory}-${item.service_id}`">
-              <td>{{ item.service_name }}</td><td>{{ item.qty }}</td><td>Rp {{ formatCurrency(item.revenue) }}</td>
+              <td>{{ item.service_name }}</td>
+              <td>{{ item.qty }}</td>
+              <td>Rp {{ formatCurrency(item.revenue) }}</td>
             </tr>
             <tr v-if="!selectedCategoryServices.length"><td colspan="3" class="muted">Tidak ada detail service.</td></tr>
           </tbody>
         </table>
-        <table class="table" v-if="selectedCategory==='SPA'">
-          <thead><tr><th>Terapis</th><th>Grade</th><th>Order</th><th>Revenue</th></tr></thead>
-          <tbody>
-            <tr v-for="t in report.therapist_details || []" :key="`${t.therapist_name}-${t.grade_name}`">
-              <td>{{ t.therapist_name }}</td><td>{{ t.grade_name }}</td><td>{{ t.orders }}</td><td>Rp {{ formatCurrency(t.revenue) }}</td>
-            </tr>
-          </tbody>
-        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-head"><h3>Detail Terapis</h3></div>
+      <div class="toolbar">
+        <label class="muted">Filter Terapis</label>
+        <select class="input" v-model="therapistFilterName">
+          <option value="">Semua Terapis</option>
+          <option v-for="name in therapistNameOptions" :key="name" :value="name">{{ name }}</option>
+        </select>
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Terapis</th>
+            <th>Grade</th>
+            <th>Service</th>
+            <th>Kategori</th>
+            <th>Happy Hour</th>
+            <th>Non Happy Hour</th>
+            <th>Total Kerja</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in filteredTherapistPnl" :key="`${row.therapist_name}-${row.category}-${row.service_name}`">
+            <td>{{ row.therapist_name }}</td>
+            <td>{{ row.grade_name }}</td>
+            <td>{{ row.service_name }}</td>
+            <td>{{ row.category }}</td>
+            <td>Rp {{ formatCurrency(row.happy_hour_revenue) }}</td>
+            <td>Rp {{ formatCurrency(row.non_happy_hour_revenue) }}</td>
+            <td>Rp {{ formatCurrency(row.total_revenue) }}</td>
+          </tr>
+          <tr v-if="!filteredTherapistPnl.length"><td colspan="7" class="muted">Belum ada data terapis.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="chart-wrap">
+        <ApexChart type="bar" :height="260" :options="therapistPerformanceOptions" :series="therapistPerformanceSeries" />
       </div>
     </section>
 
@@ -152,12 +216,6 @@
         <span>Page {{ stockPage }} / {{ stockTotalPages }}</span>
         <button class="btn-light" :disabled="stockPage>=stockTotalPages" @click="stockPage += 1">Next</button>
       </div>
-
-      <div class="pagination">
-        <button class="btn-light" :disabled="undoPage===1" @click="changeUndoPage(undoPage-1)">Prev</button>
-        <span>Page {{ undoPage }} / {{ undoPagination.total_pages }}</span>
-        <button class="btn-light" :disabled="undoPage>=undoPagination.total_pages" @click="changeUndoPage(undoPage+1)">Next</button>
-      </div>
     </section>
 
     <section class="card">
@@ -211,9 +269,11 @@ const undoPage = ref(1)
 const undoPagination = ref({ page: 1, page_size: 20, total: 0, total_pages: 1 })
 
 const reportFilters = ref({ date_from: "", date_to: "" })
-const report = ref({ summary: { revenue: 0, paid_orders: 0, items_sold: 0 }, breakdown: [], service_details: [], therapist_details: [] })
+const report = ref({ summary: { revenue: 0, paid_orders: 0, items_sold: 0 }, breakdown: [], service_details: [], pnl_services: [], therapist_pnl: [] })
 const selectedCategory = ref('')
+const therapistFilterName = ref('')
 
+const outletIsOpen = computed(() => Boolean(outletSession.value?.id) && !outletSession.value?.closed_at)
 const filteredStocks = computed(() => {
   const key = stockSearch.value.toLowerCase()
   return fnbItems.value.filter((i) => !key || String(i.name || "").toLowerCase().includes(key))
@@ -227,6 +287,27 @@ const totalStockValue = computed(() => fnbItems.value.reduce((acc, i) => acc + N
 const pendingCount = computed(() => stockRequests.value.filter((i) => i.status === "PENDING").length)
 const undoPendingCount = computed(() => undoRequests.value.filter((i) => i.status === "PENDING").length)
 const selectedCategoryServices = computed(() => (report.value.service_details || []).filter((r) => r.category === selectedCategory.value))
+const therapistNameOptions = computed(() => [...new Set((report.value.therapist_pnl || []).map((r) => r.therapist_name))].sort())
+const filteredTherapistPnl = computed(() => {
+  const rows = report.value.therapist_pnl || []
+  return therapistFilterName.value ? rows.filter((r) => r.therapist_name === therapistFilterName.value) : rows
+})
+const therapistPerformanceMap = computed(() => {
+  const map = new Map()
+  for (const row of filteredTherapistPnl.value) {
+    const key = row.therapist_name
+    map.set(key, (map.get(key) || 0) + Number(row.total_revenue || 0))
+  }
+  return map
+})
+const therapistPerformanceOptions = computed(() => ({
+  chart: { toolbar: { show: false }, background: 'transparent' },
+  theme: { mode: 'dark' },
+  xaxis: { categories: [...therapistPerformanceMap.value.keys()] },
+  dataLabels: { enabled: false },
+  colors: ['#5f85ff']
+}))
+const therapistPerformanceSeries = computed(() => ([{ name: 'Total Kerja', data: [...therapistPerformanceMap.value.values()] }]))
 
 watch([stockSearch, stockPageSize], () => { stockPage.value = 1 })
 
@@ -349,7 +430,7 @@ onBeforeUnmount(() => {
 .btn-light { background:#27324f; color:#fff; }
 .btn-success { background:#26b36b; color:#062617; }
 .btn-danger { background:#cb4b5a; color:#fff; }
-.btn-light:disabled { opacity:.5; cursor:not-allowed; }
+.btn-light:disabled,.btn-success:disabled,.btn-danger:disabled { opacity:.5; cursor:not-allowed; }
 .empty { color:#9cb1e2; padding:10px 0; }
 .pagination { justify-content:flex-end; margin-top:10px; }
 .table { width:100%; border-collapse: collapse; margin-top:8px; }
@@ -357,6 +438,7 @@ onBeforeUnmount(() => {
 .table th { color:#9ec0ff; }
 .summary-grid { display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:10px; }
 .detail-box { margin-top:12px; border:1px solid #2b3452; border-radius:12px; padding:12px; }
+.chart-wrap { margin-top: 12px; }
 @media (max-width: 980px) { .kpi-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 760px) { .hero,.stock-row,.req-row { flex-direction:column; align-items:flex-start; } .kpi-grid,.summary-grid { grid-template-columns:1fr; } }
 </style>

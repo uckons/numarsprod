@@ -400,6 +400,74 @@ exports.kasirAnalytics = async (user, query = {}) => {
     [branchId, from, to]
   )
 
+
+  const pnlServiceRes = await db.query(
+    `${scopedOrderCte}
+     SELECT
+       oi.service_id,
+       oi.service_name,
+       CASE
+         WHEN s.type::text IN ('KARAOKE', 'KTV') THEN 'KTV'
+         WHEN s.type::text = 'LOUNGE' THEN 'LC'
+         ELSE s.type::text
+       END AS category,
+       COALESCE(SUM(oi.qty), 0) AS qty,
+       COALESCE(SUM(CASE WHEN LOWER(COALESCE(oi.price_label, '')) LIKE '%happy%' THEN oi.subtotal END), 0) AS happy_hour_revenue,
+       COALESCE(SUM(CASE WHEN LOWER(COALESCE(oi.price_label, '')) NOT LIKE '%happy%' THEN oi.subtotal END), 0) AS non_happy_hour_revenue,
+       COALESCE(SUM(oi.subtotal), 0) AS total_revenue
+     FROM order_items oi
+     JOIN orders_scoped o ON o.id = oi.order_id
+     JOIN services s ON s.id = oi.service_id
+     GROUP BY oi.service_id, oi.service_name, category
+     ORDER BY category ASC, total_revenue DESC, qty DESC`,
+    [branchId, from, to]
+  )
+
+  const therapistPnlRes = await db.query(
+    `${scopedOrderCte},
+     therapist_rows AS (
+       SELECT
+         o.id AS order_id,
+         oi.service_name,
+         CASE
+           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN 'KTV'
+           WHEN s.type::text = 'LOUNGE' THEN 'LC'
+           ELSE s.type::text
+         END AS category,
+         oi.subtotal,
+         oi.price_label,
+         BTRIM(raw_name) AS therapist_name
+       FROM order_items oi
+       JOIN orders_scoped o ON o.id = oi.order_id
+       JOIN services s ON s.id = oi.service_id
+       CROSS JOIN LATERAL regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS raw_name
+     )
+     SELECT
+       tr.therapist_name,
+       tr.category,
+       tr.service_name,
+       COALESCE(COUNT(DISTINCT tr.order_id), 0) AS orders,
+       COALESCE(SUM(CASE WHEN LOWER(COALESCE(tr.price_label, '')) LIKE '%happy%' THEN tr.subtotal END), 0) AS happy_hour_revenue,
+       COALESCE(SUM(CASE WHEN LOWER(COALESCE(tr.price_label, '')) NOT LIKE '%happy%' THEN tr.subtotal END), 0) AS non_happy_hour_revenue,
+       COALESCE(SUM(tr.subtotal), 0) AS total_revenue,
+       COALESCE(grade_info.grade_name, '-') AS grade_name
+     FROM therapist_rows tr
+     LEFT JOIN LATERAL (
+       SELECT tg.name AS grade_name
+       FROM therapists t
+       LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
+       WHERE LOWER(t.name) = LOWER(tr.therapist_name)
+         AND t.branch_id = $1
+       ORDER BY t.active DESC NULLS LAST, t.id DESC
+       LIMIT 1
+     ) grade_info ON true
+     WHERE tr.therapist_name <> ''
+       AND tr.category IN ('SPA', 'LC')
+     GROUP BY tr.therapist_name, tr.category, tr.service_name, grade_info.grade_name
+     ORDER BY tr.therapist_name ASC, tr.category ASC, total_revenue DESC`,
+    [branchId, from, to]
+  )
+
   return {
     range: {
       from: formatDateOnly(from),
@@ -451,6 +519,25 @@ exports.kasirAnalytics = async (user, query = {}) => {
       grade_name: row.grade_name,
       orders: Number(row.orders || 0),
       revenue: Number(row.revenue || 0)
+    })),
+    pnl_services: pnlServiceRes.rows.map((row) => ({
+      service_id: Number(row.service_id),
+      service_name: row.service_name,
+      category: row.category,
+      qty: Number(row.qty || 0),
+      happy_hour_revenue: Number(row.happy_hour_revenue || 0),
+      non_happy_hour_revenue: Number(row.non_happy_hour_revenue || 0),
+      total_revenue: Number(row.total_revenue || 0)
+    })),
+    therapist_pnl: therapistPnlRes.rows.map((row) => ({
+      therapist_name: row.therapist_name,
+      grade_name: row.grade_name,
+      category: row.category,
+      service_name: row.service_name,
+      orders: Number(row.orders || 0),
+      happy_hour_revenue: Number(row.happy_hour_revenue || 0),
+      non_happy_hour_revenue: Number(row.non_happy_hour_revenue || 0),
+      total_revenue: Number(row.total_revenue || 0)
     }))
   }
 }
