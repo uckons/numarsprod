@@ -415,6 +415,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
          COALESCE(oi.qty, 0) AS qty,
          COALESCE(oi.subtotal, 0) AS subtotal,
          COALESCE(oi.is_package_snapshot, false) AS is_package,
+         LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'non hh', 'happy', 'happy hour', 'non happy hour') AS is_hh_tagged,
          COALESCE(
            LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
            OR hh_match.active = true,
@@ -456,9 +457,9 @@ exports.kasirAnalytics = async (user, query = {}) => {
        category,
        COALESCE(SUM(qty), 0) AS qty,
        COALESCE(SUM(CASE WHEN is_happy THEN subtotal END), 0) AS happy_hour_revenue,
-       COALESCE(SUM(CASE WHEN category <> 'FNB' AND NOT is_happy THEN subtotal END), 0) AS non_happy_hour_revenue,
+       COALESCE(SUM(CASE WHEN (category <> 'FNB' AND NOT is_happy) OR (category = 'FNB' AND is_hh_tagged AND NOT is_happy) THEN subtotal END), 0) AS non_happy_hour_revenue,
        COALESCE(SUM(CASE WHEN category = 'FNB' AND NOT is_happy AND is_package THEN subtotal END), 0) AS package_revenue,
-       COALESCE(SUM(CASE WHEN category = 'FNB' AND NOT is_happy AND NOT is_package THEN subtotal END), 0) AS non_package_revenue,
+       COALESCE(SUM(CASE WHEN category = 'FNB' AND NOT is_happy AND NOT is_package AND NOT is_hh_tagged THEN subtotal END), 0) AS non_package_revenue,
        COALESCE(SUM(subtotal), 0) AS total_revenue
      FROM mapped_rows
      GROUP BY service_id, service_name, category
@@ -480,6 +481,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
          END AS category,
          COALESCE(oi.subtotal, 0) AS subtotal,
          COALESCE(oi.is_package_snapshot, false) AS is_package,
+         LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'non hh', 'happy', 'happy hour', 'non happy hour') AS is_hh_tagged,
          COALESCE(
            LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
            OR hh_match.active = true,
@@ -524,9 +526,9 @@ exports.kasirAnalytics = async (user, query = {}) => {
        COALESCE(COUNT(DISTINCT tr.order_id), 0) AS orders,
        COALESCE(SUM(tr.qty), 0) AS qty,
        COALESCE(SUM(CASE WHEN tr.is_happy THEN tr.subtotal END), 0) AS happy_hour_revenue,
-       COALESCE(SUM(CASE WHEN tr.category <> 'FNB' AND NOT tr.is_happy THEN tr.subtotal END), 0) AS non_happy_hour_revenue,
+       COALESCE(SUM(CASE WHEN (tr.category <> 'FNB' AND NOT tr.is_happy) OR (tr.category = 'FNB' AND tr.is_hh_tagged AND NOT tr.is_happy) THEN tr.subtotal END), 0) AS non_happy_hour_revenue,
        COALESCE(SUM(CASE WHEN tr.category = 'FNB' AND NOT tr.is_happy AND tr.is_package THEN tr.subtotal END), 0) AS package_revenue,
-       COALESCE(SUM(CASE WHEN tr.category = 'FNB' AND NOT tr.is_happy AND NOT tr.is_package THEN tr.subtotal END), 0) AS non_package_revenue,
+       COALESCE(SUM(CASE WHEN tr.category = 'FNB' AND NOT tr.is_happy AND NOT tr.is_package AND NOT tr.is_hh_tagged THEN tr.subtotal END), 0) AS non_package_revenue,
        COALESCE(SUM(tr.subtotal), 0) AS total_revenue,
        COALESCE(SUM(SUM(tr.subtotal)) OVER (PARTITION BY tr.therapist_name), 0) AS therapist_total_kerja,
        COALESCE(grade_info.grade_name, '-') AS grade_name
