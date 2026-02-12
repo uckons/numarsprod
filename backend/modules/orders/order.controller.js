@@ -1025,18 +1025,34 @@ exports.getBarInbox = async (req, res) => {
     const db = req.app.get("db")
     await ensureBarWorkflowTables(db)
 
-    const { rows } = await db.query(
-      `SELECT bo.id, bo.order_id, bo.status, bo.items_snapshot, bo.note, bo.created_at,
-              o.status AS order_status
-       FROM bar_orders bo
-       JOIN orders o ON o.id = bo.order_id
-       WHERE bo.branch_id=$1
-       ORDER BY bo.created_at DESC
-       LIMIT 100`,
-      [req.user.branch_id]
-    )
+    const page = Math.max(1, Number(req.query.page) || 1)
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.page_size) || 20))
+    const offset = (page - 1) * pageSize
 
-    res.json(rows)
+    const [{ rows }, countRes] = await Promise.all([
+      db.query(
+        `SELECT bo.id, bo.order_id, bo.status, bo.items_snapshot, bo.note, bo.created_at,
+                o.status AS order_status
+         FROM bar_orders bo
+         JOIN orders o ON o.id = bo.order_id
+         WHERE bo.branch_id=$1
+         ORDER BY bo.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [req.user.branch_id, pageSize, offset]
+      ),
+      db.query(`SELECT COUNT(*)::int AS total FROM bar_orders WHERE branch_id=$1`, [req.user.branch_id])
+    ])
+
+    const total = Number(countRes.rows[0]?.total || 0)
+    res.json({
+      data: rows,
+      pagination: {
+        page,
+        page_size: pageSize,
+        total,
+        total_pages: Math.max(1, Math.ceil(total / pageSize))
+      }
+    })
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
@@ -1195,16 +1211,32 @@ exports.getKasirBarMessages = async (req, res) => {
     const db = req.app.get("db")
     await ensureBarWorkflowTables(db)
 
-    const { rows } = await db.query(
-      `SELECT id, order_id, bar_order_id, type, title, message, payload, is_read, created_at, read_at
-       FROM bar_messages
-       WHERE branch_id=$1
-       ORDER BY created_at DESC
-       LIMIT 200`,
-      [req.user.branch_id]
-    )
+    const page = Math.max(1, Number(req.query.page) || 1)
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.page_size) || 20))
+    const offset = (page - 1) * pageSize
 
-    res.json(rows)
+    const [{ rows }, countRes] = await Promise.all([
+      db.query(
+        `SELECT id, order_id, bar_order_id, type, title, message, payload, is_read, created_at, read_at
+         FROM bar_messages
+         WHERE branch_id=$1
+         ORDER BY created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [req.user.branch_id, pageSize, offset]
+      ),
+      db.query(`SELECT COUNT(*)::int AS total FROM bar_messages WHERE branch_id=$1`, [req.user.branch_id])
+    ])
+
+    const total = Number(countRes.rows[0]?.total || 0)
+    res.json({
+      data: rows,
+      pagination: {
+        page,
+        page_size: pageSize,
+        total,
+        total_pages: Math.max(1, Math.ceil(total / pageSize))
+      }
+    })
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
