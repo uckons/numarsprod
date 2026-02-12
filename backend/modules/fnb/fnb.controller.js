@@ -48,7 +48,7 @@ exports.requestStockAdjustment = async (req, res) => {
 exports.getStockAdjustmentRequests = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const items = await service.getStockAdjustmentRequests(db, req.user)
+    const items = await service.getStockAdjustmentRequests(db, req.user, req.query)
     res.json(items)
   } catch (err) {
     res.status(400).json({ message: err.message })

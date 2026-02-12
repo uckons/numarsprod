@@ -227,12 +227,16 @@ exports.kasirAnalytics = async (user, query = {}) => {
 
   const summaryRes = await db.query(
     `${scopedOrderCte}
+     , item_summary AS (
+       SELECT COALESCE(SUM(oi.qty), 0) AS items_sold
+       FROM order_items oi
+       JOIN orders_scoped o ON o.id = oi.order_id
+     )
      SELECT
-       COUNT(DISTINCT o.id) AS paid_orders,
+       COUNT(*) AS paid_orders,
        COALESCE(SUM(o.total), 0) AS revenue,
-       COALESCE(SUM(oi.qty), 0) AS items_sold
+       (SELECT items_sold FROM item_summary) AS items_sold
      FROM orders_scoped o
-     LEFT JOIN order_items oi ON oi.order_id = o.id
      `,
     [branchId, from, to]
   )
