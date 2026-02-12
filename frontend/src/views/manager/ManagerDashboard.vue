@@ -22,7 +22,11 @@
             <h2>Manager Financial Dashboard</h2>
             <p class="muted">Full enterprise accounting module per outlet (P&L, cashflow, salary simulation).</p>
           </div>
-          <button class="btn" @click="loadReport">Refresh</button>
+          <div class="hero-actions">
+            <span v-if="loading" class="muted">Loading...</span>
+            <span v-else-if="loadError" class="bad">{{ loadError }}</span>
+            <button class="btn" @click="loadReport">Refresh</button>
+          </div>
         </section>
 
         <section class="card filters">
@@ -86,6 +90,7 @@
           <table class="table">
             <thead><tr><th>Order</th><th>Outlet</th><th>Status</th><th>Kategori</th><th>Total</th><th>Waktu</th></tr></thead>
             <tbody>
+              <tr v-if="!filteredOrders.length"><td colspan="6" class="muted">Belum ada data order pada filter ini.</td></tr>
               <tr v-for="o in filteredOrders.slice(0, 100)" :key="o.id">
                 <td>#{{ o.id }}</td>
                 <td>{{ o.branch_name || '-' }}</td>
@@ -136,17 +141,40 @@ const dateTo = ref("")
 const therapistSalaryPct = ref(35)
 const fixedSalaryCost = ref(0)
 const manualExpenses = ref([])
+const loading = ref(false)
+const loadError = ref("")
 
 const loadReport = async () => {
-  const [ordersRes, branchRes] = await Promise.all([
-    api.get("/superadmin/orders"),
-    api.get("/superadmin/branches")
-  ])
-  orders.value = Array.isArray(ordersRes.data) ? ordersRes.data : []
-  branches.value = Array.isArray(branchRes.data) ? branchRes.data : []
+  loading.value = true
+  loadError.value = ""
+  try {
+    const [ordersRes, branchRes] = await Promise.all([
+      api.get("/superadmin/orders"),
+      api.get("/superadmin/branches")
+    ])
+    orders.value = Array.isArray(ordersRes.data) ? ordersRes.data : []
+    branches.value = Array.isArray(branchRes.data) ? branchRes.data : []
+
+    if (!orders.value.length) {
+      await Swal.fire({ icon: "info", title: "Data order kosong", text: "Belum ada transaksi untuk ditampilkan di filter saat ini." })
+    }
+  } catch (err) {
+    orders.value = []
+    branches.value = []
+    loadError.value = err?.response?.data?.message || "Gagal memuat data manager"
+    await Swal.fire({ icon: "error", title: "Load report gagal", text: loadError.value })
+  } finally {
+    loading.value = false
+  }
 }
 
-onMounted(loadReport)
+onMounted(() => {
+  const today = new Date()
+  const first = new Date(today.getFullYear(), today.getMonth(), 1)
+  dateFrom.value = first.toISOString().slice(0, 10)
+  dateTo.value = today.toISOString().slice(0, 10)
+  loadReport()
+})
 
 const filteredOrders = computed(() => orders.value.filter((o) => {
   if (selectedBranch.value !== "ALL" && String(o.branch_id) !== String(selectedBranch.value)) return false
@@ -173,11 +201,11 @@ const trendBuckets = computed(() => {
   return map
 })
 
-const trendSeries = computed(() => ([{ name: "Revenue", data: [...trendBuckets.value.values()] }]))
+const trendSeries = computed(() => ([{ name: "Revenue", data: [...trendBuckets.value.values()].length ? [...trendBuckets.value.values()] : [0] }]))
 const trendOptions = computed(() => ({
   chart: { toolbar: { show: false }, background: "transparent" },
   theme: { mode: "dark" },
-  xaxis: { categories: [...trendBuckets.value.keys()] },
+  xaxis: { categories: [...trendBuckets.value.keys()].length ? [...trendBuckets.value.keys()] : ["No Data"] },
   dataLabels: { enabled: false },
   colors: ["#5f85ff"]
 }))
@@ -192,9 +220,9 @@ const breakdownMap = computed(() => {
   return map
 })
 
-const breakdownSeries = computed(() => [...breakdownMap.value.values()])
+const breakdownSeries = computed(() => [...breakdownMap.value.values()].length ? [...breakdownMap.value.values()] : [1])
 const breakdownOptions = computed(() => ({
-  labels: [...breakdownMap.value.keys()],
+  labels: [...breakdownMap.value.keys()].length ? [...breakdownMap.value.keys()] : ["No Data"],
   theme: { mode: "dark" },
   legend: { position: "bottom" }
 }))
