@@ -93,6 +93,54 @@ router.get(
 )
 
 router.post(
+  "/:id/undo-void/request",
+  auth,
+  (req, res, next) => {
+    if (!["Kasir"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Role not allowed" })
+    }
+    next()
+  },
+  controller.requestUndoVoid
+)
+
+router.get(
+  "/undo-void/requests",
+  auth,
+  (req, res, next) => {
+    if (!["Supervisor", "Manager", "Owner", "SuperAdmin"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Role not allowed" })
+    }
+    next()
+  },
+  controller.getUndoVoidRequests
+)
+
+router.post(
+  "/undo-void/requests/:requestId/approve",
+  auth,
+  (req, res, next) => {
+    if (!["Supervisor", "Manager"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Role not allowed" })
+    }
+    next()
+  },
+  controller.approveUndoVoidRequest
+)
+
+router.post(
+  "/undo-void/requests/:requestId/reject",
+  auth,
+  (req, res, next) => {
+    if (!["Supervisor", "Manager"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Role not allowed" })
+    }
+    next()
+  },
+  controller.rejectUndoVoidRequest
+)
+
+router.post(
   "/bar/messages/:messageId/read",
   auth,
   (req, res, next) => {

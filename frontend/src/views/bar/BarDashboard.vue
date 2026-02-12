@@ -40,8 +40,8 @@
 
     <section class="card-glass">
       <div class="section-head">
-        <h3>Order Inbox (Draft dari Kasir)</h3>
-        <span class="badge">{{ barInbox.length }} order</span>
+        <h3>Inbox order dari kasir</h3>
+        <span class="badge">{{ inboxPagination.total }} order</span>
       </div>
 
       <div v-if="!barInbox.length" class="empty">Belum ada inbox order.</div>
@@ -60,6 +60,12 @@
           <button class="btn-success" @click="deliver(order.id)">Deliver</button>
           <button class="btn-danger" @click="cancel(order.id)">Cancel</button>
         </div>
+      </div>
+
+      <div class="pagination inbox-pagination">
+        <button class="btn-light" :disabled="inboxPage===1" @click="changeInboxPage(inboxPage - 1)">Prev</button>
+        <span>Page {{ inboxPage }} / {{ inboxPagination.total_pages }}</span>
+        <button class="btn-light" :disabled="inboxPage>=inboxPagination.total_pages" @click="changeInboxPage(inboxPage + 1)">Next</button>
       </div>
     </section>
 
@@ -149,6 +155,9 @@ import { useAuthStore } from "../../store/auth.store"
 const auth = useAuthStore()
 const fnbItems = ref([])
 const barInbox = ref([])
+const inboxPage = ref(1)
+const inboxPageSize = 20
+const inboxPagination = ref({ page: 1, page_size: 20, total: 0, total_pages: 1 })
 const draftQty = ref({})
 const draftReason = ref({})
 const knownPendingInboxKeys = ref(new Set())
@@ -218,10 +227,11 @@ const loadAll = async (options = {}) => {
 
   const [fnbRes, inboxRes] = await Promise.all([
     api.get("/fnb"),
-    api.get("/orders/bar/inbox")
+    api.get("/orders/bar/inbox", { params: { page: inboxPage.value, page_size: inboxPageSize } })
   ])
 
-  const nextInbox = inboxRes.data || []
+  const nextInbox = Array.isArray(inboxRes.data?.data) ? inboxRes.data.data : (Array.isArray(inboxRes.data) ? inboxRes.data : [])
+  const nextPagination = inboxRes.data?.pagination || { page: inboxPage.value, page_size: inboxPageSize, total: nextInbox.length, total_pages: 1 }
   const nextPendingKeys = new Set(
     nextInbox
       .filter(item => item.status === "PENDING")
@@ -244,11 +254,22 @@ const loadAll = async (options = {}) => {
   knownPendingInboxKeys.value = nextPendingKeys
   fnbItems.value = fnbRes.data || []
   barInbox.value = nextInbox
+  inboxPagination.value = nextPagination
+  inboxPage.value = Number(nextPagination.page || inboxPage.value)
 
   if (selectedInboxOrder.value) {
     const latestSelected = nextInbox.find(item => item.id === selectedInboxOrder.value.id)
     selectedInboxOrder.value = latestSelected || null
   }
+}
+
+
+
+const changeInboxPage = async (nextPage) => {
+  const target = Math.min(Math.max(1, Number(nextPage) || 1), inboxPagination.value.total_pages || 1)
+  if (target === inboxPage.value) return
+  inboxPage.value = target
+  await loadAll({ silent: true })
 }
 
 const openInboxDetail = (order) => {
@@ -399,6 +420,7 @@ onBeforeUnmount(() => {
 .btn-light:disabled { opacity: .5; cursor: not-allowed; }
 .empty { color:#8e95a6; padding:10px 0; }
 .pagination { justify-content:flex-end; margin-top:10px; }
+.inbox-pagination { justify-content: space-between; }
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 999; }
 .modal { width: min(560px, 92vw); }
 .order-items { margin: 10px 0 0; padding-left: 18px; }

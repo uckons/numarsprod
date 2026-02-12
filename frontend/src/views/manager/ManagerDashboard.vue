@@ -45,7 +45,7 @@ const chartOptions = computed(() => ({
 
 const load = async () => {
   const res = await api.get("/fnb/stock/requests")
-  requests.value = res.data || []
+  requests.value = Array.isArray(res.data?.data) ? res.data.data : (res.data || [])
 }
 
 onMounted(async () => {
