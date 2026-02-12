@@ -1,10 +1,10 @@
 const db = require("../config/db")
-const { writeAuditLog } = require("../utils/audit")
+const { writeAuditLog: writeAuditEntry } = require("../utils/audit")
 
 module.exports = (action) => {
   return async (req, res, next) => {
     try {
-      await writeAuditLog(db, req.user?.id, action, {
+      await writeAuditEntry(db, req.user?.id, action, {
         method: req.method,
         path: req.originalUrl
       })

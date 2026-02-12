@@ -1,18 +1,5 @@
 const service = require("./timer.service")
-const { writeAuditLog } = require("../../utils/audit")
-
-const writeAuditLog = async (db, userId, action, payload = {}) => {
-  if (!userId) return
-  try {
-    await db.query(
-      `INSERT INTO audit_logs (user_id, action, target)
-       VALUES ($1, $2, $3)`,
-      [userId, action, JSON.stringify(payload)]
-    )
-  } catch (err) {
-    console.error('Timer audit log error:', err.message)
-  }
-}
+const { writeAuditLog: writeAuditEntry } = require("../../utils/audit")
 
 exports.start = async (req, res) => {
   try {
@@ -39,7 +26,7 @@ exports.start = async (req, res) => {
       room_id
     )
 
-    await writeAuditLog(db, req.user?.id, "TIMER_ADD", { order_id, service_id, therapist_id, room_id, timer_id: timer?.id })
+    await writeAuditEntry(db, req.user?.id, "TIMER_ADD", { order_id, service_id, therapist_id, room_id, timer_id: timer?.id })
 
     res.json(timer)
   } catch (err) {
@@ -520,7 +507,7 @@ exports.startTimer = async (req, res) => {
 
       await db.query('COMMIT')
 
-      await writeAuditLog(db, req.user?.id, "TIMER_START", {
+      await writeAuditEntry(db, req.user?.id, "TIMER_START", {
         order_id: finalOrderId,
         service_id: selectedService.id,
         timer_ids: createdTimers.map((t) => t.id),
@@ -551,7 +538,7 @@ exports.stop = async (req, res) => {
     const id = req.params.id
 
     const timer = await service.stopTimer(db, id)
-    await writeAuditLog(db, req.user?.id, "TIMER_STOP", { timer_id: Number(id), order_id: timer?.order_id })
+    await writeAuditEntry(db, req.user?.id, "TIMER_STOP", { timer_id: Number(id), order_id: timer?.order_id })
     res.json(timer)
   } catch (err) {
     console.error(err)
@@ -577,7 +564,7 @@ exports.create = async (req, res) => {
     [order_id, service_id, branch_id, start, end]
   )
 
-  await writeAuditLog(db, req.user?.id, "TIMER_CREATE_MANUAL", { order_id, service_id, timer_id: created.rows[0]?.id })
+  await writeAuditEntry(db, req.user?.id, "TIMER_CREATE_MANUAL", { order_id, service_id, timer_id: created.rows[0]?.id })
 
   res.json({ success: true })
 }
@@ -615,7 +602,7 @@ exports.startManual = async (req, res) => {
       ]
     )
 
-    await writeAuditLog(db, req.user?.id, "TIMER_START_MANUAL", { order_id, service_id, timer_id: started.rows[0]?.id })
+    await writeAuditEntry(db, req.user?.id, "TIMER_START_MANUAL", { order_id, service_id, timer_id: started.rows[0]?.id })
 
     res.json({ success: true })
   } catch (err) {
