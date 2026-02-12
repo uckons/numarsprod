@@ -171,6 +171,7 @@ exports.create = async (req, res) => {
     await dashboardService.ensureOutletCanReceiveOrder(user)
 
     const order = await service.createOrder(db, user)
+    await writeAuditLog(db, req.user?.id, "ORDER_CREATE", { order_id: order?.id || null, branch_id: user?.branch_id || null })
     res.json(order)
   } catch (err) {
     res.status(400).json({ message: err.message })
@@ -184,6 +185,7 @@ exports.addItem = async (req, res) => {
     const { service_id, qty } = req.body
 
     const item = await service.addItem(db, orderId, service_id, qty || 1)
+    await writeAuditLog(db, req.user?.id, "ORDER_ADD_ITEM", { order_id: orderId, service_id, qty: Number(qty || 1) })
     res.json(item)
   } catch (err) {
     res.status(400).json({ message: err.message })
@@ -325,6 +327,13 @@ exports.close = async (req, res) => {
         )
       }
     }
+
+    await writeAuditLog(db, req.user?.id, "ORDER_PAID", {
+      order_id: result.rows[0].id,
+      total: result.rows[0].total,
+      payment_method: payment_method || "CASH",
+      item_count: Array.isArray(items) ? items.length : 0
+    })
 
     res.json({ 
       order_id: result.rows[0].id,
@@ -1192,6 +1201,8 @@ exports.getOrderDetail = async (req, res) => {
     
     // Set default phone (column doesn't exist in branches table)
     order.branch_phone = "021-xxx-xxxx"
+
+    await writeAuditLog(db, req.user?.id, "ORDER_REPRINT_VIEW", { order_id: orderId, branch_id: branchId })
 
     res.json(order)
   } catch (err) {
