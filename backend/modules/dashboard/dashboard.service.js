@@ -416,8 +416,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
          COALESCE(oi.subtotal, 0) AS subtotal,
          COALESCE(oi.is_package_snapshot, false) AS is_package,
          (
-           LOWER(COALESCE(oi.price_label, '')) LIKE '%happy%'
-           OR LOWER(COALESCE(oi.price_label, '')) LIKE '%hh%'
+           LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
            OR hh_match.active = true
          ) AS is_happy
        FROM order_items oi
@@ -457,8 +456,8 @@ exports.kasirAnalytics = async (user, query = {}) => {
        COALESCE(SUM(qty), 0) AS qty,
        COALESCE(SUM(CASE WHEN is_happy THEN subtotal END), 0) AS happy_hour_revenue,
        COALESCE(SUM(CASE WHEN NOT is_happy THEN subtotal END), 0) AS non_happy_hour_revenue,
-       COALESCE(SUM(CASE WHEN NOT is_happy AND is_package THEN subtotal END), 0) AS non_happy_package_revenue,
-       COALESCE(SUM(CASE WHEN NOT is_happy AND NOT is_package THEN subtotal END), 0) AS non_happy_non_package_revenue,
+       COALESCE(SUM(CASE WHEN is_package THEN subtotal END), 0) AS package_revenue,
+       COALESCE(SUM(CASE WHEN NOT is_package THEN subtotal END), 0) AS non_package_revenue,
        COALESCE(SUM(subtotal), 0) AS total_revenue
      FROM mapped_rows
      GROUP BY service_id, service_name, category
@@ -481,8 +480,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
          COALESCE(oi.subtotal, 0) AS subtotal,
          COALESCE(oi.is_package_snapshot, false) AS is_package,
          (
-           LOWER(COALESCE(oi.price_label, '')) LIKE '%happy%'
-           OR LOWER(COALESCE(oi.price_label, '')) LIKE '%hh%'
+           LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
            OR hh_match.active = true
          ) AS is_happy,
          BTRIM(raw_name) AS therapist_name
@@ -525,8 +523,8 @@ exports.kasirAnalytics = async (user, query = {}) => {
        COALESCE(SUM(tr.qty), 0) AS qty,
        COALESCE(SUM(CASE WHEN tr.is_happy THEN tr.subtotal END), 0) AS happy_hour_revenue,
        COALESCE(SUM(CASE WHEN NOT tr.is_happy THEN tr.subtotal END), 0) AS non_happy_hour_revenue,
-       COALESCE(SUM(CASE WHEN NOT tr.is_happy AND tr.is_package THEN tr.subtotal END), 0) AS non_happy_package_revenue,
-       COALESCE(SUM(CASE WHEN NOT tr.is_happy AND NOT tr.is_package THEN tr.subtotal END), 0) AS non_happy_non_package_revenue,
+       COALESCE(SUM(CASE WHEN tr.is_package THEN tr.subtotal END), 0) AS package_revenue,
+       COALESCE(SUM(CASE WHEN NOT tr.is_package THEN tr.subtotal END), 0) AS non_package_revenue,
        COALESCE(SUM(tr.subtotal), 0) AS total_revenue,
        COALESCE(SUM(SUM(tr.subtotal)) OVER (PARTITION BY tr.therapist_name), 0) AS therapist_total_kerja,
        COALESCE(grade_info.grade_name, '-') AS grade_name
@@ -606,8 +604,10 @@ exports.kasirAnalytics = async (user, query = {}) => {
       qty: Number(row.qty || 0),
       happy_hour_revenue: Number(row.happy_hour_revenue || 0),
       non_happy_hour_revenue: Number(row.non_happy_hour_revenue || 0),
-      non_happy_package_revenue: Number(row.non_happy_package_revenue || 0),
-      non_happy_non_package_revenue: Number(row.non_happy_non_package_revenue || 0),
+      package_revenue: Number(row.package_revenue || 0),
+      non_package_revenue: Number(row.non_package_revenue || 0),
+      non_happy_package_revenue: Number(row.package_revenue || 0),
+      non_happy_non_package_revenue: Number(row.non_package_revenue || 0),
       total_revenue: Number(row.total_revenue || 0)
     })),
     therapist_pnl: therapistPnlRes.rows.map((row) => ({
@@ -619,8 +619,10 @@ exports.kasirAnalytics = async (user, query = {}) => {
       qty: Number(row.qty || 0),
       happy_hour_revenue: Number(row.happy_hour_revenue || 0),
       non_happy_hour_revenue: Number(row.non_happy_hour_revenue || 0),
-      non_happy_package_revenue: Number(row.non_happy_package_revenue || 0),
-      non_happy_non_package_revenue: Number(row.non_happy_non_package_revenue || 0),
+      package_revenue: Number(row.package_revenue || 0),
+      non_package_revenue: Number(row.non_package_revenue || 0),
+      non_happy_package_revenue: Number(row.package_revenue || 0),
+      non_happy_non_package_revenue: Number(row.non_package_revenue || 0),
       total_revenue: Number(row.total_revenue || 0),
       therapist_total_kerja: Number(row.therapist_total_kerja || 0)
     }))

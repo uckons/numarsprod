@@ -55,8 +55,8 @@
             <th>Qty</th>
             <th>Happy Hour</th>
             <th>Non Happy Hour</th>
-            <th>Non HH Paket</th>
-            <th>Non HH Non Paket</th>
+            <th>Paket</th>
+            <th>Non Paket</th>
             <th>Total</th>
           </tr>
         </thead>
@@ -67,8 +67,8 @@
             <td>{{ row.qty }}</td>
             <td>Rp {{ formatCurrency(row.happy_hour_revenue) }}</td>
             <td>Rp {{ formatCurrency(row.non_happy_hour_revenue) }}</td>
-            <td>Rp {{ formatCurrency(row.non_happy_package_revenue) }}</td>
-            <td>Rp {{ formatCurrency(row.non_happy_non_package_revenue) }}</td>
+            <td>Rp {{ formatCurrency(row.package_revenue ?? row.non_happy_package_revenue) }}</td>
+            <td>Rp {{ formatCurrency(row.non_package_revenue ?? row.non_happy_non_package_revenue) }}</td>
             <td>Rp {{ formatCurrency(row.total_revenue) }}</td>
           </tr>
           <tr v-if="!(report.pnl_services || []).length"><td colspan="8" class="muted">Belum ada data service.</td></tr>
@@ -126,8 +126,8 @@
             <th>Qty</th>
             <th>Happy Hour</th>
             <th>Non Happy Hour</th>
-            <th>Non HH Paket</th>
-            <th>Non HH Non Paket</th>
+            <th>Paket</th>
+            <th>Non Paket</th>
             <th>Total Kerja</th>
           </tr>
         </thead>
@@ -140,8 +140,8 @@
             <td>{{ row.qty }}</td>
             <td>Rp {{ formatCurrency(row.happy_hour_revenue) }}</td>
             <td>Rp {{ formatCurrency(row.non_happy_hour_revenue) }}</td>
-            <td>Rp {{ formatCurrency(row.non_happy_package_revenue) }}</td>
-            <td>Rp {{ formatCurrency(row.non_happy_non_package_revenue) }}</td>
+            <td>Rp {{ formatCurrency(row.package_revenue ?? row.non_happy_package_revenue) }}</td>
+            <td>Rp {{ formatCurrency(row.non_package_revenue ?? row.non_happy_non_package_revenue) }}</td>
             <td>Rp {{ formatCurrency(row.therapist_total_kerja) }}</td>
           </tr>
           <tr v-if="!filteredTherapistPnl.length"><td colspan="10" class="muted">Belum ada data terapis.</td></tr>
