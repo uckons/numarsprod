@@ -55,6 +55,8 @@
             <th>Qty</th>
             <th>Happy Hour</th>
             <th>Non Happy Hour</th>
+            <th>Non HH Paket</th>
+            <th>Non HH Non Paket</th>
             <th>Total</th>
           </tr>
         </thead>
@@ -65,9 +67,11 @@
             <td>{{ row.qty }}</td>
             <td>Rp {{ formatCurrency(row.happy_hour_revenue) }}</td>
             <td>Rp {{ formatCurrency(row.non_happy_hour_revenue) }}</td>
+            <td>Rp {{ formatCurrency(row.non_happy_package_revenue) }}</td>
+            <td>Rp {{ formatCurrency(row.non_happy_non_package_revenue) }}</td>
             <td>Rp {{ formatCurrency(row.total_revenue) }}</td>
           </tr>
-          <tr v-if="!(report.pnl_services || []).length"><td colspan="6" class="muted">Belum ada data service.</td></tr>
+          <tr v-if="!(report.pnl_services || []).length"><td colspan="8" class="muted">Belum ada data service.</td></tr>
         </tbody>
       </table>
     </section>
@@ -121,6 +125,8 @@
             <th>Kategori</th>
             <th>Happy Hour</th>
             <th>Non Happy Hour</th>
+            <th>Non HH Paket</th>
+            <th>Non HH Non Paket</th>
             <th>Total Kerja</th>
           </tr>
         </thead>
@@ -132,9 +138,11 @@
             <td>{{ row.category }}</td>
             <td>Rp {{ formatCurrency(row.happy_hour_revenue) }}</td>
             <td>Rp {{ formatCurrency(row.non_happy_hour_revenue) }}</td>
-            <td>Rp {{ formatCurrency(row.total_revenue) }}</td>
+            <td>Rp {{ formatCurrency(row.non_happy_package_revenue) }}</td>
+            <td>Rp {{ formatCurrency(row.non_happy_non_package_revenue) }}</td>
+            <td>Rp {{ formatCurrency(row.therapist_total_kerja) }}</td>
           </tr>
-          <tr v-if="!filteredTherapistPnl.length"><td colspan="7" class="muted">Belum ada data terapis.</td></tr>
+          <tr v-if="!filteredTherapistPnl.length"><td colspan="9" class="muted">Belum ada data terapis.</td></tr>
         </tbody>
       </table>
 
@@ -296,7 +304,8 @@ const therapistPerformanceMap = computed(() => {
   const map = new Map()
   for (const row of filteredTherapistPnl.value) {
     const key = row.therapist_name
-    map.set(key, (map.get(key) || 0) + Number(row.total_revenue || 0))
+    const totalKerja = Number(row.therapist_total_kerja || row.total_revenue || 0)
+    map.set(key, Math.max(map.get(key) || 0, totalKerja))
   }
   return map
 })
