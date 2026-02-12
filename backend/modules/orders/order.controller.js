@@ -1,5 +1,6 @@
 const service = require("./order.service")
 const stockService = require("../stock/stock.service")
+const { writeAuditLog } = require("../../utils/audit")
 const dashboardService = require("../dashboard/dashboard.service")
 
 const parseOrderId = (rawId) => {
@@ -156,13 +157,6 @@ const createKasirBarMessage = async (db, payload = {}) => {
   return rows[0]
 }
 
-const writeAuditLog = async (db, userId, action, payload = {}) => {
-  await db.query(
-    `INSERT INTO audit_logs (user_id, action, target)
-     VALUES ($1, $2, $3)`,
-    [userId, action, JSON.stringify(payload)]
-  )
-}
 
 exports.create = async (req, res) => {
   try {

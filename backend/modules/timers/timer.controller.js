@@ -1,4 +1,5 @@
 const service = require("./timer.service")
+const { writeAuditLog } = require("../../utils/audit")
 
 const writeAuditLog = async (db, userId, action, payload = {}) => {
   if (!userId) return
