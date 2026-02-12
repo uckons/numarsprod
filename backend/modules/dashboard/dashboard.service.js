@@ -472,6 +472,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
        SELECT
          o.id AS order_id,
          oi.service_name,
+         COALESCE(oi.qty, 0) AS qty,
          CASE
            WHEN s.type::text IN ('KARAOKE', 'KTV') THEN 'KTV'
            WHEN s.type::text = 'LOUNGE' THEN 'LC'
@@ -521,6 +522,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
        tr.category,
        tr.service_name,
        COALESCE(COUNT(DISTINCT tr.order_id), 0) AS orders,
+       COALESCE(SUM(tr.qty), 0) AS qty,
        COALESCE(SUM(CASE WHEN tr.is_happy THEN tr.subtotal END), 0) AS happy_hour_revenue,
        COALESCE(SUM(CASE WHEN NOT tr.is_happy THEN tr.subtotal END), 0) AS non_happy_hour_revenue,
        COALESCE(SUM(CASE WHEN NOT tr.is_happy AND tr.is_package THEN tr.subtotal END), 0) AS non_happy_package_revenue,
@@ -614,6 +616,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
       category: row.category,
       service_name: row.service_name,
       orders: Number(row.orders || 0),
+      qty: Number(row.qty || 0),
       happy_hour_revenue: Number(row.happy_hour_revenue || 0),
       non_happy_hour_revenue: Number(row.non_happy_hour_revenue || 0),
       non_happy_package_revenue: Number(row.non_happy_package_revenue || 0),
