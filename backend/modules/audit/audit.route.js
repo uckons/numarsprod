@@ -46,7 +46,7 @@ router.get("/", auth, rbac(["SuperAdmin"]), async (req, res) => {
       a.target,
       a.created_at,
       COALESCE(u.username, 'Unknown User') AS username,
-      COALESCE(u.role, '-') AS role
+      '-'::text AS role
     FROM audit_logs a
     LEFT JOIN users u ON u.id = a.user_id
     WHERE ${where}
