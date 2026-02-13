@@ -15,39 +15,41 @@
       <p class="subtitle">NUMARS SPA-LOUNGE-KARAOKE</p>
       <p class="subtitle subtitle-login">Login in systems</p>
 
-      <!-- USERNAME (GANTI DARI PHONE) -->
-      <input
-        v-model="username"
-        placeholder="Username"
-        autocomplete="username"
-      />
-
-      <input
-        v-model="password"
-        type="password"
-        placeholder="Password"
-        autocomplete="current-password"
-      />
-
-      <div class="captcha-box">
-        <label for="captchaInput">Captcha keamanan</label>
-        <div class="captcha-row">
-          <span class="captcha-question">{{ captchaQuestion }}</span>
-          <button type="button" class="captcha-refresh" @click="generateCaptcha" title="Refresh captcha">↻</button>
-        </div>
+      <form class="login-form" @submit.prevent="handleLogin">
+        <!-- USERNAME (GANTI DARI PHONE) -->
         <input
-          id="captchaInput"
-          v-model="captchaAnswer"
-          type="text"
-          inputmode="numeric"
-          placeholder="Jawaban captcha"
-          autocomplete="off"
+          v-model="username"
+          placeholder="Username"
+          autocomplete="username"
         />
-      </div>
 
-      <button @click="handleLogin" :disabled="loading">
-        {{ loading ? "Loading..." : "Login" }}
-      </button>
+        <input
+          v-model="password"
+          type="password"
+          placeholder="Password"
+          autocomplete="current-password"
+        />
+
+        <div class="captcha-box">
+          <label for="captchaInput">Captcha keamanan</label>
+          <div class="captcha-row">
+            <span class="captcha-question">{{ captchaQuestion }}</span>
+            <button type="button" class="captcha-refresh" @click="generateCaptcha" title="Refresh captcha">↻</button>
+          </div>
+          <input
+            id="captchaInput"
+            v-model="captchaAnswer"
+            type="text"
+            inputmode="numeric"
+            placeholder="Jawaban captcha"
+            autocomplete="off"
+          />
+        </div>
+
+        <button type="submit" :disabled="loading">
+          {{ loading ? "Loading..." : "Login" }}
+        </button>
+      </form>
 
       <p v-if="error" class="error">{{ error }}</p>
     </div>
@@ -142,7 +144,7 @@ const handleLogin = async () => {
 }
 
 .login-card {
-  width: 320px;
+  width: min(460px, 92vw);
   background: #111;
   border: 1px solid #c9a24d;
   padding: 24px;
@@ -156,11 +158,11 @@ const handleLogin = async () => {
 }
 
 .logo-image {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid #c9a24d;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  max-height: 88px;
+  object-fit: contain;
   box-shadow: 0 0 14px rgba(201, 162, 77, 0.2);
 }
 
@@ -193,6 +195,10 @@ h1 {
   margin-bottom: 14px;
   color: #8d8d8d;
   font-size: 13px;
+}
+
+.login-form {
+  width: 100%;
 }
 
 .captcha-box {
