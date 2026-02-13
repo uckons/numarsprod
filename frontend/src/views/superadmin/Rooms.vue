@@ -116,11 +116,8 @@ const filteredRooms = computed(() => {
 })
 
 const fetchBranches = async () => {
-  const res = await api.get('/branches')
-  branches.value = res.data?.data || res.data || []
-  if (!selectedBranchId.value && branches.value.length) {
-    selectedBranchId.value = String(branches.value[0].id)
-  }
+  const res = await api.get('/superadmin/branches')
+  branches.value = Array.isArray(res.data) ? res.data : (res.data?.data || [])
 }
 
 const fetchRooms = async () => {
