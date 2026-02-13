@@ -59,17 +59,17 @@
         <section class="card chart-grid">
           <div>
             <h4>Revenue Trend</h4>
-            <ApexChart type="area" :height="280" :series="trendSeries" :options="trendOptions" />
+            <ApexChart type="area" :height="240" :series="trendSeries" :options="trendOptions" />
           </div>
           <div>
             <h4>Breakdown Service</h4>
-            <ApexChart type="donut" :height="280" :series="breakdownSeries" :options="breakdownOptions" />
+            <ApexChart type="donut" :height="240" :series="breakdownSeries" :options="breakdownOptions" />
           </div>
         </section>
 
         <section class="card">
           <h4>Trend Pendapatan per Kategori (FNB, SPA, LC, KTV)</h4>
-          <ApexChart type="line" :height="320" :series="categoryTrendSeries" :options="categoryTrendOptions" />
+          <ApexChart type="line" :height="250" :series="categoryTrendSeries" :options="categoryTrendOptions" />
         </section>
 
         <section class="card">
@@ -355,16 +355,16 @@ const trendBuckets = computed(() => {
   return map
 })
 
-const twoDec = (v) => Number(v || 0).toFixed(2)
+const formatAccountingNumber = (v) => Number(v || 0).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 const trendSeries = computed(() => ([{ name: "Revenue", data: [...trendBuckets.value.values()].length ? [...trendBuckets.value.values()] : [0] }]))
 const trendOptions = computed(() => ({
   chart: { toolbar: { show: false }, background: "transparent" },
   theme: { mode: "dark" },
   xaxis: { categories: [...trendBuckets.value.keys()].length ? [...trendBuckets.value.keys()] : ["No Data"] },
-  yaxis: { labels: { formatter: twoDec } },
+  yaxis: { labels: { formatter: formatAccountingNumber } },
   dataLabels: { enabled: false },
-  tooltip: { y: { formatter: twoDec } },
+  tooltip: { y: { formatter: formatAccountingNumber } },
   colors: ["#5f85ff"]
 }))
 
@@ -382,7 +382,7 @@ const breakdownSeries = computed(() => [...breakdownMap.value.values()].length ?
 const breakdownOptions = computed(() => ({
   labels: [...breakdownMap.value.keys()].length ? [...breakdownMap.value.keys()] : ["No Data"],
   theme: { mode: "dark" },
-  tooltip: { y: { formatter: twoDec } },
+  tooltip: { y: { formatter: formatAccountingNumber } },
   legend: { position: "bottom" }
 }))
 
@@ -411,8 +411,8 @@ const categoryTrendOptions = computed(() => ({
   chart: { toolbar: { show: false }, background: "transparent" },
   theme: { mode: "dark" },
   xaxis: { categories: [...categoryTrendData.value.keys()].length ? [...categoryTrendData.value.keys()] : ["No Data"] },
-  yaxis: { labels: { formatter: twoDec } },
-  tooltip: { y: { formatter: twoDec } },
+  yaxis: { labels: { formatter: formatAccountingNumber } },
+  tooltip: { y: { formatter: formatAccountingNumber } },
   dataLabels: { enabled: false },
   stroke: { curve: "smooth", width: 2 },
   legend: { position: "top" },
