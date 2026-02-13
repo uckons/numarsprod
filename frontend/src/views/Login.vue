@@ -2,7 +2,14 @@
   <div class="login-wrapper">
     <div class="login-card">
       <div class="logo-block" aria-hidden="true">
-        <div class="logo-circle">S</div>
+        <img
+          v-if="showLogoImage"
+          :src="logoUrl"
+          alt="SKY POS Logo"
+          class="logo-image"
+          @error="showLogoImage = false"
+        />
+        <div v-else class="logo-circle">S</div>
       </div>
       <h1>SKY POS SYSTEM</h1>
       <p class="subtitle">NUMARS SPA-LOUNGE-KARAOKE</p>
@@ -22,6 +29,22 @@
         autocomplete="current-password"
       />
 
+      <div class="captcha-box">
+        <label for="captchaInput">Captcha keamanan</label>
+        <div class="captcha-row">
+          <span class="captcha-question">{{ captchaQuestion }}</span>
+          <button type="button" class="captcha-refresh" @click="generateCaptcha" title="Refresh captcha">↻</button>
+        </div>
+        <input
+          id="captchaInput"
+          v-model="captchaAnswer"
+          type="text"
+          inputmode="numeric"
+          placeholder="Jawaban captcha"
+          autocomplete="off"
+        />
+      </div>
+
       <button @click="handleLogin" :disabled="loading">
         {{ loading ? "Loading..." : "Login" }}
       </button>
@@ -32,7 +55,7 @@
 </template>
 
 <script setup>
-import { ref } from "vue"
+import { computed, ref } from "vue"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "../store/auth.store"
 
@@ -44,6 +67,21 @@ const username = ref("")
 const password = ref("")
 const loading = ref(false)
 const error = ref("")
+
+const captchaAnswer = ref("")
+const captchaA = ref(0)
+const captchaB = ref(0)
+const captchaQuestion = computed(() => `${captchaA.value} + ${captchaB.value} = ?`)
+const logoUrl = computed(() => import.meta.env.VITE_LOGIN_LOGO_URL || "/logo-sky.png")
+const showLogoImage = ref(true)
+
+const generateCaptcha = () => {
+  captchaA.value = Math.floor(Math.random() * 9) + 1
+  captchaB.value = Math.floor(Math.random() * 9) + 1
+  captchaAnswer.value = ""
+}
+
+generateCaptcha()
 
 //const handleLogin = async () => {
 //  loading.value = true
@@ -64,7 +102,15 @@ const error = ref("")
 //}
 
 const handleLogin = async () => {
+  const expected = captchaA.value + captchaB.value
+  if (Number(captchaAnswer.value) !== expected) {
+    error.value = "Captcha tidak valid"
+    generateCaptcha()
+    return
+  }
+
   loading.value = true
+  error.value = ""
   try {
     await auth.login(username.value, password.value)
     const role = auth.role
@@ -109,6 +155,15 @@ const handleLogin = async () => {
   margin-bottom: 12px;
 }
 
+.logo-image {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #c9a24d;
+  box-shadow: 0 0 14px rgba(201, 162, 77, 0.2);
+}
+
 .logo-circle {
   width: 56px;
   height: 56px;
@@ -135,9 +190,43 @@ h1 {
 }
 
 .subtitle-login {
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   color: #8d8d8d;
   font-size: 13px;
+}
+
+.captcha-box {
+  text-align: left;
+  margin-bottom: 12px;
+}
+
+.captcha-box label {
+  display: block;
+  color: #b8b8b8;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.captcha-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.captcha-question {
+  color: #e5c677;
+  font-weight: 700;
+}
+
+.captcha-refresh {
+  width: auto;
+  padding: 4px 8px;
+  background: #1f1f1f;
+  border: 1px solid #373737;
+  color: #c9a24d;
+  border-radius: 8px;
 }
 
 input {

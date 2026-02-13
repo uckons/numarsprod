@@ -53,6 +53,7 @@
             <span class="status" :class="order.status.toLowerCase()">{{ order.status }}</span>
           </div>
           <small class="muted">{{ formatItems(order.items_snapshot) }}</small>
+          <small v-if="order.note" class="note-line">📝 {{ order.note }}</small>
         </button>
 
         <div class="actions" v-if="!['DELIVERED','CANCELLED'].includes(order.status)">
@@ -122,6 +123,7 @@
       <div class="modal card-glass">
         <h3>Order #{{ selectedInboxOrder.order_id }}</h3>
         <p class="muted">Status: {{ selectedInboxOrder.status }}</p>
+        <p v-if="selectedInboxOrder.note" class="note-box">Catatan kasir: {{ selectedInboxOrder.note }}</p>
 
         <ul class="order-items">
           <li v-for="item in selectedInboxOrder.items_snapshot || []" :key="`${item.service_id}-${item.service_name}`">
@@ -426,6 +428,9 @@ onBeforeUnmount(() => {
 .order-items { margin: 10px 0 0; padding-left: 18px; }
 .order-items li { margin-bottom: 6px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+
+.note-line { display:block; margin-top:6px; color:#f5c518; font-size:12px; }
+.note-box { margin-top:10px; margin-bottom:10px; padding:8px 10px; border-radius:10px; border:1px solid rgba(245, 197, 24, 0.35); background:rgba(245, 197, 24, 0.08); color:#f5d86a; font-size:13px; }
 
 @media (max-width: 1100px) {
   .kpi-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
