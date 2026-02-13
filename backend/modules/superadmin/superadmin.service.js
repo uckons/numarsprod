@@ -101,9 +101,10 @@ exports.orders = async () => {
 
 exports.timers = async () => {
   return (await db.query(`
-    SELECT t.*, u.name therapist
+    SELECT t.*, u.name therapist, b.name AS branch_name
     FROM timers t
     LEFT JOIN therapists u ON u.id=t.therapist_id
+    LEFT JOIN branches b ON b.id = t.branch_id
     ORDER BY t.start_time DESC
   `)).rows
 }

@@ -14,6 +14,13 @@
         <input v-model.trim="query" placeholder="Contoh: Andi / #123" />
       </div>
       <div class="field">
+        <label>Outlet</label>
+        <select v-model="selectedBranch">
+          <option value="ALL">Semua Outlet</option>
+          <option v-for="b in branches" :key="b.id" :value="String(b.id)">{{ b.name }}</option>
+        </select>
+      </div>
+      <div class="field">
         <label>Status</label>
         <select v-model="statusFilter">
           <option value="ALL">Semua</option>
@@ -35,6 +42,7 @@
         <thead>
           <tr>
             <th>Order</th>
+            <th>Outlet</th>
             <th>Terapis</th>
             <th>Mulai</th>
             <th>Selesai</th>
@@ -42,28 +50,21 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="!pagedTimers.length">
-            <td colspan="5" class="empty">Tidak ada timer.</td>
-          </tr>
+          <tr v-if="!pagedTimers.length"><td colspan="6" class="empty">Tidak ada timer.</td></tr>
           <tr v-for="t in pagedTimers" :key="t.id">
             <td>#{{ t.order_id }}</td>
+            <td>{{ t.branch_name || '-' }}</td>
             <td>{{ t.therapist || '-' }}</td>
             <td>{{ formatDateTime(t.start_time) }}</td>
             <td>{{ formatDateTime(t.end_time) }}</td>
-            <td>
-              <span class="status" :class="statusClass(t)">{{ statusLabel(t) }}</span>
-            </td>
+            <td><span class="status" :class="statusClass(t)">{{ statusLabel(t) }}</span></td>
           </tr>
         </tbody>
       </table>
       <div class="pagination">
         <div class="pager-left">
           <label>Per Halaman</label>
-          <select v-model.number="pageSize">
-            <option :value="10">10</option>
-            <option :value="20">20</option>
-            <option :value="50">50</option>
-          </select>
+          <select v-model.number="pageSize"><option :value="10">10</option><option :value="20">20</option><option :value="50">50</option></select>
         </div>
         <div class="pager-right">
           <button @click="page -= 1" :disabled="page === 1">Prev</button>
@@ -80,14 +81,17 @@ import { computed, onMounted, ref, watch } from "vue"
 import api from "@/services/api"
 
 const timers = ref([])
+const branches = ref([])
 const query = ref("")
+const selectedBranch = ref("ALL")
 const statusFilter = ref("ALL")
 const page = ref(1)
 const pageSize = ref(20)
 
 const loadTimers = async () => {
-  const res = await api.get("/superadmin/timers")
-  timers.value = Array.isArray(res.data) ? res.data : []
+  const [timerRes, branchRes] = await Promise.all([api.get("/superadmin/timers"), api.get("/superadmin/branches")])
+  timers.value = Array.isArray(timerRes.data) ? timerRes.data : []
+  branches.value = Array.isArray(branchRes.data) ? branchRes.data : Array.isArray(branchRes.data?.data) ? branchRes.data.data : []
 }
 
 onMounted(loadTimers)
@@ -97,40 +101,30 @@ const statusLabel = (t) => {
   if (t?.end_time && new Date(t.end_time).getTime() <= Date.now()) return "STOPPED"
   return "RUNNING"
 }
-
 const statusClass = (t) => statusLabel(t).toLowerCase()
-
 const runningCount = computed(() => timers.value.filter((t) => statusLabel(t) === "RUNNING").length)
 const pausedCount = computed(() => timers.value.filter((t) => statusLabel(t) === "PAUSE").length)
 const stoppedCount = computed(() => timers.value.filter((t) => statusLabel(t) === "STOPPED").length)
 
-watch([query, statusFilter, pageSize], () => {
-  page.value = 1
-})
+watch([query, statusFilter, pageSize, selectedBranch], () => { page.value = 1 })
 
 const filteredTimers = computed(() => {
   const key = query.value.toLowerCase()
   return timers.value.filter((t) => {
+    if (selectedBranch.value !== "ALL" && String(t.branch_id) !== String(selectedBranch.value)) return false
     const status = statusLabel(t)
     if (statusFilter.value !== "ALL" && statusFilter.value !== status) return false
-
     if (!key) return true
     const therapist = String(t.therapist || "").toLowerCase()
     const order = String(t.order_id || "").toLowerCase()
-    return therapist.includes(key) || order.includes(key)
+    const branch = String(t.branch_name || "").toLowerCase()
+    return therapist.includes(key) || order.includes(key) || branch.includes(key)
   })
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredTimers.value.length / pageSize.value)))
-const pagedTimers = computed(() => {
-  const start = (page.value - 1) * pageSize.value
-  return filteredTimers.value.slice(start, start + pageSize.value)
-})
-
-const formatDateTime = (v) => {
-  if (!v) return "-"
-  return new Date(v).toLocaleString("id-ID")
-}
+const pagedTimers = computed(() => filteredTimers.value.slice((page.value - 1) * pageSize.value, (page.value - 1) * pageSize.value + pageSize.value))
+const formatDateTime = (v) => (!v ? "-" : new Date(v).toLocaleString("id-ID"))
 </script>
 
 <style scoped>
@@ -139,7 +133,6 @@ const formatDateTime = (v) => {
 .hero { display: flex; align-items: center; justify-content: space-between; }
 .subtitle { color: var(--text-muted); margin-top: 4px; }
 .btn-outline { background: transparent; border: 1px solid var(--gold); color: var(--gold); border-radius: 10px; padding: 8px 14px; cursor: pointer; }
-
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; justify-content: space-between; }
 .field { display: grid; gap: 6px; }
 label { color: var(--text-muted); font-size: 12px; }
@@ -150,7 +143,6 @@ input, select { background: #0a0a0a; border: 1px solid var(--border-soft); color
 .pill.running { border-color: rgba(56,217,150,.6); color: #38d996; }
 .pill.paused { border-color: rgba(245,161,74,.6); color: #f5a14a; }
 .pill.stopped { border-color: rgba(255,255,255,.45); color: #d0d0d0; }
-
 .table-card { overflow: auto; }
 table { width: 100%; border-collapse: collapse; }
 th { text-align: left; color: var(--text-muted); font-size: 12px; padding: 11px 10px; border-bottom: 1px solid var(--border-soft); }
