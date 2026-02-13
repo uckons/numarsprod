@@ -201,6 +201,7 @@
                 required
               />
             </label>
+            <div class="section-title">Pengaturan Paket & Happy Hour</div>
             <label class="inline-toggle">
               <span>Minuman (Happy Hour)</span>
               <input v-model="form.is_beverage" type="checkbox" />
@@ -251,6 +252,7 @@
                 :disabled="!form.happy_hour_enabled"
               />
             </label>
+            <div class="section-title">Persediaan</div>
             <label>
               Stock
               <input
@@ -795,20 +797,21 @@ td {
 }
 
 .modal {
-  background: #151515;
-  padding: 24px;
-  border-radius: 16px;
+  background: linear-gradient(145deg, #181818, #111);
+  padding: 22px;
+  border-radius: 18px;
   width: 100%;
-  max-width: 520px;
+  max-width: 760px;
+  border: 1px solid #2b2b2b;
   box-shadow: 0 30px 80px rgba(0,0,0,.55);
   animation: slideIn .25s ease-in-out;
 }
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 .form-grid label {
@@ -818,15 +821,24 @@ td {
   color: #bbb;
   font-size: 13px;
 }
+.section-title {
+  grid-column: 1 / -1;
+  color: #c9a24d;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  padding-top: 4px;
+}
 
 .inline-toggle {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 12px;
   border-radius: 12px;
   background: #101010;
-  border: 1px solid #222;
+  border: 1px solid #2c2c2c;
 }
 
 .inline-toggle input {
@@ -851,6 +863,7 @@ td {
   cursor: pointer;
   transition: all .2s ease-in-out;
 }
+.modal-header h3 { margin: 0; }
 
 .btn-ghost:hover {
   border-color: #c9a24d;
@@ -879,6 +892,7 @@ td {
 }
 
 @media (max-width: 768px) {
+  .form-grid { grid-template-columns: 1fr; }
   .header {
     flex-direction: column;
     align-items: flex-start;

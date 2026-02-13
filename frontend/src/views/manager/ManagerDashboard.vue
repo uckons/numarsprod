@@ -137,7 +137,7 @@
           <button class="btn" @click="loadPayroll">Hitung Payroll</button>
           <button class="btn" @click="settlePayroll">Settle Paid</button>
           <button class="btn" @click="printPayroll">Print</button>
-          <button class="btn" @click="exportPayrollPdf">Cetak PDF</button>
+          <button class="btn" @click="exportPayrollExcel">Export Excel</button>
         </section>
 
         <section class="card" v-if="payrollWarning">
@@ -304,8 +304,90 @@ const openPayrollTab = async () => {
   await loadPayroll()
 }
 
-const printPayroll = () => window.print()
-const exportPayrollPdf = () => window.print()
+const getSelectedBranchLabel = () => {
+  if (selectedBranch.value === "ALL") return "Semua Outlet"
+  const found = branches.value.find((b) => String(b.id) === String(selectedBranch.value))
+  return found?.name || selectedBranch.value
+}
+
+const buildPayrollReportHtml = () => {
+  const rows = payrollRows.value.map((row) => `
+    <tr>
+      <td>${row.therapist_name || '-'}</td>
+      <td>${row.grade_name || '-'}</td>
+      <td>${row.spa_work_count || 0}</td>
+      <td>${row.lc_work_count || 0}</td>
+      <td>${row.work_count || 0}</td>
+      <td style="text-align:right">Rp ${formatCurrency(row.commission_amount)}</td>
+      <td style="text-align:right">Rp ${formatCurrency(row.gross_amount)}</td>
+      <td style="text-align:right">Rp ${formatCurrency(row.paid_amount)}</td>
+      <td style="text-align:right">Rp ${formatCurrency(row.unsettled_amount)}</td>
+    </tr>
+  `).join("")
+
+  return `
+    <html>
+      <head>
+        <title>Laporan Payroll Terapis</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; color:#111; }
+          h1 { margin:0 0 6px; font-size:22px; }
+          .meta { margin-bottom: 16px; color:#444; }
+          table { width:100%; border-collapse: collapse; }
+          th, td { border:1px solid #d1d5db; padding:8px; font-size:12px; }
+          th { background:#f3f4f6; text-align:left; }
+        </style>
+      </head>
+      <body>
+        <h1>Laporan Payroll Terapis</h1>
+        <div class="meta">Periode: ${payrollFrom.value} s/d ${payrollTo.value} | Outlet: ${getSelectedBranchLabel()}</div>
+        <table>
+          <thead>
+            <tr><th>Terapis</th><th>Grade</th><th>SPA</th><th>LC</th><th>Total Kerja</th><th>Komisi Fix</th><th>Gross</th><th>Sudah Paid</th><th>Unsettled</th></tr>
+          </thead>
+          <tbody>${rows || '<tr><td colspan="9">Tidak ada data.</td></tr>'}</tbody>
+        </table>
+      </body>
+    </html>
+  `
+}
+
+const printPayroll = () => {
+  const w = window.open('', '_blank', 'width=1100,height=800')
+  if (!w) return
+  w.document.open()
+  w.document.write(buildPayrollReportHtml())
+  w.document.close()
+  w.focus()
+  w.print()
+}
+
+const exportPayrollExcel = () => {
+  const headers = ["Terapis","Grade","SPA","LC","Total Kerja","Komisi Fix","Gross","Sudah Paid","Unsettled"]
+  const rows = payrollRows.value.map((row) => ([
+    row.therapist_name || '-',
+    row.grade_name || '-',
+    row.spa_work_count || 0,
+    row.lc_work_count || 0,
+    row.work_count || 0,
+    row.commission_amount || 0,
+    row.gross_amount || 0,
+    row.paid_amount || 0,
+    row.unsettled_amount || 0
+  ]))
+
+  const csv = [headers, ...rows]
+    .map((line) => line.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(','))
+    .join('\n')
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `payroll-terapis-${payrollFrom.value}-sampai-${payrollTo.value}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}
 
 onMounted(() => {
   const today = new Date()
