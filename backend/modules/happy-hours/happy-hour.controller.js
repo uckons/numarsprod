@@ -1,10 +1,26 @@
 const service = require("./happy-hour.service")
 
+const resolveBranchId = (req) => {
+  const role = String(req.user?.role || "")
+  const privileged = ["SuperAdmin", "Manager", "Owner"].includes(role)
+
+  const queryBranch = Number(req.query?.branch_id)
+  const bodyBranch = Number(req.body?.branch_id)
+
+  if (privileged) {
+    if (Number.isInteger(queryBranch) && queryBranch > 0) return queryBranch
+    if (Number.isInteger(bodyBranch) && bodyBranch > 0) return bodyBranch
+  }
+
+  const userBranch = Number(req.user?.branch_id)
+  return Number.isInteger(userBranch) && userBranch > 0 ? userBranch : null
+}
+
 exports.list = async (req, res) => {
   try {
-    const branchId = req.user.branch_id
+    const branchId = resolveBranchId(req)
     if (!branchId) {
-      return res.status(400).json({ message: "User belum terikat ke branch" })
+      return res.status(400).json({ message: "Branch belum dipilih" })
     }
     const rows = await service.listByBranch(branchId)
     res.json(rows)
@@ -15,10 +31,10 @@ exports.list = async (req, res) => {
 
 exports.upsert = async (req, res) => {
   try {
-    const branchId = req.user.branch_id
+    const branchId = resolveBranchId(req)
     const serviceType = req.params.service_type
     if (!branchId) {
-      return res.status(400).json({ message: "User belum terikat ke branch" })
+      return res.status(400).json({ message: "Branch belum dipilih" })
     }
     if (!serviceType) {
       return res.status(400).json({ message: "Service type is required" })

@@ -1,5 +1,6 @@
 const service = require("./order.service")
 const stockService = require("../stock/stock.service")
+const { writeAuditLog: writeAuditEntry } = require("../../utils/audit")
 const dashboardService = require("../dashboard/dashboard.service")
 
 const parseOrderId = (rawId) => {
@@ -156,13 +157,6 @@ const createKasirBarMessage = async (db, payload = {}) => {
   return rows[0]
 }
 
-const writeAuditLog = async (db, userId, action, payload = {}) => {
-  await db.query(
-    `INSERT INTO audit_logs (user_id, action, target)
-     VALUES ($1, $2, $3)`,
-    [userId, action, JSON.stringify(payload)]
-  )
-}
 
 exports.create = async (req, res) => {
   try {
@@ -171,6 +165,7 @@ exports.create = async (req, res) => {
     await dashboardService.ensureOutletCanReceiveOrder(user)
 
     const order = await service.createOrder(db, user)
+    await writeAuditEntry(db, req.user?.id, "ORDER_CREATE", { order_id: order?.id || null, branch_id: user?.branch_id || null })
     res.json(order)
   } catch (err) {
     res.status(400).json({ message: err.message })
@@ -184,6 +179,7 @@ exports.addItem = async (req, res) => {
     const { service_id, qty } = req.body
 
     const item = await service.addItem(db, orderId, service_id, qty || 1)
+    await writeAuditEntry(db, req.user?.id, "ORDER_ADD_ITEM", { order_id: orderId, service_id, qty: Number(qty || 1) })
     res.json(item)
   } catch (err) {
     res.status(400).json({ message: err.message })
@@ -326,6 +322,13 @@ exports.close = async (req, res) => {
       }
     }
 
+    await writeAuditEntry(db, req.user?.id, "ORDER_PAID", {
+      order_id: result.rows[0].id,
+      total: result.rows[0].total,
+      payment_method: payment_method || "CASH",
+      item_count: Array.isArray(items) ? items.length : 0
+    })
+
     res.json({ 
       order_id: result.rows[0].id,
       total: result.rows[0].total,
@@ -392,7 +395,7 @@ exports.cancel = async (req, res) => {
       [orderId]
     )
 
-    await writeAuditLog(db, req.user.id, 'VOID_DRAFT_ORDER', {
+    await writeAuditEntry(db, req.user.id, 'VOID_DRAFT_ORDER', {
       order_id: orderId,
       reason,
       at: new Date().toISOString()
@@ -425,7 +428,7 @@ const performUndoVoid = async (db, { orderId, actorId }) => {
 
   await db.query("UPDATE orders SET status='DRAFT' WHERE id=$1", [orderId])
 
-  await writeAuditLog(db, actorId, 'UNDO_VOID_DRAFT_ORDER', {
+  await writeAuditEntry(db, actorId, 'UNDO_VOID_DRAFT_ORDER', {
     order_id: orderId,
     at: new Date().toISOString(),
     window_minutes: VOID_UNDO_WINDOW_MINUTES
@@ -777,6 +780,7 @@ exports.createDraftFromPos = async (req, res) => {
     const user = req.user
     await dashboardService.ensureOutletCanReceiveOrder(user)
     const { items } = req.body
+    const barNote = String(req.body?.bar_note || "").trim() || null
 
     const userRes = await db.query(
       "SELECT branch_id FROM users WHERE id=$1",
@@ -844,15 +848,16 @@ exports.createDraftFromPos = async (req, res) => {
     const fnbSnapshot = await buildBarOrderSnapshot(db, orderId)
     if (fnbSnapshot.length) {
       await db.query(
-        `INSERT INTO bar_orders (order_id, branch_id, status, items_snapshot, requested_by)
-         VALUES ($1,$2,'PENDING',$3::jsonb,$4)`,
-        [orderId, branchId, JSON.stringify(fnbSnapshot), user.id]
+        `INSERT INTO bar_orders (order_id, branch_id, status, items_snapshot, note, requested_by)
+         VALUES ($1,$2,'PENDING',$3::jsonb,$4,$5)`,
+        [orderId, branchId, JSON.stringify(fnbSnapshot), barNote, user.id]
       )
 
       emitBarOrderNew(req, {
         order_id: orderId,
         branch_id: branchId,
         status: "PENDING",
+        note: barNote,
         items: fnbSnapshot
       })
     }
@@ -861,7 +866,8 @@ exports.createDraftFromPos = async (req, res) => {
       success: true,
       order_id: orderId,
       total,
-      status: "DRAFT"
+      status: "DRAFT",
+      bar_note: barNote
     })
   } catch (err) {
     console.error("CREATE POS DRAFT ERROR:", err)
@@ -876,6 +882,7 @@ exports.saveDraft = async (req, res) => {
   try {
     const idOrder = parseOrderId(req.params.id)
     const { items } = req.body
+    const barNote = String(req.body?.bar_note || "").trim() || null
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Item kosong" })
@@ -921,15 +928,16 @@ exports.saveDraft = async (req, res) => {
 
     if (incrementalFnbSnapshot.length) {
       await db.query(
-        `INSERT INTO bar_orders (order_id, branch_id, status, items_snapshot, requested_by)
-         VALUES ($1,$2,'PENDING',$3::jsonb,$4)`,
-        [idOrder, req.user.branch_id, JSON.stringify(incrementalFnbSnapshot), req.user.id]
+        `INSERT INTO bar_orders (order_id, branch_id, status, items_snapshot, note, requested_by)
+         VALUES ($1,$2,'PENDING',$3::jsonb,$4,$5)`,
+        [idOrder, req.user.branch_id, JSON.stringify(incrementalFnbSnapshot), barNote, req.user.id]
       )
 
       emitBarOrderNew(req, {
         order_id: idOrder,
         branch_id: req.user.branch_id,
         status: "PENDING",
+        note: barNote,
         items: incrementalFnbSnapshot
       })
     }
@@ -943,7 +951,8 @@ exports.saveDraft = async (req, res) => {
       status: "DRAFT",
       total,
       bar_queued: Boolean(incrementalFnbSnapshot.length),
-      queued_items: incrementalFnbSnapshot
+      queued_items: incrementalFnbSnapshot,
+      bar_note: barNote
     })
   } catch (err) {
     try {
@@ -1192,6 +1201,8 @@ exports.getOrderDetail = async (req, res) => {
     
     // Set default phone (column doesn't exist in branches table)
     order.branch_phone = "021-xxx-xxxx"
+
+    await writeAuditEntry(db, req.user?.id, "ORDER_REPRINT_VIEW", { order_id: orderId, branch_id: branchId })
 
     res.json(order)
   } catch (err) {

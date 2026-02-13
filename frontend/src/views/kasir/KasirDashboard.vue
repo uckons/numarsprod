@@ -294,7 +294,10 @@ const updateCountdown = () => {
 const loadBarMessages = async () => {
   try {
     const res = await api.get('/orders/bar/messages')
-    barMessages.value = Array.isArray(res.data) ? res.data : []
+    const rows = Array.isArray(res.data?.data)
+      ? res.data.data
+      : (Array.isArray(res.data) ? res.data : [])
+    barMessages.value = rows
   } catch (err) {
     console.error('Gagal load bar messages', err)
   }

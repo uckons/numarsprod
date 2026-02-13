@@ -1,4 +1,4 @@
-exports.getAll = async (db, user) => {
+exports.getAll = async (db, user, query = {}) => {
   const { rows } = await db.query(
   //  `SELECT * FROM fnb_items WHERE branch_id=$1 ORDER BY name`,
     `SELECT
@@ -6,6 +6,7 @@ exports.getAll = async (db, user) => {
       fi.branch_id,
       fi.service_id,
       fi.name,
+      b.name AS branch_name,
       fi.cost_price,
       fi.stock,
       fi.alert_stock,
@@ -31,11 +32,24 @@ exports.getAll = async (db, user) => {
          AND (hh.service_type IS NULL OR hh.service_type = 'FNB' OR hh.service_type = 'ALL')
        LIMIT 1
      ) hh_active ON true
-     WHERE fi.branch_id=$1
+     LEFT JOIN branches b ON b.id = fi.branch_id
+     WHERE 1=1
+       AND (
+         $1::text = 'ALL'
+         OR fi.branch_id = $1::int
+       )
      ORDER BY fi.name`,
-    [user.branch_id]
+    [
+      (query.branch_id && String(query.branch_id).toUpperCase() !== 'ALL')
+        ? String(query.branch_id)
+        : (['SuperAdmin','Manager','Owner'].includes(user.role) ? 'ALL' : String(user.branch_id || '0'))
+    ]
   )
-  return rows
+
+  return rows.map((r) => ({
+    ...r,
+    branch_name: r.branch_name || r.branch || null
+  }))
 }
 
 exports.create = async (db, user, data) => {
@@ -56,6 +70,14 @@ exports.create = async (db, user, data) => {
     package_price,
     package_name
   } = data
+  const role = String(user.role || '')
+  const privileged = ['SuperAdmin', 'Manager', 'Owner'].includes(role)
+  const targetBranchId = privileged && Number(data.branch_id) > 0
+    ? Number(data.branch_id)
+    : Number(user.branch_id)
+  if (!Number.isInteger(targetBranchId) || targetBranchId <= 0) {
+    throw new Error('branch_id wajib diisi')
+  }
   if (Boolean(is_package) && Number(package_qty || 0) <= 0) {
     throw new Error("package_qty wajib diisi untuk item paket")
   }
@@ -67,7 +89,7 @@ exports.create = async (db, user, data) => {
        (branch_id, type, name, base_price, duration_minutes, is_active)
        VALUES ($1,'FNB',$2,$3,NULL,true)
        RETURNING id`,
-      [user.branch_id, name, sell_price ?? price ?? 0]
+      [targetBranchId, name, sell_price ?? price ?? 0]
     )
 
     const serviceId = serviceRes.rows[0].id 
@@ -78,7 +100,7 @@ exports.create = async (db, user, data) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING *`,
       [
-        user.branch_id,
+        targetBranchId,
         serviceId,
         name,
         cost_price ?? 0,
