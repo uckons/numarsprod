@@ -11,9 +11,9 @@
         />
         <div v-else class="logo-circle">S</div>
       </div>
-      <h1>SKY POS SYSTEM</h1>
-      <p class="subtitle">NUMARS SPA-LOUNGE-KARAOKE</p>
-      <p class="subtitle subtitle-login">Login in systems</p>
+      <h1>SKY ePOS</h1>
+      <p class="subtitle">NUMARS SYSTEMS</p>
+      <p class="subtitle subtitle-login">System Login</p>
 
       <form class="login-form" @submit.prevent="handleLogin">
         <!-- USERNAME (GANTI DARI PHONE) -->
