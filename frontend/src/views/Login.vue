@@ -1,8 +1,12 @@
 <template>
   <div class="login-wrapper">
     <div class="login-card">
-      <h1>NUMARS POS</h1>
-      <p class="subtitle">Login Sistem</p>
+      <div class="logo-block" aria-hidden="true">
+        <div class="logo-circle">S</div>
+      </div>
+      <h1>SKY POS SYSTEM</h1>
+      <p class="subtitle">NUMARS SPA-LOUNGE-KARAOKE</p>
+      <p class="subtitle subtitle-login">Login in systems</p>
 
       <!-- USERNAME (GANTI DARI PHONE) -->
       <input
@@ -99,6 +103,27 @@ const handleLogin = async () => {
   text-align: center;
 }
 
+.logo-block {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.logo-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid #c9a24d;
+  color: #c9a24d;
+  font-weight: 800;
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #171717, #090909);
+  box-shadow: 0 0 14px rgba(201, 162, 77, 0.2);
+}
+
 h1 {
   color: #c9a24d;
   margin-bottom: 4px;
@@ -106,7 +131,13 @@ h1 {
 
 .subtitle {
   color: #aaa;
+  margin-bottom: 4px;
+}
+
+.subtitle-login {
   margin-bottom: 20px;
+  color: #8d8d8d;
+  font-size: 13px;
 }
 
 input {

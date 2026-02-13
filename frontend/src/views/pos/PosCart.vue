@@ -471,10 +471,18 @@ const saveDraft = async () => {
   const res = await SwalTheme.fire({
     icon: "question",
     title: "Simpan draft?",
-    text: "Order akan masuk ke daftar order sebagai draft.",
+    html: `
+      <p style="margin-bottom:12px;">Order akan masuk ke daftar order sebagai draft.</p>
+      <textarea id="bar-note-input" class="swal2-textarea" placeholder="Catatan untuk bar (opsional), contoh: less sugar / tanpa es"></textarea>
+    `,
     showCancelButton: true,
     confirmButtonText: "Simpan",
-    cancelButtonText: "Batal"
+    cancelButtonText: "Batal",
+    focusConfirm: false,
+    preConfirm: () => {
+      const noteInput = document.getElementById("bar-note-input")
+      return noteInput ? String(noteInput.value || "").trim() : ""
+    }
   })
 
   if (!res.isConfirmed) return
@@ -482,7 +490,8 @@ const saveDraft = async () => {
   loading.value = true
   try {
     const payload = {
-      items: toPayloadItems()
+      items: toPayloadItems(),
+      bar_note: res.value || null
     }
 
     if (pos.currentOrderId) {

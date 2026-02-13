@@ -26,7 +26,13 @@
     </div>
     <div class="card happy-hour-card">
       <h3>Pengaturan Jam Happy Hour</h3>
-      <p class="subtitle">Atur jam aktif happy hour untuk FNB, SPA, dan LC.</p>
+      <p class="subtitle">Atur jam aktif happy hour untuk FNB, SPA, dan LC per outlet.</p>
+      <div class="filters" style="margin-top:10px">
+        <select v-model="happyHourBranchId" class="select" @change="loadHappyHours">
+          <option value="">Pilih Outlet Happy Hour</option>
+          <option v-for="b in branches" :key="`hh-${b.id}`" :value="String(b.id)">{{ b.name }}</option>
+        </select>
+      </div>
       <div class="happy-hour-grid">
         <div
           v-for="entry in happyHours"
@@ -66,6 +72,11 @@
         <option value="OUT">Out of Stock</option>
       </select>
 
+      <select v-model="selectedBranch" class="select">
+        <option value="ALL">All Outlet</option>
+        <option v-for="b in branches" :key="b.id" :value="String(b.id)">{{ b.name }}</option>
+      </select>
+
       <div class="per-page">
         <span>Show</span>
         <select v-model="perPage" class="select">
@@ -81,6 +92,7 @@
         <thead>
           <tr>
             <th>Name</th>
+            <th>Outlet</th>
             <th>Stock</th>
             <th>Alert</th>
             <th>Harga Modal</th>
@@ -94,10 +106,10 @@
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="10" class="empty">Loading...</td>
+            <td colspan="11" class="empty">Loading...</td>
           </tr>
           <tr v-else-if="!paginatedItems.length">
-            <td colspan="10" class="empty">No stock items found</td>
+            <td colspan="11" class="empty">No stock items found</td>
           </tr>
           <tr
             v-for="item in paginatedItems"
@@ -105,6 +117,7 @@
             class="row"
           >
             <td class="name">{{ item.name }}</td>
+            <td>{{ item.branch_name || "-" }}</td>
             <td>{{ item.stock }}</td>
             <td>{{ item.alert_stock }}</td>
             <td>Rp {{ format(item.cost_price) }}</td>
@@ -152,8 +165,18 @@
     <transition name="modal-fade">
       <div v-if="showForm" class="modal-backdrop" @click.self="closeForm">
         <div class="modal">
+          <div class="modal-header">
           <h3>{{ editingItem ? "Edit Stock Item" : "Add Stock Item" }}</h3>
+          <button class="btn-ghost" @click="closeForm" type="button">✕</button>
+        </div>
           <form class="form-grid" @submit.prevent="submitForm">
+            <label>
+              Outlet
+              <select v-model="form.branch_id" class="input" :disabled="Boolean(editingItem)">
+                <option value="">Pilih Outlet</option>
+                <option v-for="b in branches" :key="`fb-${b.id}`" :value="String(b.id)">{{ b.name }}</option>
+              </select>
+            </label>
             <label>
               Nama Item
               <input v-model="form.name" class="input" required />
@@ -178,6 +201,7 @@
                 required
               />
             </label>
+            <div class="section-title">Pengaturan Paket & Happy Hour</div>
             <label class="inline-toggle">
               <span>Minuman (Happy Hour)</span>
               <input v-model="form.is_beverage" type="checkbox" />
@@ -228,6 +252,7 @@
                 :disabled="!form.happy_hour_enabled"
               />
             </label>
+            <div class="section-title">Persediaan</div>
             <label>
               Stock
               <input
@@ -270,6 +295,9 @@ import "sweetalert2/dist/sweetalert2.min.css"
 import api from "@/services/api"
 
 const items = ref([])
+const branches = ref([])
+const selectedBranch = ref("ALL")
+const happyHourBranchId = ref("")
 const loading = ref(false)
 const keyword = ref("")
 const statusFilter = ref("ALL")
@@ -295,13 +323,15 @@ const form = ref({
   happy_hour_enabled: false,
   happy_hour_price: 0,
   stock: 0,
-  alert_stock: 0
+  alert_stock: 0,
+  branch_id: ""
 })
 
 const loadItems = async () => {
   loading.value = true
   try {
-    const res = await api.get("/fnb")
+    const params = selectedBranch.value !== "ALL" ? { branch_id: selectedBranch.value } : undefined
+    const res = await api.get("/fnb", { params })
     items.value = res.data || []
   } catch (error) {
     console.error("Load FNB stock failed:", error)
@@ -318,7 +348,8 @@ const loadItems = async () => {
 //onMounted(loadItems)
 const loadHappyHours = async () => {
   try {
-    const res = await api.get("/happy-hours")
+    if (!happyHourBranchId.value) return
+    const res = await api.get("/happy-hours", { params: { branch_id: happyHourBranchId.value } })
     const data = res.data || []
     happyHours.value = happyHours.value.map(entry => {
       const match = data.find(row => row.service_type === entry.service_type)
@@ -338,6 +369,7 @@ const loadHappyHours = async () => {
 const saveHappyHour = async (entry) => {
   try {
     await api.put(`/happy-hours/${entry.service_type}`, {
+      branch_id: Number(happyHourBranchId.value),
       start_time: entry.start_time,
       end_time: entry.end_time,
       is_active: Boolean(entry.is_active)
@@ -357,14 +389,24 @@ const saveHappyHour = async (entry) => {
   }
 }
 
-onMounted(() => {
-  loadItems()
-  loadHappyHours()
+const loadBranches = async () => {
+  const res = await api.get("/superadmin/branches")
+  branches.value = Array.isArray(res.data) ? res.data : Array.isArray(res.data?.data) ? res.data.data : []
+}
+
+onMounted(async () => {
+  await loadBranches()
+  if (branches.value.length) {
+    happyHourBranchId.value = String(branches.value[0].id)
+  }
+  await loadItems()
+  await loadHappyHours()
 })
 
 const filteredItems = computed(() => {
   const normalizedKeyword = keyword.value.toLowerCase()
   return items.value.filter(item => {
+    if (selectedBranch.value !== "ALL" && String(item.branch_id) !== String(selectedBranch.value)) return false
     const matchesName = item.name?.toLowerCase().includes(normalizedKeyword)
     if (!matchesName) return false
     if (statusFilter.value === "LOW") {
@@ -394,8 +436,12 @@ const outOfStockCount = computed(() =>
   items.value.filter(item => item.stock <= 0).length
 )
 
-watch([keyword, statusFilter, perPage], () => {
+watch([keyword, statusFilter, perPage, selectedBranch], () => {
   page.value = 1
+})
+
+watch(selectedBranch, () => {
+  loadItems()
 })
 
 const openAdd = () => {
@@ -413,7 +459,8 @@ const openAdd = () => {
     happy_hour_enabled: false,
     happy_hour_price: 0,
     stock: 0,
-    alert_stock: 0
+    alert_stock: 0,
+    branch_id: selectedBranch.value !== "ALL" ? String(selectedBranch.value) : (branches.value[0] ? String(branches.value[0].id) : "")
   }
   showForm.value = true
 }
@@ -433,7 +480,8 @@ const openEdit = (item) => {
     happy_hour_enabled: Boolean(item.happy_hour_enabled),
     happy_hour_price: Number(item.happy_hour_price || 0),
     stock: Number(item.stock || 0),
-    alert_stock: Number(item.alert_stock || 0)
+    alert_stock: Number(item.alert_stock || 0),
+    branch_id: String(item.branch_id || "")
   }
   showForm.value = true
 }
@@ -444,7 +492,13 @@ const closeForm = () => {
 }
 
 const submitForm = async () => {
+  if (!form.value.branch_id) {
+    await Swal.fire({ icon: "warning", title: "Outlet wajib dipilih", text: "Pilih outlet untuk item FNB" })
+    return
+  }
+
   const payload = {
+    branch_id: Number(form.value.branch_id),
     name: form.value.name,
     cost_price: Number(form.value.cost_price || 0),
     sell_price: Number(form.value.sell_price || 0),
@@ -743,20 +797,21 @@ td {
 }
 
 .modal {
-  background: #151515;
-  padding: 24px;
-  border-radius: 16px;
+  background: linear-gradient(145deg, #181818, #111);
+  padding: 22px;
+  border-radius: 18px;
   width: 100%;
-  max-width: 520px;
+  max-width: 760px;
+  border: 1px solid #2b2b2b;
   box-shadow: 0 30px 80px rgba(0,0,0,.55);
   animation: slideIn .25s ease-in-out;
 }
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 .form-grid label {
@@ -766,15 +821,24 @@ td {
   color: #bbb;
   font-size: 13px;
 }
+.section-title {
+  grid-column: 1 / -1;
+  color: #c9a24d;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  padding-top: 4px;
+}
 
 .inline-toggle {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 12px;
   border-radius: 12px;
   background: #101010;
-  border: 1px solid #222;
+  border: 1px solid #2c2c2c;
 }
 
 .inline-toggle input {
@@ -799,6 +863,7 @@ td {
   cursor: pointer;
   transition: all .2s ease-in-out;
 }
+.modal-header h3 { margin: 0; }
 
 .btn-ghost:hover {
   border-color: #c9a24d;
@@ -827,6 +892,7 @@ td {
 }
 
 @media (max-width: 768px) {
+  .form-grid { grid-template-columns: 1fr; }
   .header {
     flex-direction: column;
     align-items: flex-start;
