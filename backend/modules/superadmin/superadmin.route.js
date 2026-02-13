@@ -54,6 +54,9 @@ router.get("/users", allowSuperAdminOnly, c.users)
 router.get("/branches", allowAdminManager, c.branches)
 router.get("/orders", allowAdminManager, c.orders)
 router.get("/timers", allowAdminManager, c.timers)
+
+router.get("/therapist-payroll", allowAdminManager, c.getTherapistPayrollSummary)
+router.post("/therapist-payroll/settle", allowAdminManager, audit("THERAPIST_PAYROLL_SETTLE"), c.settleTherapistPayroll)
 router.get("/audit-logs", allowSuperAdminOnly, c.auditLogs)
 
 module.exports = router

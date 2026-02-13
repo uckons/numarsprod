@@ -4,6 +4,7 @@
       <h2>MANAGER</h2>
       <nav>
         <button :class="{active:tab==='report'}" @click="tab='report'">📊 Finance Report</button>
+        <button :class="{active:tab==='payroll'}" @click="openPayrollTab">💸 Payroll Terapis</button>
         <button :class="{active:tab==='orders'}" @click="tab='orders'">🧾 Orders</button>
         <button :class="{active:tab==='timers'}" @click="tab='timers'">⏱ Timers</button>
         <button :class="{active:tab==='branches'}" @click="tab='branches'">🏢 Branches</button>
@@ -13,6 +14,7 @@
         <button :class="{active:tab==='stock'}" @click="tab='stock'">📦 FNB Stock</button>
         <button :class="{active:tab==='grades'}" @click="tab='grades'">🏆 Grades</button>
       </nav>
+      <button class="logout" @click="logout">Logout</button>
     </aside>
 
     <main class="content">
@@ -20,7 +22,7 @@
         <section class="card hero">
           <div>
             <h2>Manager Financial Dashboard</h2>
-            <p class="muted">Full enterprise accounting module per outlet (P&L, cashflow, salary simulation).</p>
+            <p class="muted">P&L, cashflow, trend chart, dan drill-down accounting.</p>
           </div>
           <div class="hero-actions">
             <span v-if="loading" class="muted">Loading...</span>
@@ -49,7 +51,7 @@
         <section class="kpi-grid">
           <article class="card kpi"><p>Revenue</p><h3>Rp {{ formatCurrency(totalRevenue) }}</h3></article>
           <article class="card kpi"><p>Paid Orders</p><h3>{{ paidOrders }}</h3></article>
-          <article class="card kpi"><p>Gaji Terapis (Kerja × Komisi)</p><h3>Rp {{ formatCurrency(therapistSalaryCost) }}</h3></article>
+          <article class="card kpi"><p>Beban Terapis (Kerja × Komisi)</p><h3>Rp {{ formatCurrency(therapistSalaryCost) }}</h3></article>
           <article class="card kpi"><p>Total Beban</p><h3>Rp {{ formatCurrency(totalExpense) }}</h3></article>
           <article class="card kpi"><p>Net Profit/Loss</p><h3 :class="netProfit>=0?'good':'bad'">Rp {{ formatCurrency(netProfit) }}</h3></article>
         </section>
@@ -72,42 +74,13 @@
 
         <section class="card">
           <div class="table-head">
-            <h4>Perhitungan Gaji Terapis (Terintegrasi Accounting)</h4>
-          </div>
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Terapis</th>
-                <th>Grade</th>
-                <th>Jumlah Kerja</th>
-                <th>Komisi Fix / Kerja</th>
-                <th>Total Gaji</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="!therapistSalaryRows.length">
-                <td colspan="5" class="muted">Belum ada data kerja terapis pada rentang ini.</td>
-              </tr>
-              <tr v-for="row in therapistSalaryRows" :key="row.name">
-                <td>{{ row.name }}</td>
-                <td>{{ row.grade_name || '-' }}</td>
-                <td>{{ row.work_count }}</td>
-                <td class="num">Rp {{ formatCurrency(row.commission_amount) }}</td>
-                <td class="num">Rp {{ formatCurrency(row.salary) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
-        <section class="card">
-          <div class="table-head">
             <h4>Cashflow Simulation</h4>
             <button class="btn" @click="addExpense">Tambah Beban Manual</button>
           </div>
           <table class="table">
             <tbody>
               <tr><td>Cash In (Revenue)</td><td class="num">Rp {{ formatCurrency(totalRevenue) }}</td></tr>
-              <tr><td>Cash Out (Gaji Terapis)</td><td class="num">Rp {{ formatCurrency(therapistSalaryCost) }}</td></tr>
+              <tr><td>Cash Out (Beban Terapis)</td><td class="num">Rp {{ formatCurrency(therapistSalaryCost) }}</td></tr>
               <tr><td>Cash Out (Gaji Karyawan)</td><td class="num">Rp {{ formatCurrency(fixedSalaryCost) }}</td></tr>
               <tr v-for="(e, idx) in manualExpenses" :key="idx"><td>{{ e.label }}</td><td class="num">Rp {{ formatCurrency(e.amount) }}</td></tr>
               <tr><td><strong>Net Cashflow</strong></td><td class="num"><strong>Rp {{ formatCurrency(netProfit) }}</strong></td></tr>
@@ -150,6 +123,51 @@
         </section>
       </section>
 
+      <section v-else-if="tab==='payroll'" class="page">
+        <section class="card hero">
+          <div>
+            <h2>Pembayaran Terapis</h2>
+            <p class="muted">Perhitungan jumlah kerja × komisi grade fix, lalu settlement agar tidak double hitung.</p>
+          </div>
+        </section>
+
+        <section class="card filters">
+          <div class="field"><label>Dari</label><input type="date" v-model="payrollFrom" /></div>
+          <div class="field"><label>Sampai</label><input type="date" v-model="payrollTo" /></div>
+          <button class="btn" @click="loadPayroll">Hitung Payroll</button>
+          <button class="btn" @click="settlePayroll">Settle Paid</button>
+          <button class="btn" @click="printPayroll">Print</button>
+          <button class="btn" @click="exportPayrollPdf">Cetak PDF</button>
+        </section>
+
+        <section class="card" v-if="payrollWarning">
+          <p class="bad">⚠️ {{ payrollWarning }}</p>
+        </section>
+
+        <section class="card" id="payroll-print-area">
+          <h4>Detail Payroll Terapis</h4>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Terapis</th><th>Grade</th><th>Jumlah Kerja</th><th>Komisi Fix</th><th>Gross</th><th>Sudah Paid</th><th>Unsettled</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!payrollRows.length"><td colspan="7" class="muted">Belum ada data payroll di range ini.</td></tr>
+              <tr v-for="row in payrollRows" :key="row.therapist_id">
+                <td>{{ row.therapist_name }}</td>
+                <td>{{ row.grade_name }}</td>
+                <td>{{ row.work_count }}</td>
+                <td class="num">Rp {{ formatCurrency(row.commission_amount) }}</td>
+                <td class="num">Rp {{ formatCurrency(row.gross_amount) }}</td>
+                <td class="num">Rp {{ formatCurrency(row.paid_amount) }}</td>
+                <td class="num">Rp {{ formatCurrency(row.unsettled_amount) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </section>
+
       <Orders v-else-if="tab==='orders'" />
       <Timers v-else-if="tab==='timers'" />
       <Branches v-else-if="tab==='branches'" />
@@ -164,6 +182,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue"
+import { useRouter } from "vue-router"
 import Swal from "sweetalert2"
 import api from "../../services/api"
 import ApexChart from "../../components/ApexChart.vue"
@@ -175,53 +194,47 @@ import Therapists from "../superadmin/Therapists.vue"
 import Rooms from "../superadmin/Rooms.vue"
 import Grades from "../superadmin/Grades.vue"
 import StockDashboard from "../stock/StockDashboard.vue"
+import { useAuthStore } from "../../store/auth.store"
 
 const tab = ref("report")
 const branches = ref([])
 const orders = ref([])
-const timers = ref([])
-const therapists = ref([])
-const grades = ref([])
-
+const loading = ref(false)
+const loadError = ref("")
 const selectedBranch = ref("ALL")
 const dateFrom = ref("")
 const dateTo = ref("")
-
 const fixedSalaryCost = ref(0)
 const manualExpenses = ref([])
-const loading = ref(false)
-const loadError = ref("")
-
 const ordersPage = ref(1)
 const ordersPageSize = ref(25)
+
+const payrollFrom = ref("")
+const payrollTo = ref("")
+const payrollRows = ref([])
+const payrollWarning = ref("")
+
+const auth = useAuthStore()
+const router = useRouter()
+
+const logout = () => {
+  auth.logout()
+  router.push("/")
+}
 
 const loadReport = async () => {
   loading.value = true
   loadError.value = ""
   try {
-    const [ordersRes, branchRes, timersRes, therapistsRes, gradesRes] = await Promise.all([
+    const [ordersRes, branchRes] = await Promise.all([
       api.get("/superadmin/orders"),
-      api.get("/superadmin/branches"),
-      api.get("/superadmin/timers"),
-      api.get("/therapists", { params: { limit: 1000 } }),
-      api.get("/grades")
+      api.get("/superadmin/branches")
     ])
-
     orders.value = Array.isArray(ordersRes.data) ? ordersRes.data : []
     branches.value = Array.isArray(branchRes.data) ? branchRes.data : []
-    timers.value = Array.isArray(timersRes.data) ? timersRes.data : []
-    therapists.value = Array.isArray(therapistsRes.data?.data) ? therapistsRes.data.data : []
-    grades.value = Array.isArray(gradesRes.data) ? gradesRes.data : []
-
-    if (!orders.value.length) {
-      await Swal.fire({ icon: "info", title: "Data order kosong", text: "Belum ada transaksi untuk ditampilkan di filter saat ini." })
-    }
   } catch (err) {
     orders.value = []
     branches.value = []
-    timers.value = []
-    therapists.value = []
-    grades.value = []
     loadError.value = err?.response?.data?.message || "Gagal memuat data manager"
     await Swal.fire({ icon: "error", title: "Load report gagal", text: loadError.value })
   } finally {
@@ -229,12 +242,80 @@ const loadReport = async () => {
   }
 }
 
+const loadPayroll = async () => {
+  try {
+    payrollWarning.value = ""
+    const { data } = await api.get("/superadmin/therapist-payroll", {
+      params: {
+        branch_id: selectedBranch.value,
+        date_from: payrollFrom.value,
+        date_to: payrollTo.value
+      }
+    })
+    payrollRows.value = data.rows || []
+    if (data.has_settlement_in_range) {
+      payrollWarning.value = "Range salah: sudah ada pembayaran terapis pada rentang ini."
+      await Swal.fire({ icon: "warning", title: "Range sudah dibayar", text: payrollWarning.value })
+    }
+  } catch (err) {
+    payrollRows.value = []
+    await Swal.fire({ icon: "error", title: "Gagal hitung payroll", text: err?.response?.data?.message || "Gagal memuat payroll" })
+  }
+}
+
+const settlePayroll = async () => {
+  if (!payrollRows.value.length) {
+    await Swal.fire({ icon: "info", title: "Belum ada data", text: "Silakan hitung payroll dahulu." })
+    return
+  }
+
+  if (payrollWarning.value) {
+    await Swal.fire({ icon: "warning", title: "Range salah", text: payrollWarning.value })
+    return
+  }
+
+  const { isConfirmed } = await Swal.fire({
+    icon: "question",
+    title: "Konfirmasi Settlement",
+    text: "Payroll pada range ini akan ditandai paid dan masuk accounting settle.",
+    showCancelButton: true,
+    confirmButtonText: "Settle"
+  })
+
+  if (!isConfirmed) return
+
+  try {
+    const { data } = await api.post("/superadmin/therapist-payroll/settle", {
+      branch_id: selectedBranch.value,
+      date_from: payrollFrom.value,
+      date_to: payrollTo.value
+    })
+    await Swal.fire({ icon: "success", title: "Settlement berhasil", text: `Baris: ${data.settled_count}, total: Rp ${formatCurrency(data.settled_amount)}` })
+    await loadPayroll()
+  } catch (err) {
+    await Swal.fire({ icon: "error", title: "Settlement gagal", text: err?.response?.data?.message || "Gagal settle payroll" })
+  }
+}
+
+const openPayrollTab = async () => {
+  tab.value = "payroll"
+  await loadPayroll()
+}
+
+const printPayroll = () => window.print()
+const exportPayrollPdf = () => window.print()
+
 onMounted(() => {
   const today = new Date()
   const first = new Date(today.getFullYear(), today.getMonth(), 1)
-  dateFrom.value = first.toISOString().slice(0, 10)
-  dateTo.value = today.toISOString().slice(0, 10)
+  const firstISO = first.toISOString().slice(0, 10)
+  const todayISO = today.toISOString().slice(0, 10)
+  dateFrom.value = firstISO
+  dateTo.value = todayISO
+  payrollFrom.value = firstISO
+  payrollTo.value = todayISO
   loadReport()
+  loadPayroll()
 })
 
 watch([selectedBranch, dateFrom, dateTo, ordersPageSize], () => {
@@ -258,56 +339,7 @@ const pagedFilteredOrders = computed(() => {
 const paidOrdersList = computed(() => filteredOrders.value.filter((o) => String(o.status || "").toUpperCase() === "PAID"))
 const totalRevenue = computed(() => paidOrdersList.value.reduce((a, o) => a + Number(o.total || 0), 0))
 const paidOrders = computed(() => paidOrdersList.value.length)
-
-const therapistById = computed(() => {
-  const map = new Map()
-  for (const t of therapists.value) map.set(String(t.id), t)
-  return map
-})
-
-const gradeById = computed(() => {
-  const map = new Map()
-  for (const g of grades.value) map.set(String(g.id), g)
-  return map
-})
-
-const filteredFinishedTimers = computed(() => timers.value.filter((t) => {
-  if (!t.end_time) return false
-  if (selectedBranch.value !== "ALL" && String(t.branch_id) !== String(selectedBranch.value)) return false
-  const dt = new Date(t.end_time)
-  if (dateFrom.value && dt < new Date(dateFrom.value)) return false
-  if (dateTo.value && dt > new Date(`${dateTo.value}T23:59:59`)) return false
-  return true
-}))
-
-const therapistSalaryRows = computed(() => {
-  const workMap = new Map()
-  for (const timer of filteredFinishedTimers.value) {
-    const key = String(timer.therapist_id || "")
-    if (!key) continue
-    workMap.set(key, (workMap.get(key) || 0) + 1)
-  }
-
-  const rows = []
-  for (const [therapistId, workCount] of workMap.entries()) {
-    const therapist = therapistById.value.get(therapistId) || {}
-    const grade = gradeById.value.get(String(therapist.grade_id)) || {}
-    const commissionAmount = Number(grade.commission_amount ?? grade.commission_percent ?? therapist.commission_amount ?? therapist.commission_percent ?? 0)
-
-    rows.push({
-      therapist_id: therapistId,
-      name: therapist.name || `Therapist #${therapistId}`,
-      grade_name: grade.name || therapist.grade_name || "-",
-      work_count: workCount,
-      commission_amount: commissionAmount,
-      salary: workCount * commissionAmount
-    })
-  }
-
-  return rows.sort((a, b) => b.salary - a.salary)
-})
-
-const therapistSalaryCost = computed(() => therapistSalaryRows.value.reduce((a, row) => a + Number(row.salary || 0), 0))
+const therapistSalaryCost = computed(() => payrollRows.value.reduce((a, r) => a + Number(r.gross_amount || 0), 0))
 const manualExpenseTotal = computed(() => manualExpenses.value.reduce((a, e) => a + Number(e.amount || 0), 0))
 const totalExpense = computed(() => therapistSalaryCost.value + Number(fixedSalaryCost.value || 0) + manualExpenseTotal.value)
 const netProfit = computed(() => totalRevenue.value - totalExpense.value)
@@ -321,12 +353,16 @@ const trendBuckets = computed(() => {
   return map
 })
 
+const twoDec = (v) => Number(v || 0).toFixed(2)
+
 const trendSeries = computed(() => ([{ name: "Revenue", data: [...trendBuckets.value.values()].length ? [...trendBuckets.value.values()] : [0] }]))
 const trendOptions = computed(() => ({
   chart: { toolbar: { show: false }, background: "transparent" },
   theme: { mode: "dark" },
   xaxis: { categories: [...trendBuckets.value.keys()].length ? [...trendBuckets.value.keys()] : ["No Data"] },
+  yaxis: { labels: { formatter: twoDec } },
   dataLabels: { enabled: false },
+  tooltip: { y: { formatter: twoDec } },
   colors: ["#5f85ff"]
 }))
 
@@ -344,53 +380,37 @@ const breakdownSeries = computed(() => [...breakdownMap.value.values()].length ?
 const breakdownOptions = computed(() => ({
   labels: [...breakdownMap.value.keys()].length ? [...breakdownMap.value.keys()] : ["No Data"],
   theme: { mode: "dark" },
+  tooltip: { y: { formatter: twoDec } },
   legend: { position: "bottom" }
 }))
 
 const categoryTrendData = computed(() => {
   const keys = ["FNB", "SPA", "LC", "KTV"]
   const dayMap = new Map()
-
   for (const o of paidOrdersList.value) {
     const day = new Date(o.created_at).toLocaleDateString("id-ID")
-    if (!dayMap.has(day)) {
-      dayMap.set(day, { FNB: 0, SPA: 0, LC: 0, KTV: 0 })
-    }
-
-    const categories = String(o.category || "")
-      .toUpperCase()
-      .split(",")
-      .map((v) => v.trim())
-      .filter(Boolean)
-
+    if (!dayMap.has(day)) dayMap.set(day, { FNB: 0, SPA: 0, LC: 0, KTV: 0 })
+    const categories = String(o.category || "").toUpperCase().split(",").map((v) => v.trim()).filter(Boolean)
     const matched = keys.filter((k) => categories.some((cat) => cat.includes(k)))
     const divisor = matched.length || 1
     const allocated = Number(o.total || 0) / divisor
-
-    for (const cat of matched) {
-      dayMap.get(day)[cat] += allocated
-    }
+    for (const cat of matched) dayMap.get(day)[cat] += allocated
   }
-
   return dayMap
 })
 
 const categoryTrendSeries = computed(() => {
   const days = [...categoryTrendData.value.keys()]
-  if (!days.length) {
-    return ["FNB", "SPA", "LC", "KTV"].map((name) => ({ name, data: [0] }))
-  }
-
-  return ["FNB", "SPA", "LC", "KTV"].map((name) => ({
-    name,
-    data: days.map((d) => Number(categoryTrendData.value.get(d)?.[name] || 0))
-  }))
+  if (!days.length) return ["FNB", "SPA", "LC", "KTV"].map((name) => ({ name, data: [0] }))
+  return ["FNB", "SPA", "LC", "KTV"].map((name) => ({ name, data: days.map((d) => Number(categoryTrendData.value.get(d)?.[name] || 0)) }))
 })
 
 const categoryTrendOptions = computed(() => ({
   chart: { toolbar: { show: false }, background: "transparent" },
   theme: { mode: "dark" },
   xaxis: { categories: [...categoryTrendData.value.keys()].length ? [...categoryTrendData.value.keys()] : ["No Data"] },
+  yaxis: { labels: { formatter: twoDec } },
+  tooltip: { y: { formatter: twoDec } },
   dataLabels: { enabled: false },
   stroke: { curve: "smooth", width: 2 },
   legend: { position: "top" },
@@ -420,11 +440,12 @@ const formatDate = (v) => new Date(v).toLocaleString("id-ID")
 
 <style scoped>
 .layout { display:flex; min-height:100vh; background:#0e0e0e; color:#fff; }
-.sidebar { width:240px; background:#111; border-right:1px solid #c9a24d; padding:16px; }
+.sidebar { width:240px; background:#111; border-right:1px solid #c9a24d; padding:16px; display:flex; flex-direction:column; }
 .sidebar h2 { color:#c9a24d; margin-bottom:12px; }
 nav { display:grid; gap:8px; }
 nav button { text-align:left; background:transparent; border:none; color:#fff; padding:10px; border-radius:10px; cursor:pointer; }
 nav button.active { background:#c9a24d; color:#000; }
+.logout { margin-top:auto; background:#c9a24d; color:#000; border:none; border-radius:10px; padding:10px; cursor:pointer; font-weight:700; }
 .content { flex:1; padding:20px; }
 .page { display:grid; gap:14px; }
 .card { background:linear-gradient(120deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); border:1px solid rgba(255,255,255,.09); border-radius:14px; padding:14px; }

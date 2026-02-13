@@ -1,3 +1,24 @@
+
+const ensureGradeCommissionStorage = async (db) => {
+  await db.query(`
+    ALTER TABLE therapist_grades
+    ALTER COLUMN commission_percent TYPE NUMERIC(14,2)
+  `)
+
+  await db.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'therapist_grades' AND column_name = 'commission_amount'
+      ) THEN
+        ALTER TABLE therapist_grades ADD COLUMN commission_amount NUMERIC(14,2);
+        UPDATE therapist_grades SET commission_amount = COALESCE(commission_percent, 0);
+      END IF;
+    END $$;
+  `)
+}
+
 const resolveGradeCommissionExpression = async (db) => {
   const { rows } = await db.query(`
     SELECT EXISTS (
@@ -351,6 +372,7 @@ exports.createGrade = async (req, res) => {
       })
     }
 
+    await ensureGradeCommissionStorage(db)
     const gradeCommissionExpr = await resolveGradeCommissionExpression(db)
     const hasCommissionAmount = gradeCommissionExpr.includes("commission_amount")
 
@@ -418,6 +440,7 @@ exports.updateGrade = async (req, res) => {
         })
       }
 
+      await ensureGradeCommissionStorage(db)
       const gradeCommissionExpr = await resolveGradeCommissionExpression(db)
       if (gradeCommissionExpr.includes("commission_amount")) {
         updateFields.push(`commission_amount = $${paramIndex}`)
@@ -440,7 +463,7 @@ exports.updateGrade = async (req, res) => {
       UPDATE therapist_grades
       SET ${updateFields.join(', ')}
       WHERE id = $${paramIndex}
-      RETURNING id, name, commission_percent AS commission_amount, commission_percent
+      RETURNING id, name, COALESCE(commission_amount, commission_percent, 0) AS commission_amount, COALESCE(commission_amount, commission_percent, 0) AS commission_percent
     `, params)
 
     if (rows.length === 0) {
