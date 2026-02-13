@@ -780,6 +780,7 @@ exports.createDraftFromPos = async (req, res) => {
     const user = req.user
     await dashboardService.ensureOutletCanReceiveOrder(user)
     const { items } = req.body
+    const barNote = String(req.body?.bar_note || "").trim() || null
 
     const userRes = await db.query(
       "SELECT branch_id FROM users WHERE id=$1",
@@ -847,15 +848,16 @@ exports.createDraftFromPos = async (req, res) => {
     const fnbSnapshot = await buildBarOrderSnapshot(db, orderId)
     if (fnbSnapshot.length) {
       await db.query(
-        `INSERT INTO bar_orders (order_id, branch_id, status, items_snapshot, requested_by)
-         VALUES ($1,$2,'PENDING',$3::jsonb,$4)`,
-        [orderId, branchId, JSON.stringify(fnbSnapshot), user.id]
+        `INSERT INTO bar_orders (order_id, branch_id, status, items_snapshot, note, requested_by)
+         VALUES ($1,$2,'PENDING',$3::jsonb,$4,$5)`,
+        [orderId, branchId, JSON.stringify(fnbSnapshot), barNote, user.id]
       )
 
       emitBarOrderNew(req, {
         order_id: orderId,
         branch_id: branchId,
         status: "PENDING",
+        note: barNote,
         items: fnbSnapshot
       })
     }
@@ -864,7 +866,8 @@ exports.createDraftFromPos = async (req, res) => {
       success: true,
       order_id: orderId,
       total,
-      status: "DRAFT"
+      status: "DRAFT",
+      bar_note: barNote
     })
   } catch (err) {
     console.error("CREATE POS DRAFT ERROR:", err)
@@ -879,6 +882,7 @@ exports.saveDraft = async (req, res) => {
   try {
     const idOrder = parseOrderId(req.params.id)
     const { items } = req.body
+    const barNote = String(req.body?.bar_note || "").trim() || null
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Item kosong" })
@@ -924,15 +928,16 @@ exports.saveDraft = async (req, res) => {
 
     if (incrementalFnbSnapshot.length) {
       await db.query(
-        `INSERT INTO bar_orders (order_id, branch_id, status, items_snapshot, requested_by)
-         VALUES ($1,$2,'PENDING',$3::jsonb,$4)`,
-        [idOrder, req.user.branch_id, JSON.stringify(incrementalFnbSnapshot), req.user.id]
+        `INSERT INTO bar_orders (order_id, branch_id, status, items_snapshot, note, requested_by)
+         VALUES ($1,$2,'PENDING',$3::jsonb,$4,$5)`,
+        [idOrder, req.user.branch_id, JSON.stringify(incrementalFnbSnapshot), barNote, req.user.id]
       )
 
       emitBarOrderNew(req, {
         order_id: idOrder,
         branch_id: req.user.branch_id,
         status: "PENDING",
+        note: barNote,
         items: incrementalFnbSnapshot
       })
     }
@@ -946,7 +951,8 @@ exports.saveDraft = async (req, res) => {
       status: "DRAFT",
       total,
       bar_queued: Boolean(incrementalFnbSnapshot.length),
-      queued_items: incrementalFnbSnapshot
+      queued_items: incrementalFnbSnapshot,
+      bar_note: barNote
     })
   } catch (err) {
     try {
