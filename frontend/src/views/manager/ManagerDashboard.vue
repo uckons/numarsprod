@@ -149,14 +149,16 @@
           <table class="table">
             <thead>
               <tr>
-                <th>Terapis</th><th>Grade</th><th>Jumlah Kerja</th><th>Komisi Fix</th><th>Gross</th><th>Sudah Paid</th><th>Unsettled</th>
+                <th>Terapis</th><th>Grade</th><th>SPA</th><th>LC</th><th>Total Kerja</th><th>Komisi Fix</th><th>Gross</th><th>Sudah Paid</th><th>Unsettled</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-if="!payrollRows.length"><td colspan="7" class="muted">Belum ada data payroll di range ini.</td></tr>
+              <tr v-if="!payrollRows.length"><td colspan="9" class="muted">Belum ada data payroll di range ini.</td></tr>
               <tr v-for="row in payrollRows" :key="row.therapist_id">
                 <td>{{ row.therapist_name }}</td>
                 <td>{{ row.grade_name }}</td>
+                <td>{{ row.spa_work_count }}</td>
+                <td>{{ row.lc_work_count }}</td>
                 <td>{{ row.work_count }}</td>
                 <td class="num">Rp {{ formatCurrency(row.commission_amount) }}</td>
                 <td class="num">Rp {{ formatCurrency(row.gross_amount) }}</td>

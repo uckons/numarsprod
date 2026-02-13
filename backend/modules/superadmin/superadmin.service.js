@@ -219,9 +219,13 @@ exports.getTherapistPayrollSummary = async ({ branch_id, date_from, date_to }) =
     WITH work_rows AS (
       SELECT
         t.therapist_id,
-        COUNT(*)::int AS work_count
+        COUNT(*)::int AS work_count,
+        COUNT(*) FILTER (WHERE s.type = 'SPA')::int AS spa_work_count,
+        COUNT(*) FILTER (WHERE s.type IN ('LC', 'LOUNGE'))::int AS lc_work_count
       FROM timers t
+      LEFT JOIN services s ON s.id = t.service_id
       WHERE t.end_time IS NOT NULL
+        AND t.therapist_id IS NOT NULL
         AND DATE(t.end_time) BETWEEN $1::date AND $2::date
         ${branchFilter}
       GROUP BY t.therapist_id
@@ -235,9 +239,11 @@ exports.getTherapistPayrollSummary = async ({ branch_id, date_from, date_to }) =
     )
     SELECT
       w.therapist_id,
-      COALESCE(th.name, CONCAT('Therapist #', w.therapist_id::text)) AS therapist_name,
+      COALESCE(th.name, 'Unknown Therapist') AS therapist_name,
       COALESCE(g.name, '-') AS grade_name,
       ${commissionExpr} AS commission_amount,
+      w.spa_work_count,
+      w.lc_work_count,
       w.work_count,
       (w.work_count * ${commissionExpr})::numeric(14,2) AS gross_amount,
       COALESCE(s.paid_amount, 0)::numeric(14,2) AS paid_amount,
@@ -260,6 +266,8 @@ exports.getTherapistPayrollSummary = async ({ branch_id, date_from, date_to }) =
       therapist_id: Number(r.therapist_id),
       therapist_name: r.therapist_name,
       grade_name: r.grade_name,
+      spa_work_count: Number(r.spa_work_count || 0),
+      lc_work_count: Number(r.lc_work_count || 0),
       work_count: Number(r.work_count || 0),
       commission_amount: Number(r.commission_amount || 0),
       gross_amount: Number(r.gross_amount || 0),
