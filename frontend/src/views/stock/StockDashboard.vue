@@ -26,7 +26,13 @@
     </div>
     <div class="card happy-hour-card">
       <h3>Pengaturan Jam Happy Hour</h3>
-      <p class="subtitle">Atur jam aktif happy hour untuk FNB, SPA, dan LC.</p>
+      <p class="subtitle">Atur jam aktif happy hour untuk FNB, SPA, dan LC per outlet.</p>
+      <div class="filters" style="margin-top:10px">
+        <select v-model="happyHourBranchId" class="select" @change="loadHappyHours">
+          <option value="">Pilih Outlet Happy Hour</option>
+          <option v-for="b in branches" :key="`hh-${b.id}`" :value="String(b.id)">{{ b.name }}</option>
+        </select>
+      </div>
       <div class="happy-hour-grid">
         <div
           v-for="entry in happyHours"
@@ -159,8 +165,18 @@
     <transition name="modal-fade">
       <div v-if="showForm" class="modal-backdrop" @click.self="closeForm">
         <div class="modal">
+          <div class="modal-header">
           <h3>{{ editingItem ? "Edit Stock Item" : "Add Stock Item" }}</h3>
+          <button class="btn-ghost" @click="closeForm" type="button">✕</button>
+        </div>
           <form class="form-grid" @submit.prevent="submitForm">
+            <label>
+              Outlet
+              <select v-model="form.branch_id" class="input" :disabled="Boolean(editingItem)">
+                <option value="">Pilih Outlet</option>
+                <option v-for="b in branches" :key="`fb-${b.id}`" :value="String(b.id)">{{ b.name }}</option>
+              </select>
+            </label>
             <label>
               Nama Item
               <input v-model="form.name" class="input" required />
@@ -279,6 +295,7 @@ import api from "@/services/api"
 const items = ref([])
 const branches = ref([])
 const selectedBranch = ref("ALL")
+const happyHourBranchId = ref("")
 const loading = ref(false)
 const keyword = ref("")
 const statusFilter = ref("ALL")
@@ -304,7 +321,8 @@ const form = ref({
   happy_hour_enabled: false,
   happy_hour_price: 0,
   stock: 0,
-  alert_stock: 0
+  alert_stock: 0,
+  branch_id: ""
 })
 
 const loadItems = async () => {
@@ -328,7 +346,8 @@ const loadItems = async () => {
 //onMounted(loadItems)
 const loadHappyHours = async () => {
   try {
-    const res = await api.get("/happy-hours")
+    if (!happyHourBranchId.value) return
+    const res = await api.get("/happy-hours", { params: { branch_id: happyHourBranchId.value } })
     const data = res.data || []
     happyHours.value = happyHours.value.map(entry => {
       const match = data.find(row => row.service_type === entry.service_type)
@@ -348,6 +367,7 @@ const loadHappyHours = async () => {
 const saveHappyHour = async (entry) => {
   try {
     await api.put(`/happy-hours/${entry.service_type}`, {
+      branch_id: Number(happyHourBranchId.value),
       start_time: entry.start_time,
       end_time: entry.end_time,
       is_active: Boolean(entry.is_active)
@@ -374,6 +394,9 @@ const loadBranches = async () => {
 
 onMounted(async () => {
   await loadBranches()
+  if (branches.value.length) {
+    happyHourBranchId.value = String(branches.value[0].id)
+  }
   await loadItems()
   await loadHappyHours()
 })
@@ -434,7 +457,8 @@ const openAdd = () => {
     happy_hour_enabled: false,
     happy_hour_price: 0,
     stock: 0,
-    alert_stock: 0
+    alert_stock: 0,
+    branch_id: selectedBranch.value !== "ALL" ? String(selectedBranch.value) : (branches.value[0] ? String(branches.value[0].id) : "")
   }
   showForm.value = true
 }
@@ -454,7 +478,8 @@ const openEdit = (item) => {
     happy_hour_enabled: Boolean(item.happy_hour_enabled),
     happy_hour_price: Number(item.happy_hour_price || 0),
     stock: Number(item.stock || 0),
-    alert_stock: Number(item.alert_stock || 0)
+    alert_stock: Number(item.alert_stock || 0),
+    branch_id: String(item.branch_id || "")
   }
   showForm.value = true
 }
@@ -465,7 +490,13 @@ const closeForm = () => {
 }
 
 const submitForm = async () => {
+  if (!form.value.branch_id) {
+    await Swal.fire({ icon: "warning", title: "Outlet wajib dipilih", text: "Pilih outlet untuk item FNB" })
+    return
+  }
+
   const payload = {
+    branch_id: Number(form.value.branch_id),
     name: form.value.name,
     cost_price: Number(form.value.cost_price || 0),
     sell_price: Number(form.value.sell_price || 0),

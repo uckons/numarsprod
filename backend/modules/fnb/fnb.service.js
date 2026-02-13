@@ -70,6 +70,14 @@ exports.create = async (db, user, data) => {
     package_price,
     package_name
   } = data
+  const role = String(user.role || '')
+  const privileged = ['SuperAdmin', 'Manager', 'Owner'].includes(role)
+  const targetBranchId = privileged && Number(data.branch_id) > 0
+    ? Number(data.branch_id)
+    : Number(user.branch_id)
+  if (!Number.isInteger(targetBranchId) || targetBranchId <= 0) {
+    throw new Error('branch_id wajib diisi')
+  }
   if (Boolean(is_package) && Number(package_qty || 0) <= 0) {
     throw new Error("package_qty wajib diisi untuk item paket")
   }
@@ -81,7 +89,7 @@ exports.create = async (db, user, data) => {
        (branch_id, type, name, base_price, duration_minutes, is_active)
        VALUES ($1,'FNB',$2,$3,NULL,true)
        RETURNING id`,
-      [user.branch_id, name, sell_price ?? price ?? 0]
+      [targetBranchId, name, sell_price ?? price ?? 0]
     )
 
     const serviceId = serviceRes.rows[0].id 
@@ -92,7 +100,7 @@ exports.create = async (db, user, data) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING *`,
       [
-        user.branch_id,
+        targetBranchId,
         serviceId,
         name,
         cost_price ?? 0,
