@@ -16,6 +16,7 @@
         <strong>{{ i.name }}</strong>
         <small>Rp {{ format(i.base_price) }}</small>
         <small v-if="i.price_label" class="item-label">{{ i.price_label }}</small>
+        <small v-if="i.variant_name" class="item-label">Varian: {{ i.variant_name }}</small>
         <small v-if="i.locked_package" class="item-locked">LOCKED PAKET</small>
       </div>
 
@@ -176,6 +177,60 @@ const router = useRouter()
 const pos = usePosStore()
 
 const items = computed(() => pos.items || [])
+
+const loadVariantOptions = async (cartItem) => {
+  if (!cartItem?.package_group) return []
+  const res = await api.get('/services', { params: { type: 'FNB', is_active: true } })
+  const rows = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : [])
+  return rows.filter(s =>
+    s.package_group === cartItem.package_group &&
+    String(s.item_group || '').toUpperCase() === 'VARIAN' &&
+    Number(s.id) !== Number(cartItem.package_service_id || cartItem.id)
+  )
+}
+
+const chooseVariantBreakdownInCart = async (cartItem, variants = []) => {
+  const targetQty = Number(cartItem.qty || 0)
+  const html = `
+    <div style="text-align:left;display:grid;gap:8px;max-height:280px;overflow:auto;padding-right:4px;">
+      ${variants.map(opt => `
+        <label style="display:grid;grid-template-columns:1fr 90px;align-items:center;gap:8px;">
+          <span>${opt.name}</span>
+          <input class="swal2-input var-qty" data-id="${opt.id}" data-name="${String(opt.name || '').replace(/"/g, '&quot;')}" type="number" min="0" step="1" value="0" style="margin:0;height:36px;" />
+        </label>
+      `).join('')}
+    </div>
+    <small style="color:#999">Total qty varian harus = ${targetQty}</small>
+  `
+
+  const res = await SwalTheme.fire({
+    title: 'Pilih varian paket + qty',
+    html,
+    showCancelButton: true,
+    confirmButtonText: 'Pakai varian',
+    cancelButtonText: 'Batal',
+    focusConfirm: false,
+    preConfirm: () => {
+      const inputs = Array.from(document.querySelectorAll('.var-qty'))
+      const rows = inputs.map(el => ({
+        variant_service_id: Number(el.getAttribute('data-id') || 0),
+        variant_name: el.getAttribute('data-name') || '',
+        qty: Number(el.value || 0)
+      })).filter(row => row.variant_service_id > 0 && row.qty > 0)
+
+      const sumQty = rows.reduce((acc, row) => acc + row.qty, 0)
+      if (sumQty !== targetQty) {
+        Swal.showValidationMessage(`Total qty varian harus ${targetQty} (sekarang ${sumQty})`)
+        return false
+      }
+      return rows
+    }
+  })
+
+  if (!res.isConfirmed) return undefined
+  return Array.isArray(res.value) ? res.value : []
+}
+
 const maybeOfferPackage = async (cartItem) => {
   if (!cartItem || cartItem.is_package) return
 
@@ -200,7 +255,33 @@ const packageQty = Number(cartItem.package_qty || 0)
     price_label: "PAKET",
     is_package: true,
     package_group: cartItem.package_group,
-    package_qty: cartItem.package_qty
+    package_qty: cartItem.package_qty,
+    package_special: Boolean(cartItem.package_special)
+  }
+
+  const variants = await loadVariantOptions(cartItem)
+  const variantRequired = Boolean(cartItem.package_special)
+  let breakdown = []
+  if (variantRequired && !variants.length) {
+    await SwalTheme.fire({ icon: 'warning', title: 'Varian belum tersedia', text: 'Paket khusus wajib memilih varian.' })
+    return
+  }
+  if (variants.length) {
+    const pickedBreakdown = await chooseVariantBreakdownInCart(cartItem, variants)
+    if (pickedBreakdown === undefined) return
+    breakdown = pickedBreakdown
+  } else if (variantRequired) {
+    return
+  }
+
+  if (breakdown.length) {
+    const first = breakdown[0]
+    packageService.variant_name = first.variant_name
+    packageService.variant_service_id = first.variant_service_id
+    packageService.name = `${packageService.name} - ${first.variant_name}`
+    packageService.item_group = 'VARIAN'
+    pos.convertToPackageWithBreakdown(cartItem.cart_key, packageService, breakdown)
+    return
   }
 
   pos.convertToPackage(cartItem.cart_key, packageService)
@@ -245,9 +326,11 @@ const toPayloadItems = () => {
         id: i.package_service_id,
         qty: packageCount,
         base_price: packagePrice,
-        name: i.package_name || i.name,
+        name: i.variant_name ? `${i.package_name || i.name} - ${i.variant_name}` : (i.package_name || i.name),
         price_label: "PAKET",
-        is_package: true
+        is_package: true,
+        variant_name: i.variant_name || null,
+        variant_service_id: i.variant_service_id || null
       })
       continue
     }
@@ -256,9 +339,11 @@ const toPayloadItems = () => {
       id: i.id,
       qty: i.qty,
       base_price: i.base_price,
-      name: i.name,
+      name: i.variant_name ? `${i.name} - ${i.variant_name}` : i.name,
       price_label: i.price_label,
-      is_package: Boolean(i.is_package)
+      is_package: Boolean(i.is_package),
+      variant_name: i.variant_name || null,
+      variant_service_id: i.variant_service_id || null
     })
   }
 
