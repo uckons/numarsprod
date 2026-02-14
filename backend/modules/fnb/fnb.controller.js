@@ -26,6 +26,26 @@ exports.update = async (req, res) => {
   }
 }
 
+exports.remove = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const result = await service.remove(db, req.params.id)
+    res.json(result)
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
+
+exports.removeDuplicates = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    const result = await service.removeDuplicates(db, req.user, req.body)
+    res.json(result)
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
+
 
 exports.requestStockAdjustment = async (req, res) => {
   try {
