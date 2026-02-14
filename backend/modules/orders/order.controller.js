@@ -70,13 +70,21 @@ const ensureUndoVoidApprovalTable = async (db) => {
   `)
 }
 
+const ensureOrderItemColumns = async (db) => {
+  await db.query(`
+    ALTER TABLE order_items
+    ADD COLUMN IF NOT EXISTS variant_service_id INT
+  `)
+}
+
 const buildBarOrderSnapshot = async (db, orderId) => {
+  await ensureOrderItemColumns(db)
   const { rows } = await db.query(
     [
       "SELECT fi.id AS fnb_item_id, oi.service_id, oi.service_name, oi.qty",
       "FROM order_items oi",
-      "JOIN services s ON s.id = oi.service_id",
-      "JOIN fnb_items fi ON fi.service_id = s.id",
+      "JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)",
+      "JOIN fnb_items fi ON fi.service_id = COALESCE(oi.variant_service_id, oi.service_id)",
       "WHERE oi.order_id=$1 AND s.type='FNB'"
     ].join(" "),
     [orderId]
@@ -202,6 +210,7 @@ exports.close = async (req, res) => {
   try {
     const db = req.app.get("db")
     const orderId = parseOrderId(req.params.id)
+    await ensureOrderItemColumns(db)
     const { items, payment_method } = req.body
     const orderStatusRes = await db.query(
       "SELECT status FROM orders WHERE id = $1",
@@ -261,11 +270,12 @@ exports.close = async (req, res) => {
       }
 
       await db.query(
-        `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal, therapist_name, room_name, price_label, is_package_snapshot)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        `INSERT INTO order_items (order_id, service_id, variant_service_id, service_name, qty, price, subtotal, therapist_name, room_name, price_label, is_package_snapshot)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
           orderId,
           serviceId,
+          i.variant_service_id ? Number(i.variant_service_id) : null,
           serviceName,
           qty,
           unitPrice,
@@ -307,8 +317,8 @@ exports.close = async (req, res) => {
         [
           "SELECT fi.id AS fnb_item_id, oi.qty",
           "FROM order_items oi",
-          "JOIN services s ON s.id = oi.service_id",
-          "JOIN fnb_items fi ON fi.service_id = s.id",
+          "JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)",
+          "JOIN fnb_items fi ON fi.service_id = COALESCE(oi.variant_service_id, oi.service_id)",
           "WHERE oi.order_id=$1 AND s.type='FNB'"
         ].join(" "),
         [orderId]
@@ -344,6 +354,7 @@ exports.cancel = async (req, res) => {
   const db = req.app.get("db")
   const orderId = parseOrderId(req.params.id)
   const reason = String(req.body?.reason || "").trim()
+  await ensureOrderItemColumns(db)
 
   if (!reason) {
     return res.status(400).json({ message: "Void reason wajib diisi" })
@@ -372,8 +383,8 @@ exports.cancel = async (req, res) => {
       [
         "SELECT fi.id AS fnb_item_id, oi.qty",
         "FROM order_items oi",
-        "JOIN services s ON s.id = oi.service_id",
-        "JOIN fnb_items fi ON fi.service_id = s.id",
+        "JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)",
+        "JOIN fnb_items fi ON fi.service_id = COALESCE(oi.variant_service_id, oi.service_id)",
         "WHERE oi.order_id=$1 AND s.type='FNB'"
       ].join(" "),
       [orderId]
@@ -411,12 +422,13 @@ exports.cancel = async (req, res) => {
 }
 
 const performUndoVoid = async (db, { orderId, actorId }) => {
+  await ensureOrderItemColumns(db)
   const { rows: fnbItems } = await db.query(
     [
       "SELECT fi.id AS fnb_item_id, oi.qty",
       "FROM order_items oi",
-      "JOIN services s ON s.id = oi.service_id",
-      "JOIN fnb_items fi ON fi.service_id = s.id",
+      "JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)",
+      "JOIN fnb_items fi ON fi.service_id = COALESCE(oi.variant_service_id, oi.service_id)",
       "WHERE oi.order_id=$1 AND s.type='FNB'"
     ].join(" "),
     [orderId]
@@ -652,6 +664,7 @@ exports.createFromPos = async (req, res) => {
   try {
     const db = req.app.get("db")
     const user = req.user
+    await ensureOrderItemColumns(db)
     await dashboardService.ensureOutletCanReceiveOrder(user)
     const { items, payment_method } = req.body
 
@@ -708,11 +721,11 @@ exports.createFromPos = async (req, res) => {
       await db.query(
         `
         INSERT INTO order_items
-          (order_id, service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
+          (order_id, service_id, variant_service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
         VALUES
-          ($1,$2,$3,$4,$5,$6,$7,$8)
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9)
         `,
-        [orderId, svc.id, i.name || svc.name, qty, unitPrice, subtotal, i.price_label || null, Boolean(i.is_package)]
+        [orderId, svc.id, i.variant_service_id ? Number(i.variant_service_id) : null, i.name || svc.name, qty, unitPrice, subtotal, i.price_label || null, Boolean(i.is_package)]
       )
 
       if (svc.duration_minutes && svc.duration_minutes > 0) {
@@ -743,12 +756,12 @@ exports.createFromPos = async (req, res) => {
      "UPDATE orders SET total=$1, payment_method=$2, status='PAID' WHERE id=$3",
       [total, payment_method || "CASH", orderId]
     )
-     const fnbItemsRes = await db.query(
+    const fnbItemsRes = await db.query(
       [
         "SELECT fi.id AS fnb_item_id, oi.qty",
         "FROM order_items oi",
-        "JOIN services s ON s.id = oi.service_id",
-        "JOIN fnb_items fi ON fi.service_id = s.id",
+        "JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)",
+        "JOIN fnb_items fi ON fi.service_id = COALESCE(oi.variant_service_id, oi.service_id)",
         "WHERE oi.order_id=$1 AND s.type='FNB'"
       ].join(" "),
       [orderId]
@@ -778,6 +791,7 @@ exports.createDraftFromPos = async (req, res) => {
   try {
     const db = req.app.get("db")
     const user = req.user
+    await ensureOrderItemColumns(db)
     await dashboardService.ensureOutletCanReceiveOrder(user)
     const { items } = req.body
     const barNote = String(req.body?.bar_note || "").trim() || null
@@ -831,11 +845,11 @@ exports.createDraftFromPos = async (req, res) => {
       await db.query(
         `
         INSERT INTO order_items
-          (order_id, service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
+          (order_id, service_id, variant_service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
         VALUES
-          ($1,$2,$3,$4,$5,$6,$7,$8)
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9)
         `,
-        [orderId, svc.id, i.name || svc.name, qty, unitPrice, subtotal, i.price_label || null, Boolean(i.is_package)]
+        [orderId, svc.id, i.variant_service_id ? Number(i.variant_service_id) : null, i.name || svc.name, qty, unitPrice, subtotal, i.price_label || null, Boolean(i.is_package)]
       )
     }
 
@@ -881,6 +895,7 @@ exports.saveDraft = async (req, res) => {
 
   try {
     const idOrder = parseOrderId(req.params.id)
+    await ensureOrderItemColumns(db)
     const { items } = req.body
     const barNote = String(req.body?.bar_note || "").trim() || null
 
@@ -910,9 +925,9 @@ exports.saveDraft = async (req, res) => {
       total += subtotal
 
       await db.query(
-        `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [idOrder, item.id, item.name || svcRes.rows[0].name, qty, unitPrice, subtotal, item.price_label || null, Boolean(item.is_package)]
+        `INSERT INTO order_items (order_id, service_id, variant_service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [idOrder, item.id, item.variant_service_id ? Number(item.variant_service_id) : null, item.name || svcRes.rows[0].name, qty, unitPrice, subtotal, item.price_label || null, Boolean(item.is_package)]
       )
     }
 
@@ -1059,12 +1074,25 @@ exports.getKasirOrders = async (req, res) => {
             'service_id', oi.service_id,
             'service_name', oi.service_name,
             'qty', oi.qty,
-            'subtotal', oi.subtotal
+            'subtotal', oi.subtotal,
+            'is_fnb', (s.type = 'FNB'),
+            'is_delivered', (
+              s.type = 'FNB' AND EXISTS (
+                SELECT 1
+                FROM bar_orders bo
+                WHERE bo.order_id = o.id
+                  AND bo.status = 'DELIVERED'
+                  AND bo.items_snapshot @> jsonb_build_array(
+                    jsonb_build_object('service_id', oi.service_id)
+                  )
+              )
+            )
           )
         ) FILTER (WHERE oi.id IS NOT NULL) AS items
 
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
+      LEFT JOIN services s ON s.id = oi.service_id
       LEFT JOIN therapists th ON th.id = o.therapist_id
       LEFT JOIN LATERAL (
         SELECT COALESCE(
