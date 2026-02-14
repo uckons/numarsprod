@@ -187,7 +187,7 @@ exports.create = async (data, actor) => {
              package_special=$8,
              package_price=$9,
              package_name=$10
-         WHERE service_id=$2`,
+         WHERE branch_id=$1 AND service_id=$2`,
         fnbPayload
       )
       if (!updated.rowCount) {
@@ -273,7 +273,7 @@ exports.update = async (id, data) => {
              package_special=$8,
              package_price=$9,
              package_name=$10
-         WHERE service_id=$2`,
+         WHERE branch_id=$1 AND service_id=$2`,
         fnbPayload
       )
       if (!updated.rowCount) {
