@@ -76,7 +76,7 @@ const markRead = async (id) => {
   await Swal.fire({ icon: 'success', title: 'Message ditandai dibaca' })
 }
 
-const formatDate = (v) => new Date(v).toLocaleString('id-ID')
+const formatDate = (v) => v ? new Date(v).toLocaleString('id-ID', { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"
 
 onMounted(refresh)
 </script>

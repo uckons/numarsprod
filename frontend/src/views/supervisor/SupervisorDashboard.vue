@@ -370,7 +370,7 @@ const changeUndoPage = async (p) => {
 }
 
 const formatCurrency = (n) => Number(n || 0).toLocaleString('id-ID')
-const formatDate = (d) => new Date(d).toLocaleString('id-ID')
+const formatDate = (d) => d ? new Date(d).toLocaleString('id-ID', { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"
 
 onMounted(async () => {
   socket.emit('join-branch', { branch_id: auth.user?.branch_id, role: auth.user?.role, user_id: auth.user?.id })

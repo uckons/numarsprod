@@ -35,30 +35,37 @@ const selectedRoom = ref(null)
   function addService(service) {
     const key = itemKey(service)
     const found = items.value.find(i => i.cart_key === key)
-    if (found) {
-      found.qty += Number(service.seed_qty || 1)
-    } else {
-      items.value.push({
-        id: service.id,
-        name: service.name,
-        base_price: Number(service.base_price),
-        price_label: service.price_label || null,
-        is_package: Boolean(service.is_package),
-        package_qty: Number(service.package_qty || 0),
-        package_group: service.package_group || null,
-        package_service_id: service.package_service_id || null,
-        package_price: Number(service.package_price || 0) || null,
-        package_name: service.package_name || null,
-        package_total: Number(service.package_total || 0) || null,
-        package_special: Boolean(service.package_special),
-        variant_name: service.variant_name || null,
-        variant_service_id: service.variant_service_id || null,
-        item_group: service.item_group || null,
-        locked_package: Boolean(service.locked_package),
-        cart_key: key,
-        qty: Number(service.seed_qty || 1)
-      })
+    const seedQty = Number(service.seed_qty || 1)
+
+    if (found && !found.locked_package) {
+      found.qty += seedQty
+      return
     }
+
+    const uniqueLockedKey = found?.locked_package
+      ? `${key}:locked:${Date.now()}:${Math.random().toString(36).slice(2, 7)}`
+      : key
+
+    items.value.push({
+      id: service.id,
+      name: service.name,
+      base_price: Number(service.base_price),
+      price_label: service.price_label || null,
+      is_package: Boolean(service.is_package),
+      package_qty: Number(service.package_qty || 0),
+      package_group: service.package_group || null,
+      package_service_id: service.package_service_id || null,
+      package_price: Number(service.package_price || 0) || null,
+      package_name: service.package_name || null,
+      package_total: Number(service.package_total || 0) || null,
+      package_special: Boolean(service.package_special),
+      variant_name: service.variant_name || null,
+      variant_service_id: service.variant_service_id || null,
+      item_group: service.item_group || null,
+      locked_package: Boolean(service.locked_package),
+      cart_key: uniqueLockedKey,
+      qty: seedQty
+    })
   }
 
   const locked = ref(false)
