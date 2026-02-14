@@ -1,5 +1,20 @@
 const db = require("../../config/db")
 
+const resolvePackageGroupConfig = async (branchId, packageGroup) => {
+  if (!packageGroup) return null
+  const { rows } = await db.query(
+    `SELECT package_qty, package_price, package_name
+     FROM fnb_items
+     WHERE branch_id=$1
+       AND package_group=$2
+       AND is_package=true
+     ORDER BY id DESC
+     LIMIT 1`,
+    [branchId, packageGroup]
+  )
+  return rows[0] || null
+}
+
 exports.list = async ({ branch_id, type, is_active }) => {
   const params = []
   let where = "s.deleted_at IS NULL"
@@ -60,6 +75,8 @@ exports.list = async ({ branch_id, type, is_active }) => {
       COALESCE(fi.is_package, false) AS is_package,
       fi.package_qty,
       fi.package_group,
+      COALESCE(fi.item_group, 'NORMAL') AS item_group,
+      COALESCE(fi.package_special, false) AS package_special,
       fi.package_price,
       fi.package_name,
       COALESCE(fi.price, s.base_price) AS sell_price,
@@ -114,41 +131,85 @@ exports.create = async (data, actor) => {
     duration_minutes,
     is_active = true,
     happy_hour_enabled = false,
-    happy_hour_price = null
+    happy_hour_price = null,
+    package_special = false,
+    package_group = null
   } = data
 
   if (!branch_id || !type || !name) {
     throw new Error("Missing required fields")
   }
 
-  await db.query(`
-    INSERT INTO services
-    branch_id, type, name, base_price, duration_minutes, is_active, happy_hour_enabled, happy_hour_price)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-  `, [
-    branch_id,
-    type,
-    name,
-    base_price || 0,
-    duration_minutes || null,
-    is_active,
-    Boolean(happy_hour_enabled),
-    happy_hour_price ?? null
-  ])
-}
+  await db.query("BEGIN")
+  try {
+    const serviceRes = await db.query(
+      `INSERT INTO services (branch_id, type, name, base_price, duration_minutes, is_active, happy_hour_enabled, happy_hour_price)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       RETURNING id, branch_id`,
+      [
+        Number(branch_id),
+        type,
+        name,
+        Number(base_price || 0),
+        duration_minutes || null,
+        is_active,
+        Boolean(happy_hour_enabled),
+        happy_hour_price ?? null
+      ]
+    )
 
-//exports.update = async (id, data) => {
-//  await db.query(`
-//    UPDATE services
-//    SET base_price = $1,
-//        duration_minutes = $2
-//    WHERE id = $3
-//  `, [data.base_price, data.duration_minutes, id])
-//}
+    const created = serviceRes.rows[0]
+
+    if (type === "FNB") {
+      const pkgCfg = await resolvePackageGroupConfig(created.branch_id, package_group)
+      if (Boolean(package_special) && !pkgCfg) {
+        throw new Error("Group paket tidak valid atau belum punya konfigurasi paket (qty/harga)")
+      }
+      const fnbPayload = [
+        created.branch_id,
+        created.id,
+        name,
+        Number(base_price || 0),
+        Boolean(package_special),
+        pkgCfg?.package_qty ?? null,
+        package_group || null,
+        Boolean(package_special),
+        pkgCfg?.package_price ?? null,
+        pkgCfg?.package_name ?? name
+      ]
+      const updated = await db.query(
+        `UPDATE fnb_items
+         SET name=$3,
+             price=$4,
+             is_package=$5,
+             package_qty=$6,
+             package_group=$7,
+             package_special=$8,
+             package_price=$9,
+             package_name=$10
+         WHERE service_id=$2`,
+        fnbPayload
+      )
+      if (!updated.rowCount) {
+        await db.query(
+          `INSERT INTO fnb_items
+           (branch_id, service_id, name, cost_price, price, stock, alert_stock, is_beverage, happy_hour_enabled, happy_hour_price, is_package, package_qty, package_group, item_group, package_special, package_price, package_name)
+           VALUES ($1,$2,$3,0,$4,0,0,true,false,NULL,$5,$6,$7,'NORMAL',$8,$9,$10)`,
+          fnbPayload
+        )
+      }
+    }
+
+    await db.query("COMMIT")
+  } catch (err) {
+    await db.query("ROLLBACK")
+    throw err
+  }
+}
 
 exports.update = async (id, data) => {
   const existingRes = await db.query(
-    `SELECT type, base_price FROM services WHERE id=$1`,
+    `SELECT id, branch_id, type, base_price FROM services WHERE id=$1`,
     [id]
   )
 
@@ -157,38 +218,78 @@ exports.update = async (id, data) => {
   }
 
   const existing = existingRes.rows[0]
-  const keepFnbBasePrice = existing.type === 'FNB' && data.type === 'FNB'
+  const nextType = data.type || existing.type
+  const keepFnbBasePrice = existing.type === 'FNB' && nextType === 'FNB'
   const finalBasePrice = keepFnbBasePrice ? existing.base_price : data.base_price
 
-  await db.query(`
-    UPDATE services
-    SET
-      name=$1,
-      type=$2,
-      base_price=$3,
-      duration_minutes=$4,
-      is_active=$5,
-      happy_hour_enabled=$6,
-      happy_hour_price=$7
-    WHERE id=$8
-  `, [
-    data.name,
-    data.type,
-    finalBasePrice,
-    data.duration_minutes,
-    data.is_active,
-    Boolean(data.happy_hour_enabled),
-    data.happy_hour_price ?? null,
-    id
-  ])
-  
-  if (data.type === "FNB") {
-    await db.query(
-      `UPDATE fnb_items
-       SET name=$1
-       WHERE service_id=$2`,
-      [data.name, id]
-    )
+  await db.query("BEGIN")
+  try {
+    await db.query(`
+      UPDATE services
+      SET
+        name=$1,
+        type=$2,
+        base_price=$3,
+        duration_minutes=$4,
+        is_active=$5,
+        happy_hour_enabled=$6,
+        happy_hour_price=$7
+      WHERE id=$8
+    `, [
+      data.name,
+      nextType,
+      finalBasePrice,
+      data.duration_minutes,
+      data.is_active,
+      Boolean(data.happy_hour_enabled),
+      data.happy_hour_price ?? null,
+      id
+    ])
+
+    if (nextType === "FNB") {
+      const pkgCfg = await resolvePackageGroupConfig(existing.branch_id, data.package_group)
+      if (Boolean(data.package_special) && !pkgCfg) {
+        throw new Error("Group paket tidak valid atau belum punya konfigurasi paket (qty/harga)")
+      }
+      const fnbPayload = [
+        existing.branch_id,
+        id,
+        data.name,
+        Number(finalBasePrice || 0),
+        Boolean(data.package_special),
+        pkgCfg?.package_qty ?? null,
+        data.package_group || null,
+        Boolean(data.package_special),
+        pkgCfg?.package_price ?? null,
+        pkgCfg?.package_name ?? data.name
+      ]
+      const updated = await db.query(
+        `UPDATE fnb_items
+         SET name=$3,
+             price=$4,
+             is_package=$5,
+             package_qty=$6,
+             package_group=$7,
+             package_special=$8,
+             package_price=$9,
+             package_name=$10
+         WHERE service_id=$2`,
+        fnbPayload
+      )
+      if (!updated.rowCount) {
+        await db.query(
+          `INSERT INTO fnb_items
+           (branch_id, service_id, name, cost_price, price, stock, alert_stock, is_beverage, happy_hour_enabled, happy_hour_price, is_package, package_qty, package_group, item_group, package_special, package_price, package_name)
+           VALUES ($1,$2,$3,0,$4,0,0,true,false,NULL,$5,$6,$7,'NORMAL',$8,$9,$10)`,
+          fnbPayload
+        )
+      }
+    }
+
+    await db.query("COMMIT")
+  } catch (err) {
+    await db.query("ROLLBACK")
+    throw err
   }
 }
 

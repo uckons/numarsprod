@@ -519,7 +519,7 @@ const addExpense = async () => {
 }
 
 const formatCurrency = (v) => Number(v || 0).toLocaleString("id-ID")
-const formatDate = (v) => new Date(v).toLocaleString("id-ID")
+const formatDate = (v) => v ? new Date(v).toLocaleString("id-ID", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"
 </script>
 
 <style scoped>
