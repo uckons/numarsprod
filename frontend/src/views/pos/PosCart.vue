@@ -16,6 +16,7 @@
         <strong>{{ i.name }}</strong>
         <small>Rp {{ format(i.base_price) }}</small>
         <small v-if="i.price_label" class="item-label">{{ i.price_label }}</small>
+        <small v-if="i.variant_name" class="item-label">Varian: {{ i.variant_name }}</small>
         <small v-if="i.locked_package" class="item-locked">LOCKED PAKET</small>
       </div>
 
@@ -176,6 +177,18 @@ const router = useRouter()
 const pos = usePosStore()
 
 const items = computed(() => pos.items || [])
+
+const loadVariantOptions = async (cartItem) => {
+  if (!cartItem?.package_group) return []
+  const res = await api.get('/services', { params: { type: 'FNB', is_active: true } })
+  const rows = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : [])
+  return rows.filter(s =>
+    !s.is_package &&
+    s.package_group === cartItem.package_group &&
+    String(s.item_group || '').toUpperCase() === 'VARIAN'
+  )
+}
+
 const maybeOfferPackage = async (cartItem) => {
   if (!cartItem || cartItem.is_package) return
 
@@ -201,6 +214,29 @@ const packageQty = Number(cartItem.package_qty || 0)
     is_package: true,
     package_group: cartItem.package_group,
     package_qty: cartItem.package_qty
+  }
+
+  const variants = await loadVariantOptions(cartItem)
+  let selectedVariant = null
+  if (variants.length) {
+    const variantPick = await SwalTheme.fire({
+      title: 'Pilih varian paket',
+      input: 'select',
+      inputOptions: Object.fromEntries(variants.map(opt => [String(opt.id), opt.name])),
+      showCancelButton: true,
+      confirmButtonText: 'Pakai varian',
+      cancelButtonText: 'Batal'
+    })
+
+    if (!variantPick.isConfirmed) return
+    selectedVariant = variants.find(v => String(v.id) === String(variantPick.value)) || null
+  }
+
+  if (selectedVariant) {
+    packageService.variant_name = selectedVariant.name
+    packageService.variant_service_id = selectedVariant.id
+    packageService.name = `${packageService.name} - ${selectedVariant.name}`
+    packageService.item_group = 'VARIAN'
   }
 
   pos.convertToPackage(cartItem.cart_key, packageService)
@@ -245,9 +281,10 @@ const toPayloadItems = () => {
         id: i.package_service_id,
         qty: packageCount,
         base_price: packagePrice,
-        name: i.package_name || i.name,
+        name: i.variant_name ? `${i.package_name || i.name} - ${i.variant_name}` : (i.package_name || i.name),
         price_label: "PAKET",
-        is_package: true
+        is_package: true,
+        variant_name: i.variant_name || null
       })
       continue
     }
@@ -256,9 +293,10 @@ const toPayloadItems = () => {
       id: i.id,
       qty: i.qty,
       base_price: i.base_price,
-      name: i.name,
+      name: i.variant_name ? `${i.name} - ${i.variant_name}` : i.name,
       price_label: i.price_label,
-      is_package: Boolean(i.is_package)
+      is_package: Boolean(i.is_package),
+      variant_name: i.variant_name || null
     })
   }
 

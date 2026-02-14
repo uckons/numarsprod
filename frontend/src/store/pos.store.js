@@ -16,7 +16,9 @@ const selectedRoom = ref(null)
     service.id,
     Number(service.base_price || 0),
     service.price_label || '',
-    service.is_package ? 'P' : 'N'
+    service.is_package ? 'P' : 'N',
+    service.variant_name || '',
+    service.item_group || ''
   ].join(':')
 
   function addService(service) {
@@ -37,6 +39,9 @@ const selectedRoom = ref(null)
         package_price: Number(service.package_price || 0) || null,
         package_name: service.package_name || null,
         package_total: Number(service.package_total || 0) || null,
+        variant_name: service.variant_name || null,
+        variant_service_id: service.variant_service_id || null,
+        item_group: service.item_group || null,
         locked_package: Boolean(service.locked_package),
         cart_key: key,
         qty: Number(service.seed_qty || 1)
