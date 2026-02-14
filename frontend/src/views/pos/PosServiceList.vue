@@ -211,6 +211,19 @@ const enrichService = (service) => {
     package_label: 'PAKET',
     item_group: service.item_group || 'NORMAL'
   }
+
+  const { value } = await Swal.fire({
+    title: 'Pilih varian paket',
+    input: 'select',
+    inputOptions: Object.fromEntries(options.map(opt => [String(opt.id), opt.name])),
+    inputPlaceholder: 'Pilih varian',
+    showCancelButton: true,
+    confirmButtonText: 'Pakai varian',
+    cancelButtonText: 'Batal'
+  })
+
+  if (!value) return undefined
+  return options.find(opt => String(opt.id) === String(value)) || null
 }
 
 
