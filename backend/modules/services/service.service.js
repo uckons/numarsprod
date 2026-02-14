@@ -60,6 +60,7 @@ exports.list = async ({ branch_id, type, is_active }) => {
       COALESCE(fi.is_package, false) AS is_package,
       fi.package_qty,
       fi.package_group,
+      COALESCE(fi.item_group, 'NORMAL') AS item_group,
       fi.package_price,
       fi.package_name,
       COALESCE(fi.price, s.base_price) AS sell_price,
