@@ -42,6 +42,7 @@
           <h4>{{ s.name }}</h4>
           <span class="badge">{{ s.type }}</span>
           <span v-if="s.price_label" class="badge price-badge">{{ s.price_label }}</span>
+          <span v-if="String(s.item_group || '').toUpperCase() === 'VARIAN'" class="badge variant-badge">VARIAN</span>
         </div>
 
         <div class="card-bottom">
@@ -136,6 +137,12 @@ const regularPackageGroups = computed(() => {
 
 const sellableServices = computed(() =>
   services.value.filter((s) => {
+    const isVarian = String(s.item_group || 'NORMAL').toUpperCase() === 'VARIAN'
+
+    if (isVarian) {
+      return true
+    }
+
     if (s.type === 'FNB' && s.is_package && s.package_group) {
       return !regularPackageGroups.value.has(s.package_group)
     }
@@ -200,11 +207,49 @@ const enrichService = (service) => {
     package_service_id: pkg.id,
     package_price: Number(pkg.package_price || pkg.base_price || 0),
     package_name: pkg.package_name || pkg.name || seed.name,
-    package_label: 'PAKET'
+    package_special: Boolean(pkg.package_special),
+    package_label: 'PAKET',
+    item_group: service.item_group || 'NORMAL'
   }
 }
 
-const maybeOfferPackage = async (cartKey) => {
+
+const choosePackageVariantOption = (item, required = false) => {
+  const options = services.value
+    .filter(s =>
+      s.type === 'FNB' &&
+      s.package_group &&
+      s.package_group === item.package_group &&
+      String(s.item_group || '').toUpperCase() === 'VARIAN' &&
+      Number(s.id) !== Number(item.package_service_id || item.id)
+    )
+
+  if (!options.length) {
+    if (required) {
+      return Swal.fire({
+        icon: 'warning',
+        title: 'Varian belum tersedia',
+        text: 'Paket khusus wajib memiliki item varian dalam group yang sama.'
+      }).then(() => undefined)
+    }
+    return Promise.resolve(null)
+  }
+
+  return Swal.fire({
+    title: 'Pilih varian paket',
+    input: 'select',
+    inputOptions: Object.fromEntries(options.map(opt => [String(opt.id), opt.name])),
+    inputPlaceholder: 'Pilih varian',
+    showCancelButton: true,
+    confirmButtonText: 'Pakai varian',
+    cancelButtonText: 'Batal'
+  }).then(({ value }) => {
+    if (!value) return undefined
+    return options.find(opt => String(opt.id) === String(value)) || null
+  })
+}
+
+const maybeOfferPackage = (cartKey) => {
   const item = pos.findByCartKey(cartKey)
   if (!item || item.is_package) return
 
@@ -213,33 +258,73 @@ const maybeOfferPackage = async (cartKey) => {
 
   const packageService = services.value.find(s => s.id === item.package_service_id)
   if (!packageService) return
+  const variantRequired = Boolean(packageService.package_special)
 
-  const confirm = await Swal.fire({
+  return Swal.fire({
     icon: 'question',
     title: 'Jadikan paket?',
     text: `Qty ${item.name} sudah ${item.qty}. Gunakan harga paket?`,
     showCancelButton: true,
     confirmButtonText: 'Ya, jadikan paket',
     cancelButtonText: 'Tidak'
-  })
+  }).then((confirm) => {
+    if (!confirm.isConfirmed) return
+    return choosePackageVariantOption(item, variantRequired).then((selectedVariant) => {
+      if (selectedVariant === undefined) return
 
-  if (confirm.isConfirmed) {
-    pos.convertToPackage(item.cart_key, packageService)
-  }
+      const packageSeed = { ...packageService }
+      if (selectedVariant) {
+        packageSeed.variant_name = selectedVariant.name
+        packageSeed.variant_service_id = selectedVariant.id
+        packageSeed.item_group = 'VARIAN'
+        packageSeed.name = `${packageService.name} - ${selectedVariant.name}`
+      }
+
+      pos.convertToPackage(item.cart_key, packageSeed)
+    })
+  })
 }
 
-const select = async (service) => {
+const select = (service) => {
   const enriched = enrichService(service)
+
+  if (enriched.type === 'FNB' && enriched.is_package && enriched.package_special) {
+    return choosePackageVariantOption(enriched, true).then((selectedVariant) => {
+      if (selectedVariant === undefined) return
+      if (selectedVariant) {
+        enriched.variant_name = selectedVariant.name
+        enriched.variant_service_id = selectedVariant.id
+        enriched.item_group = 'VARIAN'
+        enriched.name = `${enriched.package_name || enriched.name} - ${selectedVariant.name}`
+      }
+
+      pos.addService(enriched)
+
+      const key = [
+        enriched.id,
+        Number(enriched.base_price || 0),
+        enriched.price_label || "",
+        enriched.is_package ? "P" : "N",
+        enriched.variant_name || "",
+        enriched.item_group || ""
+      ].join(":")
+
+      return maybeOfferPackage(key)
+    })
+  }
+
   pos.addService(enriched)
 
   const key = [
     enriched.id,
     Number(enriched.base_price || 0),
     enriched.price_label || "",
-    enriched.is_package ? "P" : "N"
+    enriched.is_package ? "P" : "N",
+    enriched.variant_name || "",
+    enriched.item_group || ""
   ].join(":")
 
-  await maybeOfferPackage(key)
+  return maybeOfferPackage(key)
 }
 
 const resetSearch = () => {
@@ -267,6 +352,7 @@ const format = (v) => Number(v || 0).toLocaleString("id-ID")
 .card-top h4 { margin: 0; font-size: 16px; font-weight: 700; }
 .badge { margin-top: 6px; display: inline-block; background: rgba(201,162,77,.2); color: #c9a24d; padding: 4px 10px; border-radius: 12px; font-size: 12px; width: fit-content; }
 .price-badge { margin-left: 6px; background: #f5c518; color: #111; }
+.variant-badge { margin-left: 6px; background: #2a67d1; color: #fff; }
 .card-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
 .duration { font-size: 12px; color: #888; }
 .price { font-size: 16px; font-weight: 700; color: #2ecc71; }
