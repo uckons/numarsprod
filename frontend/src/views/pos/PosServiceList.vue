@@ -136,6 +136,9 @@ const regularPackageGroups = computed(() => {
 
 const sellableServices = computed(() =>
   services.value.filter((s) => {
+    if (s.type === 'FNB' && String(s.item_group || 'NORMAL').toUpperCase() === 'VARIAN') {
+      return false
+    }
     if (s.type === 'FNB' && s.is_package && s.package_group) {
       return !regularPackageGroups.value.has(s.package_group)
     }
@@ -200,8 +203,43 @@ const enrichService = (service) => {
     package_service_id: pkg.id,
     package_price: Number(pkg.package_price || pkg.base_price || 0),
     package_name: pkg.package_name || pkg.name || seed.name,
-    package_label: 'PAKET'
+    package_special: Boolean(pkg.package_special),
+    package_label: 'PAKET',
+    item_group: service.item_group || 'NORMAL'
   }
+}
+
+
+const pickPackageVariant = async (item, required = false) => {
+  const options = services.value
+    .filter(s =>
+      s.type === 'FNB' &&
+      !s.is_package &&
+      s.package_group &&
+      s.package_group === item.package_group &&
+      String(s.item_group || '').toUpperCase() === 'VARIAN'
+    )
+
+  if (!options.length) {
+    if (required) {
+      await Swal.fire({ icon: 'warning', title: 'Varian belum tersedia', text: 'Paket khusus wajib memiliki item varian dalam group yang sama.' })
+      return undefined
+    }
+    return null
+  }
+
+  const { value } = await Swal.fire({
+    title: 'Pilih varian paket',
+    input: 'select',
+    inputOptions: Object.fromEntries(options.map(opt => [String(opt.id), opt.name])),
+    inputPlaceholder: 'Pilih varian',
+    showCancelButton: true,
+    confirmButtonText: 'Pakai varian',
+    cancelButtonText: 'Batal'
+  })
+
+  if (!value) return undefined
+  return options.find(opt => String(opt.id) === String(value)) || null
 }
 
 const maybeOfferPackage = async (cartKey) => {
@@ -213,6 +251,7 @@ const maybeOfferPackage = async (cartKey) => {
 
   const packageService = services.value.find(s => s.id === item.package_service_id)
   if (!packageService) return
+  const variantRequired = Boolean(packageService.package_special)
 
   const confirm = await Swal.fire({
     icon: 'question',
@@ -224,7 +263,18 @@ const maybeOfferPackage = async (cartKey) => {
   })
 
   if (confirm.isConfirmed) {
-    pos.convertToPackage(item.cart_key, packageService)
+    const selectedVariant = await pickPackageVariant(item, variantRequired)
+    if (selectedVariant === undefined) return
+
+    const packageSeed = { ...packageService }
+    if (selectedVariant) {
+      packageSeed.variant_name = selectedVariant.name
+      packageSeed.variant_service_id = selectedVariant.id
+      packageSeed.item_group = 'VARIAN'
+      packageSeed.name = `${packageService.name} - ${selectedVariant.name}`
+    }
+
+    pos.convertToPackage(item.cart_key, packageSeed)
   }
 }
 
@@ -236,7 +286,9 @@ const select = async (service) => {
     enriched.id,
     Number(enriched.base_price || 0),
     enriched.price_label || "",
-    enriched.is_package ? "P" : "N"
+    enriched.is_package ? "P" : "N",
+    enriched.variant_name || "",
+    enriched.item_group || ""
   ].join(":")
 
   await maybeOfferPackage(key)
