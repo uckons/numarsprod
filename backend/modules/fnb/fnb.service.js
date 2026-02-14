@@ -150,8 +150,8 @@ exports.create = async (db, user, data) => {
         Boolean(package_special),
         package_price !== undefined && package_price !== null ? Number(package_price) : null,
         package_name || null,
-        Boolean(package_special) ? 0 : stock,
-        Boolean(package_special) ? 0 : alert_stock
+        stock ?? 0,
+        alert_stock ?? 0
       ]
     )
 
@@ -258,8 +258,8 @@ exports.update = async (db, id, data) => {
         name,
         cost_price ?? 0,
         Number(sell_price ?? price ?? 0),
-        Boolean(package_special) ? 0 : stock,
-        Boolean(package_special) ? 0 : alert_stock,
+        stock ?? 0,
+        alert_stock ?? 0,
         serviceId,
         Boolean(is_beverage),
         Boolean(happy_hour_enabled),
