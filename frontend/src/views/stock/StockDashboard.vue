@@ -7,7 +7,10 @@
           Kelola stok, harga modal, dan harga jual FNB terintegrasi dengan services.
         </p>
       </div>
-      <button class="btn-primary" @click="openAdd">+ Add Stock</button>
+      <div class="header-actions">
+        <button v-if="canManageStock" class="btn-danger" @click="removeDuplicates">Hapus Item Double</button>
+        <button v-if="canManageStock" class="btn-primary" @click="openAdd">+ Add Stock</button>
+      </div>
     </div>
 
     <div class="stats">
@@ -101,15 +104,16 @@
             <th>Happy Hour</th>
             <th>Paket</th>
             <th>Status</th>
-            <th width="140">Actions</th>
+            <th>Group</th>
+            <th width="200">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="11" class="empty">Loading...</td>
+            <td colspan="12" class="empty">Loading...</td>
           </tr>
           <tr v-else-if="!paginatedItems.length">
-            <td colspan="11" class="empty">No stock items found</td>
+            <td colspan="12" class="empty">No stock items found</td>
           </tr>
           <tr
             v-for="item in paginatedItems"
@@ -148,8 +152,11 @@
                 {{ statusLabel(item) }}
               </span>
             </td>
+            <td>{{ item.item_group || "NORMAL" }}</td>
             <td class="actions">
-              <button @click="openEdit(item)">Edit</button>
+              <button v-if="canManageStock" @click="openEdit(item)">Edit</button>
+              <button v-if="canManageStock" class="danger" @click="deleteItem(item)">Delete</button>
+              <span v-if="!canManageStock" class="muted">View only</span>
             </td>
           </tr>
         </tbody>
@@ -180,6 +187,14 @@
             <label>
               Nama Item
               <input v-model="form.name" class="input" required />
+            </label>
+            <label>
+              Item Group
+              <select v-model="form.item_group" class="input">
+                <option value="NORMAL">Normal</option>
+                <option value="VARIAN">Varian</option>
+                <option value="CUSTOM">Custom</option>
+              </select>
             </label>
             <label>
               Harga Modal
@@ -293,7 +308,9 @@ import { ref, computed, onMounted, watch } from "vue"
 import Swal from "sweetalert2"
 import "sweetalert2/dist/sweetalert2.min.css"
 import api from "@/services/api"
+import { useAuthStore } from "@/store/auth.store"
 
+const auth = useAuthStore()
 const items = ref([])
 const branches = ref([])
 const selectedBranch = ref("ALL")
@@ -324,7 +341,8 @@ const form = ref({
   happy_hour_price: 0,
   stock: 0,
   alert_stock: 0,
-  branch_id: ""
+  branch_id: "",
+  item_group: "NORMAL"
 })
 
 const loadItems = async () => {
@@ -436,6 +454,8 @@ const outOfStockCount = computed(() =>
   items.value.filter(item => item.stock <= 0).length
 )
 
+const canManageStock = computed(() => !["Supervisor", "Staff Bar"].includes(String(auth.user?.role || "")))
+
 watch([keyword, statusFilter, perPage, selectedBranch], () => {
   page.value = 1
 })
@@ -460,7 +480,8 @@ const openAdd = () => {
     happy_hour_price: 0,
     stock: 0,
     alert_stock: 0,
-    branch_id: selectedBranch.value !== "ALL" ? String(selectedBranch.value) : (branches.value[0] ? String(branches.value[0].id) : "")
+    branch_id: selectedBranch.value !== "ALL" ? String(selectedBranch.value) : (branches.value[0] ? String(branches.value[0].id) : ""),
+    item_group: "NORMAL"
   }
   showForm.value = true
 }
@@ -481,7 +502,8 @@ const openEdit = (item) => {
     happy_hour_price: Number(item.happy_hour_price || 0),
     stock: Number(item.stock || 0),
     alert_stock: Number(item.alert_stock || 0),
-    branch_id: String(item.branch_id || "")
+    branch_id: String(item.branch_id || ""),
+    item_group: item.item_group || "NORMAL"
   }
   showForm.value = true
 }
@@ -506,6 +528,7 @@ const submitForm = async () => {
     is_package: Boolean(form.value.is_package),
     package_qty: Number(form.value.package_qty || 0),
     package_group: form.value.package_group || null,
+    item_group: form.value.item_group || "NORMAL",
     package_price: form.value.is_package ? Number(form.value.package_price || 0) : null,
     package_name: form.value.is_package ? (form.value.package_name || null) : null,
     happy_hour_enabled: Boolean(form.value.happy_hour_enabled),
@@ -537,6 +560,35 @@ const submitForm = async () => {
       text: "Periksa kembali data yang diinput."
     })
   }
+}
+
+
+const deleteItem = async (item) => {
+  const confirm = await Swal.fire({ icon: "warning", title: "Hapus item ini?", text: item.name, showCancelButton: true })
+  if (!confirm.isConfirmed) return
+
+  try {
+    await api.delete(`/fnb/${item.id}`)
+    await loadItems()
+    await Swal.fire({ icon: "success", title: "Item dihapus" })
+  } catch (error) {
+    const message = error?.response?.data?.message || "Gagal menghapus item"
+    await Swal.fire({ icon: "error", title: "Delete gagal", text: message })
+  }
+}
+
+const removeDuplicates = async () => {
+  const confirm = await Swal.fire({
+    icon: "warning",
+    title: "Hapus item double?",
+    text: "Sistem akan menyisakan 1 item per nama pada outlet yang dipilih.",
+    showCancelButton: true
+  })
+  if (!confirm.isConfirmed) return
+
+  const res = await api.post("/fnb/remove-duplicates", { branch_id: selectedBranch.value === "ALL" ? null : Number(selectedBranch.value) })
+  await loadItems()
+  await Swal.fire({ icon: "success", title: `Selesai`, text: `${res.data?.removed_count || 0} item double dihapus.` })
 }
 
 const prevPage = () => {
@@ -889,6 +941,31 @@ td {
     transform: translateY(0);
     opacity: 1;
   }
+}
+
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-danger {
+  background: rgba(231, 76, 60, 0.16);
+  color: #ff8678;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(231,76,60,.45);
+  cursor: pointer;
+}
+
+.actions button.danger {
+  border-color: rgba(231,76,60,.7);
+  color: #ff8678;
+}
+
+.actions button.danger:hover {
+  background: #e74c3c;
+  color: #fff;
 }
 
 @media (max-width: 768px) {
