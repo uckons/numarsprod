@@ -210,7 +210,7 @@ const enrichService = (service) => {
 }
 
 
-const pickPackageVariant = async (item, required = false) => {
+const choosePackageVariantOption = async (item, required = false) => {
   const options = services.value
     .filter(s =>
       s.type === 'FNB' &&
@@ -227,33 +227,6 @@ const pickPackageVariant = async (item, required = false) => {
     }
     return null
   }
-
-  const { value } = await Swal.fire({
-    title: 'Pilih varian paket',
-    input: 'select',
-    inputOptions: Object.fromEntries(options.map(opt => [String(opt.id), opt.name])),
-    inputPlaceholder: 'Pilih varian',
-    showCancelButton: true,
-    confirmButtonText: 'Pakai varian',
-    cancelButtonText: 'Batal'
-  })
-
-  if (!value) return undefined
-  return options.find(opt => String(opt.id) === String(value)) || null
-}
-
-
-const pickPackageVariant = async (item) => {
-  const options = services.value
-    .filter(s =>
-      s.type === 'FNB' &&
-      !s.is_package &&
-      s.package_group &&
-      s.package_group === item.package_group &&
-      String(s.item_group || '').toUpperCase() === 'VARIAN'
-    )
-
-  if (!options.length) return null
 
   const { value } = await Swal.fire({
     title: 'Pilih varian paket',
@@ -290,7 +263,7 @@ const maybeOfferPackage = async (cartKey) => {
   })
 
   if (confirm.isConfirmed) {
-    const selectedVariant = await pickPackageVariant(item, variantRequired)
+    const selectedVariant = await choosePackageVariantOption(item, variantRequired)
     if (selectedVariant === undefined) return
 
     const packageSeed = { ...packageService }
