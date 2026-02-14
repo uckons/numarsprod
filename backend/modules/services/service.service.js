@@ -162,6 +162,9 @@ exports.create = async (data, actor) => {
 
     if (type === "FNB") {
       const pkgCfg = await resolvePackageGroupConfig(created.branch_id, package_group)
+      if (Boolean(package_special) && !pkgCfg) {
+        throw new Error("Group paket tidak valid atau belum punya konfigurasi paket (qty/harga)")
+      }
       const fnbPayload = [
         created.branch_id,
         created.id,
@@ -245,6 +248,9 @@ exports.update = async (id, data) => {
 
     if (nextType === "FNB") {
       const pkgCfg = await resolvePackageGroupConfig(existing.branch_id, data.package_group)
+      if (Boolean(data.package_special) && !pkgCfg) {
+        throw new Error("Group paket tidak valid atau belum punya konfigurasi paket (qty/harga)")
+      }
       const fnbPayload = [
         existing.branch_id,
         id,

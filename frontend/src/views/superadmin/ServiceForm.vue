@@ -151,6 +151,7 @@ const loadPackageGroups = async () => {
     const res = await api.get("/fnb", { params: { branch_id: form.value.branch_id } })
     const rows = Array.isArray(res.data) ? res.data : (Array.isArray(res.data?.data) ? res.data.data : [])
     const groups = rows
+      .filter(r => Boolean(r.is_package) && Number(r.package_qty || 0) > 0)
       .map(r => String(r.package_group || '').trim())
       .filter(Boolean)
     packageGroups.value = [...new Set(groups)].sort((a, b) => a.localeCompare(b))
@@ -237,7 +238,7 @@ const save = async () => {
     await SwalTheme.fire({
       icon: "error",
       title: "Gagal",
-      text: "Failed to save service",
+      text: e?.response?.data?.message || "Failed to save service",
       confirmButtonText: "OK"
     })
   } finally {
