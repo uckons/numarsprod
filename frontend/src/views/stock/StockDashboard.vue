@@ -566,9 +566,15 @@ const submitForm = async () => {
 const deleteItem = async (item) => {
   const confirm = await Swal.fire({ icon: "warning", title: "Hapus item ini?", text: item.name, showCancelButton: true })
   if (!confirm.isConfirmed) return
-  await api.delete(`/fnb/${item.id}`)
-  await loadItems()
-  await Swal.fire({ icon: "success", title: "Item dihapus" })
+
+  try {
+    await api.delete(`/fnb/${item.id}`)
+    await loadItems()
+    await Swal.fire({ icon: "success", title: "Item dihapus" })
+  } catch (error) {
+    const message = error?.response?.data?.message || "Gagal menghapus item"
+    await Swal.fire({ icon: "error", title: "Delete gagal", text: message })
+  }
 }
 
 const removeDuplicates = async () => {

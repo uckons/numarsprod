@@ -275,12 +275,20 @@ exports.remove = async (db, id) => {
     if (!itemRes.rows.length) throw new Error('Item FNB tidak ditemukan')
 
     const serviceId = itemRes.rows[0].service_id
+
+    await db.query(`DELETE FROM stock_logs WHERE fnb_item_id=$1`, [id])
     await db.query(`DELETE FROM fnb_items WHERE id=$1`, [id])
 
     if (serviceId) {
       const refs = await db.query(`SELECT COUNT(*)::int AS total FROM fnb_items WHERE service_id=$1`, [serviceId])
       if (!Number(refs.rows[0]?.total || 0)) {
-        await db.query(`DELETE FROM services WHERE id=$1`, [serviceId])
+        await db.query(
+          `UPDATE services
+           SET is_active=false,
+               deleted_at=COALESCE(deleted_at, NOW())
+           WHERE id=$1`,
+          [serviceId]
+        )
       }
     }
 
@@ -315,7 +323,9 @@ exports.removeDuplicates = async (db, user, data = {}) => {
   )
 
   await db.query(
-    `DELETE FROM services s
+    `UPDATE services s
+     SET is_active=false,
+         deleted_at=COALESCE(deleted_at, NOW())
      WHERE s.type='FNB'
        AND s.branch_id=$1
        AND NOT EXISTS (SELECT 1 FROM fnb_items fi WHERE fi.service_id = s.id)`,
