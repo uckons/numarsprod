@@ -53,6 +53,7 @@
             <span class="status" :class="order.status.toLowerCase()">{{ order.status }}</span>
           </div>
           <small class="muted">{{ formatItems(order.items_snapshot) }}</small>
+          <small class="muted">{{ formatAuditDate(order.created_at) }}</small>
           <small v-if="order.note" class="note-line">📝 {{ order.note }}</small>
         </button>
 
@@ -123,6 +124,7 @@
       <div class="modal card-glass">
         <h3>Order #{{ selectedInboxOrder.order_id }}</h3>
         <p class="muted">Status: {{ selectedInboxOrder.status }}</p>
+        <p class="muted">Audit: {{ formatAuditDate(selectedInboxOrder.created_at) }}</p>
         <p v-if="selectedInboxOrder.note" class="note-box">Catatan kasir: {{ selectedInboxOrder.note }}</p>
 
         <ul class="order-items">
@@ -363,6 +365,7 @@ const submitAdjustment = async (item) => {
 
 const formatItems = (items) => Array.isArray(items) ? items.map(i => `${i.service_name} x${i.qty}`).join(", ") : "-"
 const formatCurrency = (v) => Number(v || 0).toLocaleString("id-ID")
+const formatAuditDate = (v) => v ? new Date(v).toLocaleString("id-ID", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"
 
 onMounted(async () => {
   socket.emit("join-branch", {

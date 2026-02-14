@@ -1,4 +1,21 @@
+const ensureFnbColumns = async (db) => {
+  await db.query(`
+    ALTER TABLE fnb_items
+    ADD COLUMN IF NOT EXISTS item_group VARCHAR(20) NOT NULL DEFAULT 'NORMAL'
+  `)
+  await db.query(`
+    ALTER TABLE fnb_items
+    ADD COLUMN IF NOT EXISTS package_special BOOLEAN NOT NULL DEFAULT false
+  `)
+}
+
+const normalizeItemGroup = (value) => {
+  const group = String(value || 'NORMAL').toUpperCase()
+  return ['NORMAL', 'VARIAN', 'CUSTOM'].includes(group) ? group : 'NORMAL'
+}
+
 exports.getAll = async (db, user, query = {}) => {
+  await ensureFnbColumns(db)
   const { rows } = await db.query(
   //  `SELECT * FROM fnb_items WHERE branch_id=$1 ORDER BY name`,
     `SELECT
@@ -16,6 +33,8 @@ exports.getAll = async (db, user, query = {}) => {
       fi.is_package,
       fi.package_qty,
       fi.package_group,
+      fi.item_group,
+      fi.package_special,
       fi.package_price,
       fi.package_name,
       COALESCE(fi.price, s.base_price, 0) AS sell_price,
@@ -53,6 +72,7 @@ exports.getAll = async (db, user, query = {}) => {
 }
 
 exports.create = async (db, user, data) => {
+  await ensureFnbColumns(db)
  // const { name, price, stock, alert_stock } = data
       const {
     name,
@@ -67,6 +87,8 @@ exports.create = async (db, user, data) => {
     is_package,
     package_qty,
     package_group,
+    item_group,
+    package_special,
     package_price,
     package_name
   } = data
@@ -81,6 +103,19 @@ exports.create = async (db, user, data) => {
   if (Boolean(is_package) && Number(package_qty || 0) <= 0) {
     throw new Error("package_qty wajib diisi untuk item paket")
   }
+  if (Boolean(package_special) && !Boolean(is_package)) {
+    throw new Error("Paket khusus hanya berlaku untuk item paket")
+  }
+  const normalizedItemGroup = normalizeItemGroup(item_group)
+
+  const duplicateCheck = await db.query(
+    `SELECT id FROM fnb_items WHERE branch_id=$1 AND LOWER(name)=LOWER($2) LIMIT 1`,
+    [targetBranchId, name]
+  )
+  if (duplicateCheck.rows.length) {
+    throw new Error("Item FNB dengan nama yang sama sudah ada di outlet ini")
+  }
+
   await db.query("BEGIN")
 
   try {
@@ -96,8 +131,8 @@ exports.create = async (db, user, data) => {
   //return rows[0]
   const { rows } = await db.query(
       `INSERT INTO fnb_items
-       (branch_id, service_id, name, cost_price, price, is_beverage, happy_hour_enabled, happy_hour_price, is_package, package_qty, package_group, package_price, package_name, stock, alert_stock)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       (branch_id, service_id, name, cost_price, price, is_beverage, happy_hour_enabled, happy_hour_price, is_package, package_qty, package_group, item_group, package_special, package_price, package_name, stock, alert_stock)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        RETURNING *`,
       [
         targetBranchId,
@@ -111,10 +146,12 @@ exports.create = async (db, user, data) => {
         Boolean(is_package),
         Number(package_qty || 0) || null,
         package_group || null,
+        normalizedItemGroup,
+        Boolean(package_special),
         package_price !== undefined && package_price !== null ? Number(package_price) : null,
         package_name || null,
-        stock,
-        alert_stock
+        stock ?? 0,
+        alert_stock ?? 0
       ]
     )
 
@@ -128,6 +165,7 @@ exports.create = async (db, user, data) => {
 
 
 exports.update = async (db, id, data) => {
+  await ensureFnbColumns(db)
 //  const { name, price, stock, alert_stock } = data
   const {
     name,
@@ -142,10 +180,16 @@ exports.update = async (db, id, data) => {
     is_package,
     package_qty,
     package_group,
+    item_group,
+    package_special,
     package_price,
     package_name
   } = data  
-  
+  const normalizedItemGroup = normalizeItemGroup(item_group)
+  if (Boolean(package_special) && !Boolean(is_package)) {
+    throw new Error("Paket khusus hanya berlaku untuk item paket")
+  }
+
    await db.query("BEGIN")
 
   try {
@@ -204,16 +248,18 @@ exports.update = async (db, id, data) => {
            is_package=$10,
            package_qty=$11,
            package_group=$12,
-           package_price=$13,
-           package_name=$14
-       WHERE id=$15
+           item_group=$13,
+           package_special=$14,
+           package_price=$15,
+           package_name=$16
+       WHERE id=$17
        RETURNING *`,
       [
         name,
         cost_price ?? 0,
         Number(sell_price ?? price ?? 0),
-        stock,
-        alert_stock,
+        stock ?? 0,
+        alert_stock ?? 0,
         serviceId,
         Boolean(is_beverage),
         Boolean(happy_hour_enabled),
@@ -221,6 +267,8 @@ exports.update = async (db, id, data) => {
         Boolean(is_package),
         Number(package_qty || 0) || null,
         package_group || null,
+        normalizedItemGroup,
+        Boolean(package_special),
         package_price !== undefined && package_price !== null ? Number(package_price) : null,
         package_name || null,
         id
@@ -233,6 +281,74 @@ exports.update = async (db, id, data) => {
     await db.query("ROLLBACK")
     throw error
   }
+}
+
+exports.remove = async (db, id) => {
+  await ensureFnbColumns(db)
+  await db.query("BEGIN")
+  try {
+    const itemRes = await db.query(`SELECT id, service_id FROM fnb_items WHERE id=$1`, [id])
+    if (!itemRes.rows.length) throw new Error('Item FNB tidak ditemukan')
+
+    const serviceId = itemRes.rows[0].service_id
+
+    await db.query(`DELETE FROM stock_logs WHERE fnb_item_id=$1`, [id])
+    await db.query(`DELETE FROM fnb_items WHERE id=$1`, [id])
+
+    if (serviceId) {
+      const refs = await db.query(`SELECT COUNT(*)::int AS total FROM fnb_items WHERE service_id=$1`, [serviceId])
+      if (!Number(refs.rows[0]?.total || 0)) {
+        await db.query(
+          `UPDATE services
+           SET is_active=false,
+               deleted_at=COALESCE(deleted_at, NOW())
+           WHERE id=$1`,
+          [serviceId]
+        )
+      }
+    }
+
+    await db.query("COMMIT")
+    return { success: true }
+  } catch (error) {
+    await db.query("ROLLBACK")
+    throw error
+  }
+}
+
+exports.removeDuplicates = async (db, user, data = {}) => {
+  await ensureFnbColumns(db)
+  const role = String(user.role || '')
+  const privileged = ['SuperAdmin', 'Manager', 'Owner'].includes(role)
+  const branchId = privileged && Number(data.branch_id) > 0 ? Number(data.branch_id) : Number(user.branch_id)
+
+  const { rows } = await db.query(
+    `WITH ranked AS (
+      SELECT id, service_id, ROW_NUMBER() OVER (PARTITION BY branch_id, LOWER(name) ORDER BY id) AS rn
+      FROM fnb_items
+      WHERE branch_id=$1
+    ), removed AS (
+      DELETE FROM fnb_items fi
+      USING ranked r
+      WHERE fi.id = r.id
+        AND r.rn > 1
+      RETURNING fi.service_id
+    )
+    SELECT COUNT(*)::int AS removed_count FROM removed`,
+    [branchId]
+  )
+
+  await db.query(
+    `UPDATE services s
+     SET is_active=false,
+         deleted_at=COALESCE(deleted_at, NOW())
+     WHERE s.type='FNB'
+       AND s.branch_id=$1
+       AND NOT EXISTS (SELECT 1 FROM fnb_items fi WHERE fi.service_id = s.id)`,
+    [branchId]
+  )
+
+  return { removed_count: Number(rows[0]?.removed_count || 0) }
 }
 
 const ensureStockApprovalTable = async (db) => {

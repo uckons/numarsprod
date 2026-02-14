@@ -58,13 +58,12 @@ const loadOrder = async (orderId) => {
           base_price: normalizedBasePrice,
           price_label: item.price_label || null,
           is_package: Boolean(item.is_package),
+          locked_package: Boolean(item.is_package),
+          seed_qty: normalizedQty,
           qty: 1
         }
 
-        // Add sebanyak qty (combo disimpan sebagai 1 baris total)
-        for (let i = 0; i < normalizedQty; i++) {
-          pos.addService(cartItem)
-        }
+        pos.addService(cartItem)
       })
       
       console.log('Store updated, items count:', pos.items.length)
