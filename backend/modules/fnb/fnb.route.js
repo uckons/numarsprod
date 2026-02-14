@@ -31,6 +31,21 @@ module.exports = app => {
     controller.update
   )
 
+
+  app.delete(
+    "/api/fnb/:id",
+    auth,
+    rbac(["SuperAdmin", "Owner", "Supervisor", "Manager"]),
+    controller.remove
+  )
+
+  app.post(
+    "/api/fnb/remove-duplicates",
+    auth,
+    rbac(["SuperAdmin", "Owner", "Supervisor", "Manager"]),
+    controller.removeDuplicates
+  )
+
   app.post(
     "/api/fnb/:id/stock-adjustments",
     auth,
