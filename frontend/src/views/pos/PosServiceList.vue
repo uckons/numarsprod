@@ -42,6 +42,7 @@
           <h4>{{ s.name }}</h4>
           <span class="badge">{{ s.type }}</span>
           <span v-if="s.price_label" class="badge price-badge">{{ s.price_label }}</span>
+          <span v-if="String(s.item_group || '').toUpperCase() === 'VARIAN'" class="badge variant-badge">VARIAN</span>
         </div>
 
         <div class="card-bottom">
@@ -319,6 +320,7 @@ const format = (v) => Number(v || 0).toLocaleString("id-ID")
 .card-top h4 { margin: 0; font-size: 16px; font-weight: 700; }
 .badge { margin-top: 6px; display: inline-block; background: rgba(201,162,77,.2); color: #c9a24d; padding: 4px 10px; border-radius: 12px; font-size: 12px; width: fit-content; }
 .price-badge { margin-left: 6px; background: #f5c518; color: #111; }
+.variant-badge { margin-left: 6px; background: #2a67d1; color: #fff; }
 .card-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
 .duration { font-size: 12px; color: #888; }
 .price { font-size: 16px; font-weight: 700; color: #2ecc71; }
