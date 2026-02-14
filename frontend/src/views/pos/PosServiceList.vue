@@ -137,9 +137,12 @@ const regularPackageGroups = computed(() => {
 
 const sellableServices = computed(() =>
   services.value.filter((s) => {
-    if (s.type === 'FNB' && String(s.item_group || 'NORMAL').toUpperCase() === 'VARIAN') {
-      return false
+    const isVarian = String(s.item_group || 'NORMAL').toUpperCase() === 'VARIAN'
+
+    if (isVarian) {
+      return true
     }
+
     if (s.type === 'FNB' && s.is_package && s.package_group) {
       return !regularPackageGroups.value.has(s.package_group)
     }
