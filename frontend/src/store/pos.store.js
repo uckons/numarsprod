@@ -12,11 +12,24 @@ export const usePosStore = defineStore("pos", () => {
 const selectedTherapist = ref(null)
 const selectedRoom = ref(null)
 
+  const composeServiceName = (baseName, variantName) => {
+    const safeBase = String(baseName || '').trim()
+    const safeVariant = String(variantName || '').trim()
+    if (!safeVariant) return safeBase
+    const lowerBase = safeBase.toLowerCase()
+    const lowerVariant = safeVariant.toLowerCase()
+    if (lowerBase.endsWith(` - ${lowerVariant}`) || lowerBase === lowerVariant) return safeBase
+    return `${safeBase} - ${safeVariant}`
+  }
+
   const itemKey = (service) => [
     service.id,
     Number(service.base_price || 0),
     service.price_label || '',
-    service.is_package ? 'P' : 'N'
+    service.is_package ? 'P' : 'N',
+    String(service.name || '').trim().toLowerCase(),
+    service.variant_name || '',
+    service.item_group || ''
   ].join(':')
 
   function addService(service) {
@@ -37,6 +50,10 @@ const selectedRoom = ref(null)
         package_price: Number(service.package_price || 0) || null,
         package_name: service.package_name || null,
         package_total: Number(service.package_total || 0) || null,
+        package_special: Boolean(service.package_special),
+        variant_name: service.variant_name || null,
+        variant_service_id: service.variant_service_id || null,
+        item_group: service.item_group || null,
         locked_package: Boolean(service.locked_package),
         cart_key: key,
         qty: Number(service.seed_qty || 1)
@@ -116,6 +133,52 @@ function findByCartKey(cartKey) {
     }
   }
 
+  function convertToPackageWithBreakdown(cartKey, packageService, breakdown = []) {
+    const item = findByCartKey(cartKey)
+    if (!item || !packageService) return
+
+    const packageQty = Number(packageService.package_qty || item.package_qty || 0)
+    if (!packageQty) return
+
+    const normalized = (Array.isArray(breakdown) ? breakdown : [])
+      .map(entry => ({
+        variant_service_id: Number(entry.variant_service_id || 0),
+        variant_name: entry.variant_name || null,
+        qty: Number(entry.qty || 0)
+      }))
+      .filter(entry => entry.variant_service_id > 0 && entry.qty > 0)
+
+    const totalSelectedQty = normalized.reduce((acc, entry) => acc + entry.qty, 0)
+    if (!totalSelectedQty || totalSelectedQty > Number(item.qty || 0)) return
+    if (totalSelectedQty % packageQty !== 0) return
+
+    const remainder = Number(item.qty || 0) - totalSelectedQty
+    item.qty = remainder
+    if (item.qty === 0) {
+      items.value = items.value.filter(i => i.cart_key !== cartKey)
+    }
+
+    const packageTotal = Number(
+      packageService.package_price ?? packageService.base_price ?? 0
+    )
+    const unitPriceInPackage = packageQty > 0 ? packageTotal / packageQty : packageTotal
+
+    for (const entry of normalized) {
+      addService({
+        ...packageService,
+        is_package: true,
+        locked_package: true,
+        price_label: 'PAKET',
+        package_total: packageTotal,
+        variant_name: entry.variant_name,
+        variant_service_id: entry.variant_service_id,
+        name: composeServiceName(packageService.package_name || packageService.name, entry.variant_name),
+        seed_qty: entry.qty,
+        base_price: Number(unitPriceInPackage)
+      })
+    }
+  }
+
   // 🔥 AUTO SAVE
   watch(
     items,
@@ -138,6 +201,7 @@ function findByCartKey(cartKey) {
   clear,
   findByCartKey,
   convertToPackage,
+  convertToPackageWithBreakdown,
   setTherapist,         // 🆕
   setRoom              // 🆕
 }

@@ -215,11 +215,11 @@
         <select class="input" v-model.number="stockPageSize"><option :value="10">10</option><option :value="20">20</option><option :value="50">50</option></select>
       </div>
       <div v-for="item in paginatedStocks" :key="item.id" class="stock-row">
-        <div><div class="title">{{ item.name }}</div><small class="muted">Stock: {{ item.stock }} • Alert: {{ item.alert_stock }}</small></div>
-        <form class="inline-form" @submit.prevent="updateStock(item)">
-          <input class="input short" type="number" v-model.number="draftStock[item.id]" />
-          <button class="btn-primary" type="submit">Simpan</button>
-        </form>
+        <div>
+          <div class="title">{{ item.name }}</div>
+          <small class="muted">Stock: {{ item.stock }} • Alert: {{ item.alert_stock }}</small>
+        </div>
+        <span class="badge">View only</span>
       </div>
       <div class="pagination">
         <button class="btn-light" :disabled="stockPage===1" @click="stockPage -= 1">Prev</button>
@@ -248,7 +248,6 @@ const fnbItems = ref([])
 const stockSearch = ref("")
 const stockPage = ref(1)
 const stockPageSize = ref(10)
-const draftStock = ref({})
 
 const stockRequests = ref([])
 const stockApprovalPage = ref(1)
@@ -327,7 +326,6 @@ const closeOutlet = async () => {
 const loadFnb = async () => {
   const res = await api.get("/fnb")
   fnbItems.value = Array.isArray(res.data) ? res.data : []
-  for (const item of fnbItems.value) if (draftStock.value[item.id] === undefined) draftStock.value[item.id] = Number(item.stock || 0)
 }
 
 const loadStockRequests = async () => {
@@ -351,15 +349,6 @@ const loadReport = async () => {
 
 const loadAll = async () => {
   await Promise.all([loadOutletSession(), loadFnb(), loadStockRequests(), loadUndoRequests(), loadReport()])
-}
-
-const updateStock = async (item) => {
-  const nextStock = Number(draftStock.value[item.id])
-  if (Number.isNaN(nextStock) || nextStock < 0) return Swal.fire({ icon: 'warning', title: 'Stock tidak valid' })
-
-  await api.put(`/fnb/${item.id}`, { ...item, sell_price: item.sell_price || item.price, stock: nextStock, alert_stock: item.alert_stock })
-  await Swal.fire({ icon: 'success', title: `Stock ${item.name} diperbarui` })
-  await loadFnb()
 }
 
 const approveStock = async (id) => { await api.post(`/fnb/stock/requests/${id}/approve`); await Swal.fire({ icon: 'success', title: 'Request stock approved' }); await Promise.all([loadStockRequests(), loadFnb()]) }
