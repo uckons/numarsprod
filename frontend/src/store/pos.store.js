@@ -27,6 +27,7 @@ const selectedRoom = ref(null)
     Number(service.base_price || 0),
     service.price_label || '',
     service.is_package ? 'P' : 'N',
+    String(service.name || '').trim().toLowerCase(),
     service.variant_name || '',
     service.item_group || ''
   ].join(':')

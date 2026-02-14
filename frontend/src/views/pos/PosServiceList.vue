@@ -328,6 +328,7 @@ const select = (service) => {
         Number(enriched.base_price || 0),
         enriched.price_label || "",
         enriched.is_package ? "P" : "N",
+        String(enriched.name || "").trim().toLowerCase(),
         enriched.variant_name || "",
         enriched.item_group || ""
       ].join(":")
@@ -347,6 +348,7 @@ const select = (service) => {
     Number(enriched.base_price || 0),
     enriched.price_label || "",
     enriched.is_package ? "P" : "N",
+    String(enriched.name || "").trim().toLowerCase(),
     enriched.variant_name || "",
     enriched.item_group || ""
   ].join(":")
