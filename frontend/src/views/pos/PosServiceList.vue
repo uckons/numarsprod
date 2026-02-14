@@ -319,7 +319,6 @@ const select = (service) => {
         enriched.variant_name = firstVariant.variant_name
         enriched.variant_service_id = firstVariant.variant_service_id
         enriched.item_group = 'VARIAN'
-        enriched.name = `${enriched.package_name || enriched.name} - ${firstVariant.variant_name}`
       }
 
       pos.addService(enriched)

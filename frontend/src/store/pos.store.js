@@ -12,6 +12,16 @@ export const usePosStore = defineStore("pos", () => {
 const selectedTherapist = ref(null)
 const selectedRoom = ref(null)
 
+  const composeServiceName = (baseName, variantName) => {
+    const safeBase = String(baseName || '').trim()
+    const safeVariant = String(variantName || '').trim()
+    if (!safeVariant) return safeBase
+    const lowerBase = safeBase.toLowerCase()
+    const lowerVariant = safeVariant.toLowerCase()
+    if (lowerBase.endsWith(` - ${lowerVariant}`) || lowerBase === lowerVariant) return safeBase
+    return `${safeBase} - ${safeVariant}`
+  }
+
   const itemKey = (service) => [
     service.id,
     Number(service.base_price || 0),
@@ -161,9 +171,7 @@ function findByCartKey(cartKey) {
         package_total: packageTotal,
         variant_name: entry.variant_name,
         variant_service_id: entry.variant_service_id,
-        name: entry.variant_name
-          ? `${packageService.package_name || packageService.name} - ${entry.variant_name}`
-          : (packageService.package_name || packageService.name),
+        name: composeServiceName(packageService.package_name || packageService.name, entry.variant_name),
         seed_qty: entry.qty,
         base_price: Number(unitPriceInPackage)
       })

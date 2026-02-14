@@ -278,7 +278,6 @@ const packageQty = Number(cartItem.package_qty || 0)
     const first = breakdown[0]
     packageService.variant_name = first.variant_name
     packageService.variant_service_id = first.variant_service_id
-    packageService.name = `${packageService.name} - ${first.variant_name}`
     packageService.item_group = 'VARIAN'
     pos.convertToPackageWithBreakdown(cartItem.cart_key, packageService, breakdown)
     return
@@ -311,6 +310,16 @@ const grandTotal = computed(() =>
   items.value.reduce((sum, i) => sum + Number(i.base_price) * i.qty, 0)
 )
 
+const composeServiceName = (baseName, variantName) => {
+  const safeBase = String(baseName || "").trim()
+  const safeVariant = String(variantName || "").trim()
+  if (!safeVariant) return safeBase
+  const lowerBase = safeBase.toLowerCase()
+  const lowerVariant = safeVariant.toLowerCase()
+  if (lowerBase.endsWith(` - ${lowerVariant}`) || lowerBase === lowerVariant) return safeBase
+  return `${safeBase} - ${safeVariant}`
+}
+
 const toPayloadItems = () => {
   const normalized = []
 
@@ -326,7 +335,7 @@ const toPayloadItems = () => {
         id: i.package_service_id,
         qty: packageCount,
         base_price: packagePrice,
-        name: i.variant_name ? `${i.package_name || i.name} - ${i.variant_name}` : (i.package_name || i.name),
+        name: composeServiceName(i.package_name || i.name, i.variant_name),
         price_label: "PAKET",
         is_package: true,
         variant_name: i.variant_name || null,
@@ -339,7 +348,7 @@ const toPayloadItems = () => {
       id: i.id,
       qty: i.qty,
       base_price: i.base_price,
-      name: i.variant_name ? `${i.name} - ${i.variant_name}` : i.name,
+      name: composeServiceName(i.name, i.variant_name),
       price_label: i.price_label,
       is_package: Boolean(i.is_package),
       variant_name: i.variant_name || null,
