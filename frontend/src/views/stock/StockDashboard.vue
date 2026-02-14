@@ -135,6 +135,7 @@
               <span class="badge" :class="item.is_package ? 'warning' : 'danger'">
                 {{ item.is_package ? "PAKET" : "NON-PAKET" }}
               </span>
+              <span v-if="item.package_special" class="badge success" style="margin-left:6px">PAKET KHUSUS</span>
             </td>
             <td>
               <div class="happy-hour">
@@ -225,6 +226,10 @@
               <span>Paket Minuman</span>
               <input v-model="form.is_package" type="checkbox" />
             </label>
+            <label class="inline-toggle" v-if="form.is_package">
+              <span>Paket Khusus (stok ikut varian)</span>
+              <input v-model="form.package_special" type="checkbox" />
+            </label>
               <label>
               Qty Paket
               <input
@@ -275,7 +280,8 @@
                 type="number"
                 min="0"
                 class="input"
-                required
+                :disabled="form.package_special"
+                :required="!form.package_special"
               />
             </label>
             <label>
@@ -285,7 +291,8 @@
                 type="number"
                 min="0"
                 class="input"
-                required
+                :disabled="form.package_special"
+                :required="!form.package_special"
               />
             </label>
             <div class="form-actions">
@@ -337,6 +344,7 @@ const form = ref({
   package_group: '',
   package_price: 0,
   package_name: '',
+  package_special: false,
   happy_hour_enabled: false,
   happy_hour_price: 0,
   stock: 0,
@@ -460,6 +468,13 @@ watch([keyword, statusFilter, perPage, selectedBranch], () => {
   page.value = 1
 })
 
+watch(
+  () => form.value.is_package,
+  (isPackage) => {
+    if (!isPackage) form.value.package_special = false
+  }
+)
+
 watch(selectedBranch, () => {
   loadItems()
 })
@@ -476,6 +491,7 @@ const openAdd = () => {
     package_group: '',
     package_price: 0,
     package_name: '',
+    package_special: false,
     happy_hour_enabled: false,
     happy_hour_price: 0,
     stock: 0,
@@ -498,6 +514,7 @@ const openEdit = (item) => {
     package_group: item.package_group || '',
     package_price: Number(item.package_price || 0),
     package_name: item.package_name || '',
+    package_special: Boolean(item.package_special),
     happy_hour_enabled: Boolean(item.happy_hour_enabled),
     happy_hour_price: Number(item.happy_hour_price || 0),
     stock: Number(item.stock || 0),
@@ -531,12 +548,13 @@ const submitForm = async () => {
     item_group: form.value.item_group || "NORMAL",
     package_price: form.value.is_package ? Number(form.value.package_price || 0) : null,
     package_name: form.value.is_package ? (form.value.package_name || null) : null,
+    package_special: Boolean(form.value.is_package && form.value.package_special),
     happy_hour_enabled: Boolean(form.value.happy_hour_enabled),
     happy_hour_price: form.value.happy_hour_enabled
       ? Number(form.value.happy_hour_price || 0)
       : null,
-    stock: Number(form.value.stock || 0),
-    alert_stock: Number(form.value.alert_stock || 0)
+    stock: form.value.package_special ? 0 : Number(form.value.stock || 0),
+    alert_stock: form.value.package_special ? 0 : Number(form.value.alert_stock || 0)
   }
 
   try {

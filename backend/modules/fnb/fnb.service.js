@@ -3,6 +3,10 @@ const ensureFnbColumns = async (db) => {
     ALTER TABLE fnb_items
     ADD COLUMN IF NOT EXISTS item_group VARCHAR(20) NOT NULL DEFAULT 'NORMAL'
   `)
+  await db.query(`
+    ALTER TABLE fnb_items
+    ADD COLUMN IF NOT EXISTS package_special BOOLEAN NOT NULL DEFAULT false
+  `)
 }
 
 const normalizeItemGroup = (value) => {
@@ -30,6 +34,7 @@ exports.getAll = async (db, user, query = {}) => {
       fi.package_qty,
       fi.package_group,
       fi.item_group,
+      fi.package_special,
       fi.package_price,
       fi.package_name,
       COALESCE(fi.price, s.base_price, 0) AS sell_price,
@@ -83,6 +88,7 @@ exports.create = async (db, user, data) => {
     package_qty,
     package_group,
     item_group,
+    package_special,
     package_price,
     package_name
   } = data
@@ -96,6 +102,9 @@ exports.create = async (db, user, data) => {
   }
   if (Boolean(is_package) && Number(package_qty || 0) <= 0) {
     throw new Error("package_qty wajib diisi untuk item paket")
+  }
+  if (Boolean(package_special) && !Boolean(is_package)) {
+    throw new Error("Paket khusus hanya berlaku untuk item paket")
   }
   const normalizedItemGroup = normalizeItemGroup(item_group)
 
@@ -122,8 +131,8 @@ exports.create = async (db, user, data) => {
   //return rows[0]
   const { rows } = await db.query(
       `INSERT INTO fnb_items
-       (branch_id, service_id, name, cost_price, price, is_beverage, happy_hour_enabled, happy_hour_price, is_package, package_qty, package_group, item_group, package_price, package_name, stock, alert_stock)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       (branch_id, service_id, name, cost_price, price, is_beverage, happy_hour_enabled, happy_hour_price, is_package, package_qty, package_group, item_group, package_special, package_price, package_name, stock, alert_stock)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        RETURNING *`,
       [
         targetBranchId,
@@ -138,10 +147,11 @@ exports.create = async (db, user, data) => {
         Number(package_qty || 0) || null,
         package_group || null,
         normalizedItemGroup,
+        Boolean(package_special),
         package_price !== undefined && package_price !== null ? Number(package_price) : null,
         package_name || null,
-        stock,
-        alert_stock
+        Boolean(package_special) ? 0 : stock,
+        Boolean(package_special) ? 0 : alert_stock
       ]
     )
 
@@ -171,10 +181,14 @@ exports.update = async (db, id, data) => {
     package_qty,
     package_group,
     item_group,
+    package_special,
     package_price,
     package_name
   } = data  
   const normalizedItemGroup = normalizeItemGroup(item_group)
+  if (Boolean(package_special) && !Boolean(is_package)) {
+    throw new Error("Paket khusus hanya berlaku untuk item paket")
+  }
 
    await db.query("BEGIN")
 
@@ -235,16 +249,17 @@ exports.update = async (db, id, data) => {
            package_qty=$11,
            package_group=$12,
            item_group=$13,
-           package_price=$14,
-           package_name=$15
-       WHERE id=$16
+           package_special=$14,
+           package_price=$15,
+           package_name=$16
+       WHERE id=$17
        RETURNING *`,
       [
         name,
         cost_price ?? 0,
         Number(sell_price ?? price ?? 0),
-        stock,
-        alert_stock,
+        Boolean(package_special) ? 0 : stock,
+        Boolean(package_special) ? 0 : alert_stock,
         serviceId,
         Boolean(is_beverage),
         Boolean(happy_hour_enabled),
@@ -253,6 +268,7 @@ exports.update = async (db, id, data) => {
         Number(package_qty || 0) || null,
         package_group || null,
         normalizedItemGroup,
+        Boolean(package_special),
         package_price !== undefined && package_price !== null ? Number(package_price) : null,
         package_name || null,
         id

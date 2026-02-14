@@ -39,6 +39,7 @@ const selectedRoom = ref(null)
         package_price: Number(service.package_price || 0) || null,
         package_name: service.package_name || null,
         package_total: Number(service.package_total || 0) || null,
+        package_special: Boolean(service.package_special),
         variant_name: service.variant_name || null,
         variant_service_id: service.variant_service_id || null,
         item_group: service.item_group || null,
