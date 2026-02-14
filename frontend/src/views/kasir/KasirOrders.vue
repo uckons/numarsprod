@@ -128,7 +128,7 @@
         class="service-item"
       >
         {{ i.service_name }}
-        <small>×{{ i.qty }}</small>
+        <small>×{{ i.qty }} <span v-if="i.is_fnb && i.is_delivered" class="delivered-check">✅</span></small>
       </div>
     </td>
 
@@ -1703,4 +1703,7 @@ th {
     width: 100%;
   }
 }
+
+.delivered-check { margin-left: 4px; }
 </style>
+

@@ -1074,12 +1074,25 @@ exports.getKasirOrders = async (req, res) => {
             'service_id', oi.service_id,
             'service_name', oi.service_name,
             'qty', oi.qty,
-            'subtotal', oi.subtotal
+            'subtotal', oi.subtotal,
+            'is_fnb', (s.type = 'FNB'),
+            'is_delivered', (
+              s.type = 'FNB' AND EXISTS (
+                SELECT 1
+                FROM bar_orders bo
+                WHERE bo.order_id = o.id
+                  AND bo.status = 'DELIVERED'
+                  AND bo.items_snapshot @> jsonb_build_array(
+                    jsonb_build_object('service_id', oi.service_id)
+                  )
+              )
+            )
           )
         ) FILTER (WHERE oi.id IS NOT NULL) AS items
 
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
+      LEFT JOIN services s ON s.id = oi.service_id
       LEFT JOIN therapists th ON th.id = o.therapist_id
       LEFT JOIN LATERAL (
         SELECT COALESCE(
