@@ -16,6 +16,7 @@
         <strong>{{ i.name }}</strong>
         <small>Rp {{ format(i.base_price) }}</small>
         <small v-if="i.price_label" class="item-label">{{ i.price_label }}</small>
+        <small v-if="i.variant_name" class="item-label">Varian: {{ i.variant_name }}</small>
         <small v-if="i.locked_package" class="item-locked">LOCKED PAKET</small>
       </div>
 
