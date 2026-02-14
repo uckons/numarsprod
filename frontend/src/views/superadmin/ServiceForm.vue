@@ -53,6 +53,22 @@
             <input type="number" v-model.number="form.base_price" />
           </div>
         </div>
+        <div class="row" v-if="form.type === 'FNB'">
+          <div class="form-group">
+            <label class="checkbox-inline">
+              <input type="checkbox" v-model="form.package_special" />
+              <span>Paket Varian</span>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label>Group Paket</label>
+            <select v-model="form.package_group" :disabled="!form.package_special">
+              <option value="">Pilih group paket</option>
+              <option v-for="g in packageGroups" :key="g" :value="g">{{ g }}</option>
+            </select>
+          </div>
+        </div>
           <div class="row" v-if="form.type === 'SPA' || form.type === 'LC'">
           <div class="form-group">
             <label>Happy Hour Aktif</label>
@@ -83,7 +99,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted, watch } from "vue"
 import api from "@/services/api"
 import Swal from "sweetalert2"
 import "sweetalert2/dist/sweetalert2.min.css" // tetap import base css (boleh dipindah ke main jika ingin global)
@@ -101,11 +117,14 @@ const form = ref({
   duration_minutes: null,
   branch_id: null,
   happy_hour_enabled: false,
-  happy_hour_price: 0
+  happy_hour_price: 0,
+  package_special: false,
+  package_group: ""
 
 })
 
 const branches = ref([])
+const packageGroups = ref([])
 const loading = ref(false)
 
 /* ===== Add this Swal theme mixin (black & gold) ===== */
@@ -123,6 +142,24 @@ const SwalTheme = Swal.mixin({
 /* ================================================== */
 
 /* INIT */
+const loadPackageGroups = async () => {
+  if (!form.value.branch_id) {
+    packageGroups.value = []
+    return
+  }
+  try {
+    const res = await api.get("/fnb", { params: { branch_id: form.value.branch_id } })
+    const rows = Array.isArray(res.data) ? res.data : (Array.isArray(res.data?.data) ? res.data.data : [])
+    const groups = rows
+      .filter(r => Boolean(r.is_package) && Number(r.package_qty || 0) > 0)
+      .map(r => String(r.package_group || '').trim())
+      .filter(Boolean)
+    packageGroups.value = [...new Set(groups)].sort((a, b) => a.localeCompare(b))
+  } catch (err) {
+    packageGroups.value = []
+  }
+}
+
 onMounted(async () => {
   try {
     const res = await api.get("/branches")
@@ -136,8 +173,22 @@ onMounted(async () => {
   }
 
   if (props.edit && props.data) {
-    Object.assign(form.value, props.data)
+    Object.assign(form.value, {
+      ...props.data,
+      package_special: Boolean(props.data.package_special),
+      package_group: props.data.package_group || ""
+    })
   }
+
+  await loadPackageGroups()
+})
+
+watch(() => form.value.branch_id, async () => {
+  await loadPackageGroups()
+})
+
+watch(() => form.value.package_special, (enabled) => {
+  if (!enabled) form.value.package_group = ""
 })
 
 /* ACTIONS */
@@ -151,6 +202,16 @@ const save = async () => {
       icon: "warning",
       title: "Validasi",
       text: "Name, Type dan Branch wajib diisi",
+      confirmButtonText: "OK"
+    })
+    return
+  }
+
+  if (form.value.type === 'FNB' && form.value.package_special && !form.value.package_group) {
+    await SwalTheme.fire({
+      icon: "warning",
+      title: "Validasi",
+      text: "Paket Varian wajib memilih Group Paket",
       confirmButtonText: "OK"
     })
     return
@@ -177,7 +238,7 @@ const save = async () => {
     await SwalTheme.fire({
       icon: "error",
       title: "Gagal",
-      text: "Failed to save service",
+      text: e?.response?.data?.message || "Failed to save service",
       confirmButtonText: "OK"
     })
   } finally {
@@ -228,6 +289,14 @@ const save = async () => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+.checkbox-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+  color: #fff;
 }
 
 label {
