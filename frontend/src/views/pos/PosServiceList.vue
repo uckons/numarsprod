@@ -214,7 +214,7 @@ const enrichService = (service) => {
 }
 
 
-const choosePackageVariantOption = (item, required = false) => {
+const choosePackageVariantBreakdown = (item, required = false, totalQty = 0) => {
   const options = services.value
     .filter(s =>
       s.type === 'FNB' &&
@@ -232,20 +232,49 @@ const choosePackageVariantOption = (item, required = false) => {
         text: 'Paket khusus wajib memiliki item varian dalam group yang sama.'
       }).then(() => undefined)
     }
-    return Promise.resolve(null)
+    return Promise.resolve([])
   }
 
+  const targetQty = Math.max(0, Number(totalQty || item.package_qty || 0))
+
+  const html = `
+    <div style="text-align:left;display:grid;gap:8px;max-height:280px;overflow:auto;padding-right:4px;">
+      ${options.map(opt => `
+        <label style="display:grid;grid-template-columns:1fr 90px;align-items:center;gap:8px;">
+          <span>${opt.name}</span>
+          <input class="swal2-input var-qty" data-id="${opt.id}" data-name="${String(opt.name || '').replace(/"/g, '&quot;')}" type="number" min="0" step="1" value="0" style="margin:0;height:36px;" />
+        </label>
+      `).join('')}
+    </div>
+    <small style="color:#999">Total qty varian harus = ${targetQty}</small>
+  `
+
   return Swal.fire({
-    title: 'Pilih varian paket',
-    input: 'select',
-    inputOptions: Object.fromEntries(options.map(opt => [String(opt.id), opt.name])),
-    inputPlaceholder: 'Pilih varian',
+    title: 'Pilih varian paket + qty',
+    html,
     showCancelButton: true,
     confirmButtonText: 'Pakai varian',
-    cancelButtonText: 'Batal'
-  }).then(({ value }) => {
-    if (!value) return undefined
-    return options.find(opt => String(opt.id) === String(value)) || null
+    cancelButtonText: 'Batal',
+    focusConfirm: false,
+    preConfirm: () => {
+      const inputs = Array.from(document.querySelectorAll('.var-qty'))
+      const rows = inputs.map(el => ({
+        variant_service_id: Number(el.getAttribute('data-id') || 0),
+        variant_name: el.getAttribute('data-name') || '',
+        qty: Number(el.value || 0)
+      })).filter(row => row.variant_service_id > 0 && row.qty > 0)
+
+      const sumQty = rows.reduce((acc, row) => acc + row.qty, 0)
+      if (sumQty !== targetQty) {
+        Swal.showValidationMessage(`Total qty varian harus ${targetQty} (sekarang ${sumQty})`)
+        return false
+      }
+
+      return rows
+    }
+  }).then(({ isConfirmed, value }) => {
+    if (!isConfirmed) return undefined
+    return Array.isArray(value) ? value : []
   })
 }
 
@@ -269,18 +298,11 @@ const maybeOfferPackage = (cartKey) => {
     cancelButtonText: 'Tidak'
   }).then((confirm) => {
     if (!confirm.isConfirmed) return
-    return choosePackageVariantOption(item, variantRequired).then((selectedVariant) => {
-      if (selectedVariant === undefined) return
+    return choosePackageVariantBreakdown(item, variantRequired, item.qty).then((breakdown) => {
+      if (breakdown === undefined) return
 
       const packageSeed = { ...packageService }
-      if (selectedVariant) {
-        packageSeed.variant_name = selectedVariant.name
-        packageSeed.variant_service_id = selectedVariant.id
-        packageSeed.item_group = 'VARIAN'
-        packageSeed.name = `${packageService.name} - ${selectedVariant.name}`
-      }
-
-      pos.convertToPackage(item.cart_key, packageSeed)
+      pos.convertToPackageWithBreakdown(item.cart_key, packageSeed, breakdown)
     })
   })
 }
@@ -289,13 +311,15 @@ const select = (service) => {
   const enriched = enrichService(service)
 
   if (enriched.type === 'FNB' && enriched.is_package && enriched.package_special) {
-    return choosePackageVariantOption(enriched, true).then((selectedVariant) => {
-      if (selectedVariant === undefined) return
-      if (selectedVariant) {
-        enriched.variant_name = selectedVariant.name
-        enriched.variant_service_id = selectedVariant.id
+    return choosePackageVariantBreakdown(enriched, true, Number(enriched.package_qty || 0)).then((breakdown) => {
+      if (breakdown === undefined) return
+
+      const firstVariant = breakdown[0]
+      if (firstVariant) {
+        enriched.variant_name = firstVariant.variant_name
+        enriched.variant_service_id = firstVariant.variant_service_id
         enriched.item_group = 'VARIAN'
-        enriched.name = `${enriched.package_name || enriched.name} - ${selectedVariant.name}`
+        enriched.name = `${enriched.package_name || enriched.name} - ${firstVariant.variant_name}`
       }
 
       pos.addService(enriched)
@@ -309,6 +333,10 @@ const select = (service) => {
         enriched.item_group || ""
       ].join(":")
 
+      const added = pos.findByCartKey(key)
+      if (added && breakdown.length) {
+        pos.convertToPackageWithBreakdown(key, enriched, breakdown)
+      }
       return maybeOfferPackage(key)
     })
   }

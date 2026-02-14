@@ -189,6 +189,48 @@ const loadVariantOptions = async (cartItem) => {
   )
 }
 
+const chooseVariantBreakdownInCart = async (cartItem, variants = []) => {
+  const targetQty = Number(cartItem.qty || 0)
+  const html = `
+    <div style="text-align:left;display:grid;gap:8px;max-height:280px;overflow:auto;padding-right:4px;">
+      ${variants.map(opt => `
+        <label style="display:grid;grid-template-columns:1fr 90px;align-items:center;gap:8px;">
+          <span>${opt.name}</span>
+          <input class="swal2-input var-qty" data-id="${opt.id}" data-name="${String(opt.name || '').replace(/"/g, '&quot;')}" type="number" min="0" step="1" value="0" style="margin:0;height:36px;" />
+        </label>
+      `).join('')}
+    </div>
+    <small style="color:#999">Total qty varian harus = ${targetQty}</small>
+  `
+
+  const res = await SwalTheme.fire({
+    title: 'Pilih varian paket + qty',
+    html,
+    showCancelButton: true,
+    confirmButtonText: 'Pakai varian',
+    cancelButtonText: 'Batal',
+    focusConfirm: false,
+    preConfirm: () => {
+      const inputs = Array.from(document.querySelectorAll('.var-qty'))
+      const rows = inputs.map(el => ({
+        variant_service_id: Number(el.getAttribute('data-id') || 0),
+        variant_name: el.getAttribute('data-name') || '',
+        qty: Number(el.value || 0)
+      })).filter(row => row.variant_service_id > 0 && row.qty > 0)
+
+      const sumQty = rows.reduce((acc, row) => acc + row.qty, 0)
+      if (sumQty !== targetQty) {
+        Swal.showValidationMessage(`Total qty varian harus ${targetQty} (sekarang ${sumQty})`)
+        return false
+      }
+      return rows
+    }
+  })
+
+  if (!res.isConfirmed) return undefined
+  return Array.isArray(res.value) ? res.value : []
+}
+
 const maybeOfferPackage = async (cartItem) => {
   if (!cartItem || cartItem.is_package) return
 
@@ -219,32 +261,27 @@ const packageQty = Number(cartItem.package_qty || 0)
 
   const variants = await loadVariantOptions(cartItem)
   const variantRequired = Boolean(cartItem.package_special)
-  let selectedVariant = null
+  let breakdown = []
   if (variantRequired && !variants.length) {
     await SwalTheme.fire({ icon: 'warning', title: 'Varian belum tersedia', text: 'Paket khusus wajib memilih varian.' })
     return
   }
   if (variants.length) {
-    const variantPick = await SwalTheme.fire({
-      title: 'Pilih varian paket',
-      input: 'select',
-      inputOptions: Object.fromEntries(variants.map(opt => [String(opt.id), opt.name])),
-      showCancelButton: true,
-      confirmButtonText: 'Pakai varian',
-      cancelButtonText: 'Batal'
-    })
-
-    if (!variantPick.isConfirmed) return
-    selectedVariant = variants.find(v => String(v.id) === String(variantPick.value)) || null
+    const pickedBreakdown = await chooseVariantBreakdownInCart(cartItem, variants)
+    if (pickedBreakdown === undefined) return
+    breakdown = pickedBreakdown
   } else if (variantRequired) {
     return
   }
 
-  if (selectedVariant) {
-    packageService.variant_name = selectedVariant.name
-    packageService.variant_service_id = selectedVariant.id
-    packageService.name = `${packageService.name} - ${selectedVariant.name}`
+  if (breakdown.length) {
+    const first = breakdown[0]
+    packageService.variant_name = first.variant_name
+    packageService.variant_service_id = first.variant_service_id
+    packageService.name = `${packageService.name} - ${first.variant_name}`
     packageService.item_group = 'VARIAN'
+    pos.convertToPackageWithBreakdown(cartItem.cart_key, packageService, breakdown)
+    return
   }
 
   pos.convertToPackage(cartItem.cart_key, packageService)
