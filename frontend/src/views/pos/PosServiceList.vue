@@ -211,6 +211,19 @@ const enrichService = (service) => {
     package_label: 'PAKET',
     item_group: service.item_group || 'NORMAL'
   }
+
+  const { value } = await Swal.fire({
+    title: 'Pilih varian paket',
+    input: 'select',
+    inputOptions: Object.fromEntries(options.map(opt => [String(opt.id), opt.name])),
+    inputPlaceholder: 'Pilih varian',
+    showCancelButton: true,
+    confirmButtonText: 'Pakai varian',
+    cancelButtonText: 'Batal'
+  })
+
+  if (!value) return undefined
+  return options.find(opt => String(opt.id) === String(value)) || null
 }
 
 
@@ -218,10 +231,10 @@ const choosePackageVariantOption = async (item, required = false) => {
   const options = services.value
     .filter(s =>
       s.type === 'FNB' &&
-      !s.is_package &&
       s.package_group &&
       s.package_group === item.package_group &&
-      String(s.item_group || '').toUpperCase() === 'VARIAN'
+      String(s.item_group || '').toUpperCase() === 'VARIAN' &&
+      Number(s.id) !== Number(item.package_service_id || item.id)
     )
 
   if (!options.length) {
@@ -284,6 +297,18 @@ const maybeOfferPackage = async (cartKey) => {
 
 const select = async (service) => {
   const enriched = enrichService(service)
+
+  if (enriched.type === 'FNB' && enriched.is_package && enriched.package_special) {
+    const selectedVariant = await choosePackageVariantOption(enriched, true)
+    if (selectedVariant === undefined) return
+    if (selectedVariant) {
+      enriched.variant_name = selectedVariant.name
+      enriched.variant_service_id = selectedVariant.id
+      enriched.item_group = 'VARIAN'
+      enriched.name = `${enriched.package_name || enriched.name} - ${selectedVariant.name}`
+    }
+  }
+
   pos.addService(enriched)
 
   const key = [

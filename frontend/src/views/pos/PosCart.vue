@@ -183,9 +183,9 @@ const loadVariantOptions = async (cartItem) => {
   const res = await api.get('/services', { params: { type: 'FNB', is_active: true } })
   const rows = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : [])
   return rows.filter(s =>
-    !s.is_package &&
     s.package_group === cartItem.package_group &&
-    String(s.item_group || '').toUpperCase() === 'VARIAN'
+    String(s.item_group || '').toUpperCase() === 'VARIAN' &&
+    Number(s.id) !== Number(cartItem.package_service_id || cartItem.id)
   )
 }
 
