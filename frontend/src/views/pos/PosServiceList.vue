@@ -242,6 +242,33 @@ const pickPackageVariant = async (item, required = false) => {
   return options.find(opt => String(opt.id) === String(value)) || null
 }
 
+
+const pickPackageVariant = async (item) => {
+  const options = services.value
+    .filter(s =>
+      s.type === 'FNB' &&
+      !s.is_package &&
+      s.package_group &&
+      s.package_group === item.package_group &&
+      String(s.item_group || '').toUpperCase() === 'VARIAN'
+    )
+
+  if (!options.length) return null
+
+  const { value } = await Swal.fire({
+    title: 'Pilih varian paket',
+    input: 'select',
+    inputOptions: Object.fromEntries(options.map(opt => [String(opt.id), opt.name])),
+    inputPlaceholder: 'Pilih varian',
+    showCancelButton: true,
+    confirmButtonText: 'Pakai varian',
+    cancelButtonText: 'Batal'
+  })
+
+  if (!value) return undefined
+  return options.find(opt => String(opt.id) === String(value)) || null
+}
+
 const maybeOfferPackage = async (cartKey) => {
   const item = pos.findByCartKey(cartKey)
   if (!item || item.is_package) return

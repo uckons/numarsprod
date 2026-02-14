@@ -247,6 +247,29 @@ const packageQty = Number(cartItem.package_qty || 0)
     packageService.item_group = 'VARIAN'
   }
 
+  const variants = await loadVariantOptions(cartItem)
+  let selectedVariant = null
+  if (variants.length) {
+    const variantPick = await SwalTheme.fire({
+      title: 'Pilih varian paket',
+      input: 'select',
+      inputOptions: Object.fromEntries(variants.map(opt => [String(opt.id), opt.name])),
+      showCancelButton: true,
+      confirmButtonText: 'Pakai varian',
+      cancelButtonText: 'Batal'
+    })
+
+    if (!variantPick.isConfirmed) return
+    selectedVariant = variants.find(v => String(v.id) === String(variantPick.value)) || null
+  }
+
+  if (selectedVariant) {
+    packageService.variant_name = selectedVariant.name
+    packageService.variant_service_id = selectedVariant.id
+    packageService.name = `${packageService.name} - ${selectedVariant.name}`
+    packageService.item_group = 'VARIAN'
+  }
+
   pos.convertToPackage(cartItem.cart_key, packageService)
 }
 
