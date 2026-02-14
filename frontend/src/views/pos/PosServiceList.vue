@@ -295,6 +295,43 @@ const choosePackageVariantOption = (item, required = false) => {
   })
 }
 
+
+const choosePackageVariantOption = async (item, required = false) => {
+  const options = services.value
+    .filter(s =>
+      s.type === 'FNB' &&
+      s.package_group &&
+      s.package_group === item.package_group &&
+      String(s.item_group || '').toUpperCase() === 'VARIAN' &&
+      Number(s.id) !== Number(item.package_service_id || item.id)
+    )
+
+  if (!options.length) {
+    if (required) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Varian belum tersedia',
+        text: 'Paket khusus wajib memiliki item varian dalam group yang sama.'
+      })
+      return undefined
+    }
+    return null
+  }
+
+  const { value } = await Swal.fire({
+    title: 'Pilih varian paket',
+    input: 'select',
+    inputOptions: Object.fromEntries(options.map(opt => [String(opt.id), opt.name])),
+    inputPlaceholder: 'Pilih varian',
+    showCancelButton: true,
+    confirmButtonText: 'Pakai varian',
+    cancelButtonText: 'Batal'
+  })
+
+  if (!value) return undefined
+  return options.find(opt => String(opt.id) === String(value)) || null
+}
+
 const maybeOfferPackage = async (cartKey) => {
   const item = pos.findByCartKey(cartKey)
   if (!item || item.is_package) return
