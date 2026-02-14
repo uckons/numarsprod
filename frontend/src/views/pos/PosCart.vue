@@ -184,8 +184,7 @@ const loadVariantOptions = async (cartItem) => {
   const rows = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : [])
   return rows.filter(s =>
     s.package_group === cartItem.package_group &&
-    Number(s.id) !== Number(cartItem.package_service_id || cartItem.id) &&
-    (!s.is_package || String(s.item_group || '').toUpperCase() === 'VARIAN')
+    !(Boolean(s.is_package) && String(s.item_group || 'NORMAL').toUpperCase() !== 'VARIAN')
   )
 }
 

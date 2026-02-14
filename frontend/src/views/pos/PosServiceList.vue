@@ -220,8 +220,7 @@ const choosePackageVariantBreakdown = (item, required = false, totalQty = 0) => 
       s.type === 'FNB' &&
       s.package_group &&
       s.package_group === item.package_group &&
-      Number(s.id) !== Number(item.package_service_id || item.id) &&
-      (!s.is_package || String(s.item_group || '').toUpperCase() === 'VARIAN')
+      !(Boolean(s.is_package) && String(s.item_group || 'NORMAL').toUpperCase() !== 'VARIAN')
     )
 
   if (!options.length) {
