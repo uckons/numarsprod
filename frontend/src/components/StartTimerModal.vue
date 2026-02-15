@@ -146,14 +146,14 @@
         <div v-for="item in karaokeBaseItems" :key="`base-${item.id}`" class="ktv-item-row">
           <input class="ktv-checkbox" type="checkbox" :checked="isKtvItemChecked(item)" @change="toggleKtvItem(item, 'KTV', $event.target.checked)" />
           <span class="ktv-item-name">{{ item.name }}</span>
-          <input class="ktv-qty-input" type="number" min="0" :value="(selectedKtvFnbItems.find(v => Number(v.service_id)===Number(item.service_id)) || { qty: getKtvDefaultQtyByTag(item, 'KTV') || 1 }).qty" @input="updateKtvItemQty(item, $event)" />
+          <input class="ktv-qty-input" type="number" min="0" :value="(selectedKtvFnbItems.find(v => Number(v.service_id)===Number(item.service_id)) || { qty: getKtvDefaultQtyByTag(item, 'KTV') || 1 }).qty" :disabled="!isKtvItemChecked(item)" @input="updateKtvItemQty(item, $event)" />
         </div>
 
         <div v-if="karaokePackageItems.length" class="section-caption">Paket {{ selectedKtvPackageTag }} (pilih minimal 1 item)</div>
         <div v-for="item in karaokePackageItems" :key="`pkg-${item.id}`" class="ktv-item-row">
           <input class="ktv-checkbox" type="checkbox" :checked="isKtvItemChecked(item)" @change="toggleKtvItem(item, selectedKtvPackageTag, $event.target.checked)" />
           <span class="ktv-item-name">{{ item.name }}</span>
-          <input class="ktv-qty-input" type="number" min="0" :value="(selectedKtvFnbItems.find(v => Number(v.service_id)===Number(item.service_id)) || { qty: getKtvDefaultQtyByTag(item, selectedKtvPackageTag) || 1 }).qty" @input="updateKtvItemQty(item, $event)" />
+          <input class="ktv-qty-input" type="number" min="0" :value="(selectedKtvFnbItems.find(v => Number(v.service_id)===Number(item.service_id)) || { qty: getKtvDefaultQtyByTag(item, selectedKtvPackageTag) || 1 }).qty" :disabled="!isKtvItemChecked(item)" @input="updateKtvItemQty(item, $event)" />
         </div>
       </div>
     </div>

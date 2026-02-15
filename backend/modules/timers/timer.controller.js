@@ -519,13 +519,12 @@ exports.startTimer = async (req, res) => {
           const fnbService = fnbMap.get(item.service_id)
           if (!fnbService) continue
           const qty = Number(item.qty || 0)
-          const unitPrice = Math.round(Number(fnbService.base_price || 0))
-          const subtotal = unitPrice * qty
-          comboTotal += subtotal
+          const unitPrice = 0
+          const subtotal = 0
           await db.query(
-            `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [finalOrderId, fnbService.id, fnbService.name, qty, unitPrice, subtotal]
+            `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [finalOrderId, fnbService.id, fnbService.name, qty, unitPrice, subtotal, 'KTV INCLUDED', true]
           )
         }
       }
