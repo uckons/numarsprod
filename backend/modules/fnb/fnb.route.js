@@ -9,7 +9,7 @@ module.exports = app => {
     "/api/fnb",
     auth,
   //  rbac(["Staff Bar", "Supervisor", "Manager"]),
-    rbac(["SuperAdmin", "Owner", "Supervisor", "Manager", "Staff Bar"]),
+    rbac(["SuperAdmin", "Owner", "Supervisor", "Manager", "Staff Bar", "Kasir"]),
     controller.getAll
   )
 
@@ -49,7 +49,7 @@ module.exports = app => {
   app.post(
     "/api/fnb/:id/stock-adjustments",
     auth,
-    rbac(["SuperAdmin", "Owner", "Supervisor", "Manager", "Staff Bar"]),
+    rbac(["SuperAdmin", "Owner", "Supervisor", "Manager", "Staff Bar", "Kasir"]),
     controller.requestStockAdjustment
   )
 
