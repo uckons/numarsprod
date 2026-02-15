@@ -279,6 +279,9 @@ const resizeSelection = (currentValues, qty, { keepFirstValue = false } = {}) =>
 }
 
 const initSelections = () => {
+  if (serviceType.value === 'KARAOKE') {
+    selectedServiceQty.value = Number(requiredTherapistQty.value || 1)
+  }
   const qty = Number(selectedServiceQty.value || 1)
   selectedServiceIds.value = resizeSelection(selectedServiceIds.value, qty, { keepFirstValue: true })
   selectedTherapistIds.value = resizeSelection(selectedTherapistIds.value, qty)
@@ -534,6 +537,9 @@ watch(serviceType, async (newType, oldType) => {
 const submit = () => {
   errorMessage.value = ""
 
+  if (serviceType.value === 'KARAOKE') {
+    selectedServiceQty.value = Number(requiredTherapistQty.value || 1)
+  }
   const qty = Number(selectedServiceQty.value || 1)
   const normalizedServiceIds = selectedServiceIds.value
     .map(id => Number(id))
