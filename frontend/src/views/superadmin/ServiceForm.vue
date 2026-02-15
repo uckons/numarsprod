@@ -160,16 +160,33 @@ const loadPackageGroups = async () => {
   }
 }
 
-onMounted(async () => {
+const normalizeBranchPayload = (payload) => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  return []
+}
+
+const loadBranches = async () => {
+  try {
+    const res = await api.get("/superadmin/branches")
+    branches.value = normalizeBranchPayload(res.data)
+    if (branches.value.length) return
+  } catch (_) {}
+
   try {
     const res = await api.get("/branches")
-    branches.value = res.data.data || res.data
-  } catch (err) {
+    branches.value = normalizeBranchPayload(res.data)
+  } catch (_) {
     branches.value = []
   }
+}
+
+onMounted(async () => {
+  await loadBranches()
 
   if (!props.edit) {
-    form.value.branch_id = 1 // default Pondok Indah (pastikan id 1 valid)
+    const defaultBranchId = branches.value.find((b) => Number(b.id) === 1)?.id || branches.value[0]?.id || null
+    form.value.branch_id = defaultBranchId
   }
 
   if (props.edit && props.data) {

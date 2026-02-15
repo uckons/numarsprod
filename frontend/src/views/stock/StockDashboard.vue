@@ -429,6 +429,8 @@ onMounted(async () => {
   await loadHappyHours()
 })
 
+const hasManagedStock = (item) => !Boolean(item?.package_special)
+
 const filteredItems = computed(() => {
   const normalizedKeyword = keyword.value.toLowerCase()
   return items.value.filter(item => {
@@ -436,10 +438,10 @@ const filteredItems = computed(() => {
     const matchesName = item.name?.toLowerCase().includes(normalizedKeyword)
     if (!matchesName) return false
     if (statusFilter.value === "LOW") {
-      return item.stock > 0 && item.stock <= item.alert_stock
+      return hasManagedStock(item) && item.stock > 0 && item.stock <= item.alert_stock
     }
     if (statusFilter.value === "OUT") {
-      return item.stock <= 0
+      return hasManagedStock(item) && item.stock <= 0
     }
     return true
   })
@@ -456,10 +458,10 @@ const paginatedItems = computed(() => {
 
 const totalItems = computed(() => items.value.length)
 const lowStockCount = computed(() =>
-  items.value.filter(item => item.stock > 0 && item.stock <= item.alert_stock).length
+  items.value.filter(item => hasManagedStock(item) && item.stock > 0 && item.stock <= item.alert_stock).length
 )
 const outOfStockCount = computed(() =>
-  items.value.filter(item => item.stock <= 0).length
+  items.value.filter(item => hasManagedStock(item) && item.stock <= 0).length
 )
 
 const canManageStock = computed(() => !["Supervisor", "Staff Bar"].includes(String(auth.user?.role || "")))
@@ -618,12 +620,14 @@ const nextPage = () => {
 }
 
 const statusLabel = (item) => {
+  if (!hasManagedStock(item)) return "N/A"
   if (item.stock <= 0) return "OUT"
   if (item.stock <= item.alert_stock) return "LOW"
   return "SAFE"
 }
 
 const statusClass = (item) => {
+  if (!hasManagedStock(item)) return "neutral"
   if (item.stock <= 0) return "danger"
   if (item.stock <= item.alert_stock) return "warning"
   return "success"
@@ -798,6 +802,11 @@ td {
 .badge.danger {
   background: rgba(231,76,60,.2);
   color: #e74c3c;
+}
+
+.badge.neutral {
+  background: rgba(127, 140, 141, .25);
+  color: #d0d6d8;
 }
 
 .happy-hour {
