@@ -46,7 +46,7 @@
       <span v-if="loadingServices" class="loading-text">Memuat service…</span>
     </div>
 
-    <div class="field" v-if="serviceType && !['LOUNGE', 'KARAOKE'].includes(serviceType)">
+    <div class="field" v-if="serviceType && !['LOUNGE'].includes(serviceType)">
       <label>
         Nama Terapis
         <small v-if="therapistSelectionCount > 1">(wajib {{ therapistSelectionCount }} terapis)</small>
@@ -56,6 +56,7 @@
           v-for="idx in therapistSelectionCount"
           :key="`ther-${idx}`"
           v-model="selectedTherapistIds[idx - 1]"
+          @change="onTherapistSelectionChange(idx - 1, $event.target.value)"
           :disabled="loadingTherapists || !serviceType"
         >
           <option value="">-- Pilih Terapis #{{ idx }} --</option>
