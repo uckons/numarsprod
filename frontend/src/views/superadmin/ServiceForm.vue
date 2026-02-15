@@ -53,6 +53,14 @@
             <input type="number" v-model.number="form.base_price" />
           </div>
         </div>
+
+        <div class="row" v-if="form.type === 'KARAOKE'">
+          <div class="form-group">
+            <label>Jumlah Terapis Wajib</label>
+            <input type="number" min="1" v-model.number="form.therapist_qty_required" />
+          </div>
+        </div>
+
         <div class="row" v-if="form.type === 'FNB'">
           <div class="form-group">
             <label class="checkbox-inline">
@@ -119,7 +127,8 @@ const form = ref({
   happy_hour_enabled: false,
   happy_hour_price: 0,
   package_special: false,
-  package_group: ""
+  package_group: "",
+  therapist_qty_required: 1
 
 })
 
