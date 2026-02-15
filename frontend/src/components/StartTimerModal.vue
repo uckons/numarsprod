@@ -56,6 +56,7 @@
           v-for="idx in therapistSelectionCount"
           :key="`ther-${idx}`"
           v-model="selectedTherapistIds[idx - 1]"
+          @change="onTherapistSelectionChange(idx - 1, $event.target.value)"
           :disabled="loadingTherapists || !serviceType"
         >
           <option value="">-- Pilih Terapis #{{ idx }} --</option>
@@ -145,6 +146,7 @@ const selectedOrderType = ref("SINGLE")
 const selectedServiceQty = ref(1)
 const selectedServiceIds = ref([""])
 const selectedTherapistIds = ref([""])
+const therapistSelectionsTouched = ref([false])
 const selectedRoomId = ref("")
 const selectedComboQty = ref(1)
 const selectedComboServiceIds = ref([])
@@ -285,6 +287,7 @@ const initSelections = () => {
   const qty = Number(selectedServiceQty.value || 1)
   selectedServiceIds.value = resizeSelection(selectedServiceIds.value, qty, { keepFirstValue: true })
   selectedTherapistIds.value = resizeSelection(selectedTherapistIds.value, qty)
+  therapistSelectionsTouched.value = Array.from({ length: qty }, () => false)
 }
 
 const ensureComboBaseService = () => {
@@ -323,10 +326,16 @@ const onServiceSelectionChange = async () => {
     selectedServiceIds.value = [selectedServiceIds.value[0] || '']
     // Terapis karaoke wajib dipilih manual pada popup, jangan carry over dari pilihan service sebelumnya.
     selectedTherapistIds.value = Array.from({ length: therapistSelectionCount.value }, () => '')
+    therapistSelectionsTouched.value = Array.from({ length: therapistSelectionCount.value }, () => false)
   }
   await fetchTherapists()
   await fetchRooms()
   await fetchKtvFnbItems()
+}
+
+const onTherapistSelectionChange = (index, value) => {
+  selectedTherapistIds.value[index] = value
+  therapistSelectionsTouched.value[index] = Boolean(String(value || '').trim())
 }
 
 const isTherapistDisabled = (therapistId, currentIndex) => {
@@ -526,6 +535,7 @@ watch(serviceType, async (newType, oldType) => {
   selectedRoomId.value = ""
   // Reset setiap ganti tipe service agar pilihan terapis selalu explicit dari user.
   selectedTherapistIds.value = Array(therapistSelectionCount.value).fill("")
+  therapistSelectionsTouched.value = Array(therapistSelectionCount.value).fill(false)
   if (newType === 'KARAOKE') {
     selectedKtvFnbItems.value = []
   }
@@ -571,6 +581,12 @@ const submit = () => {
     .filter(id => Number.isInteger(id) && id > 0)
 
   if (!['LOUNGE'].includes(selectedType)) {
+    const touchedSelections = therapistSelectionsTouched.value.filter(Boolean).length
+    if (touchedSelections !== therapistSelectionCount.value) {
+      errorMessage.value = "Pilih terapis manual di popup"
+      return
+    }
+
     if (normalizedTherapistIds.length !== therapistSelectionCount.value) {
       errorMessage.value = "Pilih terapis sesuai ketentuan service"
       return
