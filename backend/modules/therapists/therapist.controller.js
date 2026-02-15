@@ -338,6 +338,7 @@ exports.deleteTherapist = async (req, res) => {
 exports.getGrades = async (req, res) => {
   try {
     const db = req.app.get("db")
+    await ensureGradeCommissionStorage(db)
     
     const gradeCommissionExpr = await resolveGradeCommissionExpression(db)
 
@@ -422,6 +423,7 @@ exports.createGrade = async (req, res) => {
 exports.updateGrade = async (req, res) => {
   try {
     const db = req.app.get("db")
+    await ensureGradeCommissionStorage(db)
     const { id } = req.params
     const { name, commission_amount, commission_percent, service_addon_amount } = req.body
 

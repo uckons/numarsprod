@@ -15,11 +15,43 @@ const ensureFnbColumns = async (db) => {
     ALTER TABLE fnb_items
     ADD COLUMN IF NOT EXISTS ktv_default_qty INT NOT NULL DEFAULT 0
   `)
+  await db.query(`
+    ALTER TABLE fnb_items
+    ADD COLUMN IF NOT EXISTS ktv_group_default_qty JSONB NOT NULL DEFAULT '{}'::jsonb
+  `)
 }
 
 const normalizeItemGroup = (value) => {
   const group = String(value || 'NORMAL').toUpperCase()
   return ['NORMAL', 'VARIAN', 'CUSTOM'].includes(group) ? group : 'NORMAL'
+}
+
+const KTV_TAG_OPTIONS = ['KTV', 'KTV-2K', 'KTV-3K', 'KTV-4K']
+
+const normalizeKtvTags = (value) => {
+  const list = Array.isArray(value)
+    ? value
+    : String(value || '').split(',')
+
+  const normalized = list
+    .map((tag) => String(tag || '').trim().toUpperCase())
+    .filter((tag) => KTV_TAG_OPTIONS.includes(tag))
+
+  return [...new Set(normalized)]
+}
+
+const normalizeKtvDefaultQtyMap = (tags, qtyMapInput, fallbackQty = 0) => {
+  const source = qtyMapInput && typeof qtyMapInput === 'object' && !Array.isArray(qtyMapInput)
+    ? qtyMapInput
+    : {}
+
+  const normalized = {}
+  for (const tag of tags) {
+    const value = Number(source[tag] ?? fallbackQty ?? 0)
+    normalized[tag] = Number.isFinite(value) && value > 0 ? Math.floor(value) : 0
+  }
+
+  return normalized
 }
 
 exports.getAll = async (db, user, query = {}) => {
@@ -47,6 +79,7 @@ exports.getAll = async (db, user, query = {}) => {
       fi.package_name,
       fi.ktv_group_tags,
       fi.ktv_default_qty,
+      fi.ktv_group_default_qty,
       COALESCE(fi.price, s.base_price, 0) AS sell_price,
       COALESCE(fi.price, s.base_price, 0) AS price,
       s.is_active AS service_active
@@ -102,7 +135,8 @@ exports.create = async (db, user, data) => {
     package_price,
     package_name,
     ktv_group_tags,
-    ktv_default_qty
+    ktv_default_qty,
+    ktv_group_default_qty
   } = data
   const role = String(user.role || '')
   const privileged = ['SuperAdmin', 'Manager', 'Owner'].includes(role)
@@ -119,6 +153,8 @@ exports.create = async (db, user, data) => {
     throw new Error("Paket khusus hanya berlaku untuk item paket")
   }
   const normalizedItemGroup = normalizeItemGroup(item_group)
+  const normalizedKtvTags = normalizeKtvTags(ktv_group_tags)
+  const normalizedKtvQtyMap = normalizeKtvDefaultQtyMap(normalizedKtvTags, ktv_group_default_qty, ktv_default_qty)
 
   const duplicateCheck = await db.query(
     `SELECT id FROM fnb_items WHERE branch_id=$1 AND LOWER(name)=LOWER($2) LIMIT 1`,
@@ -143,8 +179,8 @@ exports.create = async (db, user, data) => {
   //return rows[0]
   const { rows } = await db.query(
       `INSERT INTO fnb_items
-       (branch_id, service_id, name, cost_price, price, is_beverage, happy_hour_enabled, happy_hour_price, is_package, package_qty, package_group, item_group, package_special, package_price, package_name, ktv_group_tags, ktv_default_qty, stock, alert_stock)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+       (branch_id, service_id, name, cost_price, price, is_beverage, happy_hour_enabled, happy_hour_price, is_package, package_qty, package_group, item_group, package_special, package_price, package_name, ktv_group_tags, ktv_default_qty, ktv_group_default_qty, stock, alert_stock)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        RETURNING *`,
       [
         targetBranchId,
@@ -162,8 +198,9 @@ exports.create = async (db, user, data) => {
         Boolean(package_special),
         package_price !== undefined && package_price !== null ? Number(package_price) : null,
         package_name || null,
-        Array.isArray(ktv_group_tags) ? ktv_group_tags.map(v => String(v || '').trim()).filter(Boolean) : String(ktv_group_tags || '').split(',').map(v => v.trim()).filter(Boolean),
+        normalizedKtvTags,
         Number(ktv_default_qty || 0),
+        normalizedKtvQtyMap,
         stock ?? 0,
         alert_stock ?? 0
       ]
@@ -199,9 +236,12 @@ exports.update = async (db, id, data) => {
     package_price,
     package_name,
     ktv_group_tags,
-    ktv_default_qty
+    ktv_default_qty,
+    ktv_group_default_qty
   } = data  
   const normalizedItemGroup = normalizeItemGroup(item_group)
+  const normalizedKtvTags = normalizeKtvTags(ktv_group_tags)
+  const normalizedKtvQtyMap = normalizeKtvDefaultQtyMap(normalizedKtvTags, ktv_group_default_qty, ktv_default_qty)
   if (Boolean(package_special) && !Boolean(is_package)) {
     throw new Error("Paket khusus hanya berlaku untuk item paket")
   }
@@ -269,8 +309,9 @@ exports.update = async (db, id, data) => {
            package_price=$15,
            package_name=$16,
            ktv_group_tags=$17,
-           ktv_default_qty=$18
-       WHERE id=$19
+           ktv_default_qty=$18,
+           ktv_group_default_qty=$19
+       WHERE id=$20
        RETURNING *`,
       [
         name,
@@ -289,8 +330,9 @@ exports.update = async (db, id, data) => {
         Boolean(package_special),
         package_price !== undefined && package_price !== null ? Number(package_price) : null,
         package_name || null,
-        Array.isArray(ktv_group_tags) ? ktv_group_tags.map(v => String(v || '').trim()).filter(Boolean) : String(ktv_group_tags || '').split(',').map(v => v.trim()).filter(Boolean),
+        normalizedKtvTags,
         Number(ktv_default_qty || 0),
+        normalizedKtvQtyMap,
         id
       ]
     ) 
