@@ -142,17 +142,18 @@
         <small class="loading-text" v-if="loadingKtvFnb">Memuat FNB KTV…</small>
         <small class="loading-text" v-else-if="!karaokeBaseItems.length && !karaokePackageItems.length">Belum ada FNB bertag KTV untuk outlet ini.</small>
 
-        <div v-for="item in karaokeBaseItems" :key="`base-${item.id}`" style="display:flex;gap:8px;align-items:center">
-          <input type="checkbox" :checked="isKtvItemChecked(item)" @change="toggleKtvItem(item, 'KTV', $event.target.checked)" />
-          <span style="flex:1">{{ item.name }}</span>
-          <input type="number" min="0" style="width:90px" :value="(selectedKtvFnbItems.find(v => Number(v.service_id)===Number(item.service_id)) || { qty: getKtvDefaultQtyByTag(item, 'KTV') || 1 }).qty" @input="updateKtvItemQty(item, $event)" />
+        <div v-if="karaokeBaseItems.length" class="section-caption">Item umum (tag KTV)</div>
+        <div v-for="item in karaokeBaseItems" :key="`base-${item.id}`" class="ktv-item-row">
+          <input class="ktv-checkbox" type="checkbox" :checked="isKtvItemChecked(item)" @change="toggleKtvItem(item, 'KTV', $event.target.checked)" />
+          <span class="ktv-item-name">{{ item.name }}</span>
+          <input class="ktv-qty-input" type="number" min="0" :value="(selectedKtvFnbItems.find(v => Number(v.service_id)===Number(item.service_id)) || { qty: getKtvDefaultQtyByTag(item, 'KTV') || 1 }).qty" @input="updateKtvItemQty(item, $event)" />
         </div>
 
-        <div v-if="karaokePackageItems.length" style="margin-top:6px;font-size:12px;color:#bbb">Pilih minimal 1 item paket sesuai {{ selectedKtvPackageTag }}</div>
-        <div v-for="item in karaokePackageItems" :key="`pkg-${item.id}`" style="display:flex;gap:8px;align-items:center">
-          <input type="checkbox" :checked="isKtvItemChecked(item)" @change="toggleKtvItem(item, selectedKtvPackageTag, $event.target.checked)" />
-          <span style="flex:1">{{ item.name }}</span>
-          <input type="number" min="0" style="width:90px" :value="(selectedKtvFnbItems.find(v => Number(v.service_id)===Number(item.service_id)) || { qty: getKtvDefaultQtyByTag(item, selectedKtvPackageTag) || 1 }).qty" @input="updateKtvItemQty(item, $event)" />
+        <div v-if="karaokePackageItems.length" class="section-caption">Paket {{ selectedKtvPackageTag }} (pilih minimal 1 item)</div>
+        <div v-for="item in karaokePackageItems" :key="`pkg-${item.id}`" class="ktv-item-row">
+          <input class="ktv-checkbox" type="checkbox" :checked="isKtvItemChecked(item)" @change="toggleKtvItem(item, selectedKtvPackageTag, $event.target.checked)" />
+          <span class="ktv-item-name">{{ item.name }}</span>
+          <input class="ktv-qty-input" type="number" min="0" :value="(selectedKtvFnbItems.find(v => Number(v.service_id)===Number(item.service_id)) || { qty: getKtvDefaultQtyByTag(item, selectedKtvPackageTag) || 1 }).qty" @input="updateKtvItemQty(item, $event)" />
         </div>
       </div>
     </div>
@@ -817,7 +818,7 @@ onMounted(() => {
   color: #bbb;
 }
 .field select,
-.field input {
+.field input:not([type="checkbox"]) {
   width: 100%;
   height: 42px;
   border-radius: 10px;
@@ -872,4 +873,41 @@ onMounted(() => {
   background: #c9a24d;
   color: #111;
 }
+
+.section-caption {
+  margin-top: 8px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #9fa3aa;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.ktv-item-row {
+  display: grid;
+  grid-template-columns: 20px 1fr 88px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid #1f232c;
+  border-radius: 10px;
+  background: #0c0f14;
+}
+.ktv-item-name {
+  font-size: 15px;
+  color: #e6e9ef;
+  line-height: 1.3;
+}
+.ktv-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #c9a24d;
+  cursor: pointer;
+}
+.ktv-qty-input {
+  width: 88px !important;
+  height: 36px !important;
+  text-align: center;
+  font-weight: 700;
+}
+
 </style>
