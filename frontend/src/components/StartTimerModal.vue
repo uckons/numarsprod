@@ -321,7 +321,8 @@ const onServiceSelectionChange = async () => {
     selectedOrderType.value = 'SINGLE'
     selectedServiceQty.value = 1
     selectedServiceIds.value = [selectedServiceIds.value[0] || '']
-    selectedTherapistIds.value = Array.from({ length: therapistSelectionCount.value }, (_, idx) => selectedTherapistIds.value[idx] || '')
+    // Terapis karaoke wajib dipilih manual pada popup, jangan carry over dari pilihan service sebelumnya.
+    selectedTherapistIds.value = Array.from({ length: therapistSelectionCount.value }, () => '')
   }
   await fetchTherapists()
   await fetchRooms()
@@ -523,7 +524,11 @@ const fetchRooms = async () => {
 watch(serviceType, async (newType, oldType) => {
   if (!newType || newType === oldType) return
   selectedRoomId.value = ""
+  // Reset setiap ganti tipe service agar pilihan terapis selalu explicit dari user.
   selectedTherapistIds.value = Array(therapistSelectionCount.value).fill("")
+  if (newType === 'KARAOKE') {
+    selectedKtvFnbItems.value = []
+  }
   await fetchTherapists()
   await fetchRooms()
   await fetchKtvFnbItems()
