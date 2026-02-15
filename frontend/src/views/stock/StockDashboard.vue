@@ -258,18 +258,17 @@
               Nama Paket (opsional)
               <input v-model="form.package_name" class="input" :disabled="!form.is_package" />
             </label>
-            <div>
-              <div style="margin-bottom:8px;font-weight:600">KTV Group Tags</div>
-              <div v-for="tag in KTV_TAG_OPTIONS" :key="`tag-${tag}`" style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-                <label style="display:flex;align-items:center;gap:8px;min-width:130px">
+            <div class="ktv-tag-wrapper">
+              <div class="ktv-tag-title">KTV Group Tags</div>
+              <div v-for="tag in KTV_TAG_OPTIONS" :key="`tag-${tag}`" class="ktv-tag-row">
+                <label class="ktv-tag-check">
                   <input type="checkbox" :checked="isKtvTagChecked(tag)" @change="toggleKtvTag(tag, $event.target.checked)" />
                   <span>{{ tag }}</span>
                 </label>
                 <input
                   type="number"
                   min="0"
-                  class="input"
-                  style="max-width:160px"
+                  class="input ktv-tag-qty"
                   :disabled="!isKtvTagChecked(tag)"
                   :value="Number(form.ktv_group_default_qty?.[tag] || 0)"
                   @input="setKtvTagQty(tag, $event.target.value)"
@@ -934,7 +933,10 @@ td {
   padding: 22px;
   border-radius: 18px;
   width: 100%;
-  max-width: 760px;
+  max-width: 980px;
+  max-height: min(92vh, 980px);
+  overflow-y: auto;
+  overflow-x: hidden;
   border: 1px solid #2b2b2b;
   box-shadow: 0 30px 80px rgba(0,0,0,.55);
   animation: slideIn .25s ease-in-out;
@@ -943,7 +945,7 @@ td {
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px 16px;
   margin-top: 14px;
 }
 
@@ -962,6 +964,39 @@ td {
   letter-spacing: .4px;
   text-transform: uppercase;
   padding-top: 4px;
+}
+
+.ktv-tag-wrapper {
+  border: 1px solid #2c2c2c;
+  border-radius: 12px;
+  padding: 12px;
+  background: #101010;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ktv-tag-title {
+  font-weight: 600;
+  color: #d5d5d5;
+  margin-bottom: 2px;
+}
+
+.ktv-tag-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 170px);
+  gap: 10px;
+  align-items: center;
+}
+
+.ktv-tag-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ktv-tag-qty {
+  width: 100%;
 }
 
 .inline-toggle {
@@ -1051,6 +1086,19 @@ td {
 
 @media (max-width: 768px) {
   .form-grid { grid-template-columns: 1fr; }
+  .modal {
+    padding: 16px;
+    border-radius: 14px;
+    max-height: 95vh;
+  }
+  .modal-backdrop {
+    padding: 10px;
+    align-items: flex-start;
+  }
+  .ktv-tag-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
   .header {
     flex-direction: column;
     align-items: flex-start;
