@@ -214,12 +214,36 @@
         <input class="input" v-model.trim="stockSearch" placeholder="Cari item stok..." />
         <select class="input" v-model.number="stockPageSize"><option :value="10">10</option><option :value="20">20</option><option :value="50">50</option></select>
       </div>
-      <div v-for="item in paginatedStocks" :key="item.id" class="stock-row">
-        <div>
-          <div class="title">{{ item.name }}</div>
-          <small class="muted">Stock: {{ item.stock }} • Alert: {{ item.alert_stock }}</small>
-        </div>
-        <span class="badge">View only</span>
+      <div class="stock-cards">
+        <article v-for="item in paginatedStocks" :key="item.id" class="stock-item-card">
+          <div class="stock-card-head">
+            <div>
+              <div class="title">{{ item.name }}</div>
+              <small class="muted">Group: {{ item.item_group || 'NORMAL' }}</small>
+            </div>
+            <span class="badge" :class="stockLevelClass(item)">{{ stockLevelLabel(item) }}</span>
+          </div>
+          <div class="stock-metrics">
+            <div>
+              <p class="muted">Stock Saat Ini</p>
+              <strong>{{ item.stock }}</strong>
+            </div>
+            <div>
+              <p class="muted">Batas Alert</p>
+              <strong>{{ item.alert_stock }}</strong>
+            </div>
+            <div>
+              <p class="muted">Estimasi Nilai</p>
+              <strong>Rp {{ formatCurrency(Number(item.stock || 0) * Number(item.sell_price || item.price || 0)) }}</strong>
+            </div>
+          </div>
+          <div class="stock-card-footer">
+            <small class="muted">Outlet: {{ item.branch_name || '-' }}</small>
+          </div>
+        </article>
+      </div>
+      <div v-if="!paginatedStocks.length" class="empty">
+        Tidak ada item stok yang cocok dengan filter.
       </div>
       <div class="pagination">
         <button class="btn-light" :disabled="stockPage===1" @click="stockPage -= 1">Prev</button>
@@ -371,6 +395,19 @@ const changeUndoPage = async (p) => {
 
 const formatCurrency = (n) => Number(n || 0).toLocaleString('id-ID')
 const formatDate = (d) => d ? new Date(d).toLocaleString('id-ID', { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"
+const stockLevelLabel = (item) => {
+  const stock = Number(item?.stock || 0)
+  const alert = Number(item?.alert_stock || 0)
+  if (stock <= 0) return 'Out of Stock'
+  if (stock <= alert) return 'Low Stock'
+  return 'Aman'
+}
+const stockLevelClass = (item) => {
+  const status = stockLevelLabel(item)
+  if (status === 'Out of Stock') return 'closed'
+  if (status === 'Low Stock') return 'warning'
+  return 'open'
+}
 
 onMounted(async () => {
   socket.emit('join-branch', { branch_id: auth.user?.branch_id, role: auth.user?.role, user_id: auth.user?.id })
@@ -401,11 +438,19 @@ onBeforeUnmount(() => {
 .input { background:#121a2c; border:1px solid #334063; color:#fff; border-radius:10px; padding:8px 10px; }
 .short { width: 90px; }
 .stock-row,.req-row { display:flex; justify-content:space-between; align-items:center; gap:12px; border-top:1px solid #2b3452; padding:12px 0; }
+.stock-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px; }
+.stock-item-card { border:1px solid #2b3452; border-radius:14px; padding:12px; background: linear-gradient(180deg, rgba(28,37,59,.84), rgba(15,22,36,.78)); box-shadow: inset 0 1px 0 rgba(133,156,219,.14); }
+.stock-card-head,.stock-card-footer { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.stock-card-footer { margin-top:12px; border-top:1px solid #2b3452; padding-top:10px; align-items:center; }
+.stock-metrics { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:8px; margin-top:10px; }
+.stock-metrics p { margin:0; font-size:12px; }
+.stock-metrics strong { font-size:15px; color:#e2eaff; }
 .title { font-weight:700; }
 .reason { margin: 4px 0 0; color: #d7def7; }
 .badge { background:#2e3c66; color:#d7e2ff; border-radius:999px; padding:4px 8px; font-size:12px; }
 .badge.open { background:#155a36; }
 .badge.closed { background:#5a1a20; }
+.badge.warning { background:#72510f; color:#ffe1a6; }
 .btn-primary,.btn-light,.btn-success,.btn-danger { border:none; border-radius:10px; padding:9px 12px; font-weight:700; cursor:pointer; }
 .btn-primary { background:#5f85ff; color:#fff; }
 .btn-light { background:#27324f; color:#fff; }
@@ -421,5 +466,5 @@ onBeforeUnmount(() => {
 .detail-box { margin-top:12px; border:1px solid #2b3452; border-radius:12px; padding:12px; }
 .chart-wrap { margin-top: 12px; }
 @media (max-width: 980px) { .kpi-grid { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 760px) { .hero,.stock-row,.req-row { flex-direction:column; align-items:flex-start; } .kpi-grid,.summary-grid { grid-template-columns:1fr; } }
+@media (max-width: 760px) { .hero,.req-row,.stock-card-head,.stock-card-footer { flex-direction:column; align-items:flex-start; } .kpi-grid,.summary-grid,.stock-metrics { grid-template-columns:1fr; } }
 </style>
