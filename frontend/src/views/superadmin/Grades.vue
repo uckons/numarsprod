@@ -31,16 +31,17 @@
             <th>#</th>
             <th>Nama Grade</th>
             <th>Komisi Fix (Rp)</th>
+            <th>Addon Service (Rp)</th>
             <th>Jumlah Terapis</th>
             <th>Aksi</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="5" class="loading">Loading...</td>
+            <td colspan="6" class="loading">Loading...</td>
           </tr>
           <tr v-else-if="grades.length === 0">
-            <td colspan="5" class="empty">Belum ada data grade</td>
+            <td colspan="6" class="empty">Belum ada data grade</td>
           </tr>
           <tr v-else v-for="(grade, index) in grades" :key="grade.id">
             <td>{{ index + 1 }}</td>
@@ -52,6 +53,7 @@
             <td class="commission">
               <strong>Rp {{ formatCurrency(grade.commission_amount ?? grade.commission_percent) }}</strong>
             </td>
+            <td>Rp {{ formatCurrency(grade.service_addon_amount || 0) }}</td>
             <td>
               <span class="therapist-count">
                 {{ grade.therapist_count || 0 }} terapis
@@ -107,6 +109,12 @@
             <small class="hint">Nominal komisi fix rupiah per jumlah kerja (>= 0)</small>
           </div>
 
+          <div class="form-group">
+            <label>Addon Harga Service (Rp)</label>
+            <input type="number" v-model.number="form.service_addon_amount" min="0" step="1000" />
+            <small class="hint">Tambahan harga paket saat grade ini dipilih pada timer karaoke</small>
+          </div>
+
           <!-- Preview -->
           <div class="preview" v-if="form.name && form.commission_amount !== ''">
             <div class="preview-label">Preview:</div>
@@ -145,7 +153,8 @@ const showModal = ref(false)
 const isEdit = ref(false)
 const form = ref({
   name: '',
-  commission_amount: ''
+  commission_amount: '',
+  service_addon_amount: 0
 })
 
 // SweetAlert Theme
@@ -208,7 +217,8 @@ const openAddModal = () => {
   isEdit.value = false
   form.value = {
     name: '',
-    commission_amount: ''
+    commission_amount: '',
+    service_addon_amount: 0
   }
   showModal.value = true
 }
@@ -219,7 +229,8 @@ const openEditModal = (grade) => {
   form.value = {
     id: grade.id,
     name: grade.name,
-    commission_amount: grade.commission_amount ?? grade.commission_percent
+    commission_amount: grade.commission_amount ?? grade.commission_percent,
+    service_addon_amount: Number(grade.service_addon_amount || 0)
   }
   showModal.value = true
 }
@@ -229,7 +240,8 @@ const closeModal = () => {
   showModal.value = false
   form.value = {
     name: '',
-    commission_amount: ''
+    commission_amount: '',
+    service_addon_amount: 0
   }
 }
 
@@ -241,7 +253,8 @@ const submitForm = async () => {
     if (isEdit.value) {
       await api.put(`/grades/${form.value.id}`, {
         name: form.value.name,
-        commission_amount: form.value.commission_amount
+        commission_amount: form.value.commission_amount,
+        service_addon_amount: Number(form.value.service_addon_amount || 0)
       })
       await SwalTheme.fire({
         icon: 'success',
@@ -253,7 +266,8 @@ const submitForm = async () => {
     } else {
       await api.post('/grades', {
         name: form.value.name,
-        commission_amount: form.value.commission_amount
+        commission_amount: form.value.commission_amount,
+        service_addon_amount: Number(form.value.service_addon_amount || 0)
       })
       await SwalTheme.fire({
         icon: 'success',
