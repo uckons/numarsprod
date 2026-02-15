@@ -2,6 +2,38 @@ const service = require("./timer.service")
 const { writeAuditLog: writeAuditEntry } = require("../../utils/audit")
 
 exports.start = async (req, res) => {
+
+  const ensureBarOrdersTable = async (db) => {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS bar_orders (
+        id SERIAL PRIMARY KEY,
+        order_id INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        branch_id INT NOT NULL,
+        status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+        items_snapshot JSONB NOT NULL,
+        note TEXT,
+        requested_by INT,
+        accepted_by INT,
+        delivered_by INT,
+        cancelled_by INT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        accepted_at TIMESTAMP,
+        delivered_at TIMESTAMP,
+        cancelled_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `)
+  }
+
+  const emitBarOrderNew = (req, payload) => {
+    const io = req.app.get('io')
+    if (!io || !payload?.branch_id) return
+    const roleRoom = (branchId, role = '') => `branch:${branchId}:role:${String(role).toLowerCase().replace(/\s+/g, '-')}`
+    io.to(roleRoom(payload.branch_id, 'Staff Bar')).emit('bar:order:new', payload)
+    io.to(roleRoom(payload.branch_id, 'Supervisor')).emit('bar:order:new', payload)
+    io.to(roleRoom(payload.branch_id, 'Manager')).emit('bar:order:new', payload)
+  }
+
   try {
     const db = req.app.get("db")
 
@@ -504,10 +536,11 @@ exports.startTimer = async (req, res) => {
         )
       }
 
+      let barSnapshot = []
       if (selectedService.type === 'KARAOKE' && normalizedKtvFnbItems.length) {
         const serviceIds = normalizedKtvFnbItems.map((item) => item.service_id)
         const { rows: fnbServices } = await db.query(
-          `SELECT s.id, s.name, COALESCE(fi.price, s.base_price, 0) AS base_price
+          `SELECT s.id, s.name, fi.id AS fnb_item_id, COALESCE(fi.price, s.base_price, 0) AS base_price
            FROM services s
            JOIN fnb_items fi ON fi.service_id = s.id
            WHERE s.id = ANY($1::int[])`,
@@ -526,7 +559,15 @@ exports.startTimer = async (req, res) => {
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
             [finalOrderId, fnbService.id, fnbService.name, qty, unitPrice, subtotal, 'KTV INCLUDED', true]
           )
+          barSnapshot.push({
+            fnb_item_id: Number(fnbService.fnb_item_id || 0),
+            service_id: Number(fnbService.id),
+            service_name: fnbService.name,
+            qty
+          })
         }
+
+        barSnapshot = barSnapshot.filter((row) => row.fnb_item_id > 0 && row.qty > 0)
       }
 
       await db.query(
@@ -535,6 +576,24 @@ exports.startTimer = async (req, res) => {
          WHERE id = $2`,
         [comboTotal, finalOrderId]
       )
+
+      if (barSnapshot.length) {
+        await ensureBarOrdersTable(db)
+        const barNote = `Auto from KTV timer order #${finalOrderId}`
+        await db.query(
+          `INSERT INTO bar_orders (order_id, branch_id, status, items_snapshot, note, requested_by)
+           VALUES ($1,$2,'PENDING',$3::jsonb,$4,$5)`,
+          [finalOrderId, branchId, JSON.stringify(barSnapshot), barNote, user.id]
+        )
+
+        emitBarOrderNew(req, {
+          order_id: finalOrderId,
+          branch_id: branchId,
+          status: 'PENDING',
+          note: barNote,
+          items: barSnapshot
+        })
+      }
 
       const createdTimers = []
       for (let idx = 0; idx < timerEntries.length; idx += 1) {
