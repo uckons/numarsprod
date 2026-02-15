@@ -58,9 +58,9 @@
         </button>
 
         <div class="actions" v-if="!['DELIVERED','CANCELLED'].includes(order.status)">
-          <button class="btn-light" :disabled="order.status === 'ACCEPTED'" @click="accept(order.id)">Accept</button>
-          <button class="btn-success" @click="deliver(order.id)">Deliver</button>
-          <button class="btn-danger" @click="cancel(order.id)">Cancel</button>
+          <button v-if="order.status === 'PENDING'" class="btn-accept" @click="accept(order.id)">Accept</button>
+          <button v-if="order.status === 'ACCEPTED'" class="btn-success" @click="deliver(order.id)">Deliver</button>
+          <button v-if="order.status === 'ACCEPTED'" class="btn-danger" @click="cancel(order.id)">Cancel</button>
         </div>
       </div>
 
@@ -73,7 +73,7 @@
 
     <section class="card-glass">
       <div class="section-head">
-        <h3>Manajemen Stock (Need Approval)</h3>
+        <h3>Manajemen Stock</h3>
       </div>
 
       <div class="toolbar">
@@ -91,27 +91,36 @@
         </select>
       </div>
 
-      <div class="stock-list">
-        <div v-if="!paginatedStocks.length" class="empty">Data stock tidak ditemukan.</div>
-
-        <div v-for="item in paginatedStocks" :key="item.id" class="stock-item">
-          <div>
-            <div class="order-title">
-              {{ item.name }}
-              <span class="badge" :class="Number(item.stock || 0) <= Number(item.alert_stock || 0) ? 'warn' : 'ok'">
-                Stock {{ item.stock }}
-              </span>
+      <div class="stock-cards">
+        <article v-for="item in paginatedStocks" :key="item.id" class="stock-item-card">
+          <div class="stock-card-head">
+            <div>
+              <div class="order-title">{{ item.name }}</div>
+              <small class="muted">Group: {{ item.item_group || 'NORMAL' }}</small>
             </div>
-            <small class="muted">Alert minimum: {{ item.alert_stock }} • Harga jual: Rp {{ formatCurrency(item.sell_price || item.price) }}</small>
+            <span class="badge" :class="barStockLevelClass(item)">{{ barStockLevelLabel(item) }}</span>
           </div>
 
-          <form class="req-form" @submit.prevent="submitAdjustment(item)">
-            <input v-model.number="draftQty[item.id]" type="number" class="input" placeholder="qty +/-" required />
-            <input v-model="draftReason[item.id]" type="text" class="input" placeholder="alasan" required />
-            <button type="submit" class="btn-primary">Kirim Approval</button>
-          </form>
-        </div>
+          <div class="stock-metrics">
+            <div>
+              <p class="muted">Stock Saat Ini</p>
+              <strong>{{ item.stock }}</strong>
+            </div>
+            <div>
+              <p class="muted">Batas Alert</p>
+              <strong>{{ item.alert_stock }}</strong>
+            </div>
+            <div>
+              <p class="muted">Estimasi Nilai</p>
+              <strong>Rp {{ formatCurrency(Number(item.stock || 0) * Number(item.sell_price || item.price || 0)) }}</strong>
+            </div>
+          </div>
+
+          <small class="muted">Harga jual: Rp {{ formatCurrency(item.sell_price || item.price) }}</small>
+        </article>
       </div>
+
+      <div v-if="!paginatedStocks.length" class="empty">Data stock tidak ditemukan.</div>
 
       <div class="pagination">
         <button class="btn-light" :disabled="stockPage===1" @click="stockPage -= 1">Prev</button>
@@ -134,9 +143,9 @@
         </ul>
 
         <div class="modal-actions" v-if="!['DELIVERED','CANCELLED'].includes(selectedInboxOrder.status)">
-          <button class="btn-light" :disabled="selectedInboxOrder.status === 'ACCEPTED'" @click="accept(selectedInboxOrder.id, true)">Accept</button>
-          <button class="btn-success" @click="deliver(selectedInboxOrder.id, true)">Deliver</button>
-          <button class="btn-danger" @click="cancel(selectedInboxOrder.id, true)">Cancel</button>
+          <button v-if="selectedInboxOrder.status === 'PENDING'" class="btn-accept" @click="accept(selectedInboxOrder.id, true)">Accept</button>
+          <button v-if="selectedInboxOrder.status === 'ACCEPTED'" class="btn-success" @click="deliver(selectedInboxOrder.id, true)">Deliver</button>
+          <button v-if="selectedInboxOrder.status === 'ACCEPTED'" class="btn-danger" @click="cancel(selectedInboxOrder.id, true)">Cancel</button>
         </div>
 
         <div class="modal-actions">
@@ -162,8 +171,6 @@ const barInbox = ref([])
 const inboxPage = ref(1)
 const inboxPageSize = 20
 const inboxPagination = ref({ page: 1, page_size: 20, total: 0, total_pages: 1 })
-const draftQty = ref({})
-const draftReason = ref({})
 const knownPendingInboxKeys = ref(new Set())
 const selectedInboxOrder = ref(null)
 let autoRefreshTimer = null
@@ -285,12 +292,42 @@ const closeInboxDetail = () => {
 }
 
 const accept = async (id, fromModal = false) => {
+  const previousOrder = barInbox.value.find(item => item.id === id) || selectedInboxOrder.value
+
   await api.post(`/orders/bar/${id}/accept`)
   await loadAll({ silent: true })
-  await Swal.fire({ icon: "success", title: "Order diterima bar" })
+
+  const latest = barInbox.value.find(item => item.id === id) || previousOrder
+  const items = Array.isArray(latest?.items_snapshot) ? latest.items_snapshot : []
+  const normalizeText = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const pickHighestStock = (rows = []) => rows.sort((a, b) => Number(b.stock || 0) - Number(a.stock || 0))[0]
+  const stockRows = items.map((item) => {
+    const byFnbItemId = fnbItems.value.find((f) => Number(f.id || 0) > 0 && Number(f.id) === Number(item.fnb_item_id || 0))
+    const byVariantService = fnbItems.value.filter((f) => Number(f.service_id || 0) > 0 && Number(f.service_id) === Number(item.variant_service_id || 0))
+    const byServiceId = fnbItems.value.filter((f) => Number(f.service_id || 0) > 0 && Number(f.service_id) === Number(item.service_id || 0))
+    const byName = fnbItems.value.filter((f) => normalizeText(f.name) && normalizeText(f.name) === normalizeText(item.service_name))
+
+    const stockItem = byFnbItemId || pickHighestStock(byVariantService) || pickHighestStock(byServiceId) || pickHighestStock(byName)
+
+    return {
+      name: item.service_name,
+      qty: Number(item.qty || 0),
+      stock: Number(stockItem?.stock || 0)
+    }
+  })
+
+  const detailHtml = stockRows.length
+    ? `<div style="text-align:left">${stockRows.map((row) => `<div style="margin-bottom:6px"><strong>${row.name}</strong><br/>Qty order: ${row.qty} • Stock tersedia: ${row.stock}</div>`).join('')}</div>`
+    : '<div>Tidak ada item pada order ini.</div>'
+
+  await Swal.fire({
+    icon: 'info',
+    title: 'Order diterima',
+    html: detailHtml,
+    confirmButtonText: 'OK'
+  })
 
   if (fromModal && selectedInboxOrder.value?.id === id) {
-    const latest = barInbox.value.find(item => item.id === id)
     selectedInboxOrder.value = latest || selectedInboxOrder.value
   }
 }
@@ -346,21 +383,18 @@ const cancel = async (id, fromModal = false) => {
   if (fromModal) closeInboxDetail()
 }
 
-const submitAdjustment = async (item) => {
-  const qty = Number(draftQty.value[item.id] || 0)
-  if (!qty) {
-    await Swal.fire({ icon: "info", title: "Qty wajib diisi" })
-    return
-  }
-
-  await api.post(`/fnb/${item.id}/stock-adjustments`, {
-    qty_change: qty,
-    reason: draftReason.value[item.id]
-  })
-
-  draftQty.value[item.id] = null
-  draftReason.value[item.id] = ""
-  await Swal.fire({ icon: "success", title: "Request approval terkirim" })
+const barStockLevelLabel = (item) => {
+  const stock = Number(item?.stock || 0)
+  const alert = Number(item?.alert_stock || 0)
+  if (stock <= 0) return 'Out of Stock'
+  if (stock <= alert) return 'Low Stock'
+  return 'Aman'
+}
+const barStockLevelClass = (item) => {
+  const status = barStockLevelLabel(item)
+  if (status === 'Out of Stock') return 'closed'
+  if (status === 'Low Stock') return 'warn'
+  return 'ok'
 }
 
 const formatItems = (items) => Array.isArray(items) ? items.map(i => `${i.service_name} x${i.qty}`).join(", ") : "-"
@@ -406,7 +440,14 @@ onBeforeUnmount(() => {
 .badge { padding:4px 8px; border-radius:999px; background:#222; color:#ddd; font-size:12px; }
 .badge.warn { background: rgba(231,76,60,.2); color:#ff7b7b; }
 .badge.ok { background: rgba(46,204,113,.2); color:#2ecc71; }
-.inbox-item, .stock-item { display:flex; justify-content:space-between; gap:12px; border-top:1px solid #262626; padding:12px 0; }
+.badge.closed { background: rgba(192,57,43,.24); color:#ff9f9f; }
+.stock-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; }
+.stock-item-card { border:1px solid #2f2f2f; border-radius:14px; padding:12px; background: linear-gradient(180deg, rgba(35,35,35,.82), rgba(18,18,18,.86)); box-shadow: inset 0 1px 0 rgba(245,197,24,.08); }
+.stock-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px; }
+.stock-metrics { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-bottom:10px; }
+.stock-metrics p { margin:0; font-size:12px; }
+.stock-metrics strong { font-size:15px; color:#f3f5f9; }
+.inbox-item { display:flex; justify-content:space-between; gap:12px; border-top:1px solid #262626; padding:12px 0; }
 .inbox-main { background: transparent; border: none; text-align: left; cursor: pointer; color: #fff; padding: 0; flex: 1; }
 .order-title { font-weight:700; display:flex; align-items:center; gap:8px; }
 .status { border-radius:999px; padding:2px 8px; font-size:11px; font-weight:600; }
@@ -414,14 +455,15 @@ onBeforeUnmount(() => {
 .status.accepted { background:#19465f; color:#7fd0ff; }
 .status.delivered { background:#1f4f34; color:#87f4b9; }
 .status.cancelled { background:#5a2323; color:#ff9f9f; }
-.actions, .req-form, .toolbar, .pagination { display:flex; gap:8px; align-items:center; }
+.actions, .toolbar, .pagination { display:flex; gap:8px; align-items:center; }
 .toolbar { margin-bottom:10px; flex-wrap: wrap; }
 .input { background:#171717; border:1px solid #333; color:#fff; border-radius:10px; padding:9px 10px; }
-.btn-primary,.btn-success,.btn-danger,.btn-light { border:none; border-radius:10px; padding:9px 12px; cursor:pointer; font-weight:600; }
+.btn-primary,.btn-success,.btn-danger,.btn-light,.btn-accept { border:none; border-radius:10px; padding:9px 12px; cursor:pointer; font-weight:600; }
 .btn-primary { background:#f5c518; color:#111; }
 .btn-success { background:#2ecc71; color:#081b10; }
 .btn-danger { background:#c0392b; color:#fff; }
 .btn-light { background:#282828; color:#fff; }
+.btn-accept { background:#f5c518; color:#111; }
 .btn-light:disabled { opacity: .5; cursor: not-allowed; }
 .empty { color:#8e95a6; padding:10px 0; }
 .pagination { justify-content:flex-end; margin-top:10px; }
@@ -443,6 +485,7 @@ onBeforeUnmount(() => {
 @media (max-width: 760px) {
   .hero { flex-direction:column; }
   .kpi-grid { grid-template-columns: 1fr; }
-  .inbox-item, .stock-item { flex-direction:column; }
+  .inbox-item, .stock-card-head { flex-direction:column; }
+  .stock-metrics { grid-template-columns:1fr; }
 }
 </style>
