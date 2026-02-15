@@ -73,7 +73,7 @@
 
     <section class="card-glass">
       <div class="section-head">
-        <h3>Manajemen Stock (Need Approval)</h3>
+        <h3>Manajemen Stock</h3>
       </div>
 
       <div class="toolbar">
@@ -117,12 +117,6 @@
           </div>
 
           <small class="muted">Harga jual: Rp {{ formatCurrency(item.sell_price || item.price) }}</small>
-
-          <form class="req-form" @submit.prevent="submitAdjustment(item)">
-            <input v-model.number="draftQty[item.id]" type="number" class="input" placeholder="qty +/-" required />
-            <input v-model="draftReason[item.id]" type="text" class="input" placeholder="alasan" required />
-            <button type="submit" class="btn-primary">Kirim Approval</button>
-          </form>
         </article>
       </div>
 
@@ -177,8 +171,6 @@ const barInbox = ref([])
 const inboxPage = ref(1)
 const inboxPageSize = 20
 const inboxPagination = ref({ page: 1, page_size: 20, total: 0, total_pages: 1 })
-const draftQty = ref({})
-const draftReason = ref({})
 const knownPendingInboxKeys = ref(new Set())
 const selectedInboxOrder = ref(null)
 let autoRefreshTimer = null
@@ -361,21 +353,18 @@ const cancel = async (id, fromModal = false) => {
   if (fromModal) closeInboxDetail()
 }
 
-const submitAdjustment = async (item) => {
-  const qty = Number(draftQty.value[item.id] || 0)
-  if (!qty) {
-    await Swal.fire({ icon: "info", title: "Qty wajib diisi" })
-    return
-  }
-
-  await api.post(`/fnb/${item.id}/stock-adjustments`, {
-    qty_change: qty,
-    reason: draftReason.value[item.id]
-  })
-
-  draftQty.value[item.id] = null
-  draftReason.value[item.id] = ""
-  await Swal.fire({ icon: "success", title: "Request approval terkirim" })
+const stockLevelLabel = (item) => {
+  const stock = Number(item?.stock || 0)
+  const alert = Number(item?.alert_stock || 0)
+  if (stock <= 0) return 'Out of Stock'
+  if (stock <= alert) return 'Low Stock'
+  return 'Aman'
+}
+const stockLevelClass = (item) => {
+  const status = stockLevelLabel(item)
+  if (status === 'Out of Stock') return 'closed'
+  if (status === 'Low Stock') return 'warn'
+  return 'ok'
 }
 
 const stockLevelLabel = (item) => {
@@ -450,7 +439,7 @@ onBeforeUnmount(() => {
 .status.accepted { background:#19465f; color:#7fd0ff; }
 .status.delivered { background:#1f4f34; color:#87f4b9; }
 .status.cancelled { background:#5a2323; color:#ff9f9f; }
-.actions, .req-form, .toolbar, .pagination { display:flex; gap:8px; align-items:center; }
+.actions, .toolbar, .pagination { display:flex; gap:8px; align-items:center; }
 .toolbar { margin-bottom:10px; flex-wrap: wrap; }
 .input { background:#171717; border:1px solid #333; color:#fff; border-radius:10px; padding:9px 10px; }
 .btn-primary,.btn-success,.btn-danger,.btn-light { border:none; border-radius:10px; padding:9px 12px; cursor:pointer; font-weight:600; }
