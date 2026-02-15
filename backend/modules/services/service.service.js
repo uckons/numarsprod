@@ -1,5 +1,13 @@
 const db = require("../../config/db")
 
+
+const ensureServiceColumns = async () => {
+  await db.query(`
+    ALTER TABLE services
+    ADD COLUMN IF NOT EXISTS therapist_qty_required INT NOT NULL DEFAULT 1
+  `)
+}
+
 const resolvePackageGroupConfig = async (branchId, packageGroup) => {
   if (!packageGroup) return null
   const { rows } = await db.query(
@@ -16,6 +24,7 @@ const resolvePackageGroupConfig = async (branchId, packageGroup) => {
 }
 
 exports.list = async ({ branch_id, type, is_active }) => {
+  await ensureServiceColumns()
   const params = []
   let where = "s.deleted_at IS NULL"
 
@@ -81,6 +90,7 @@ exports.list = async ({ branch_id, type, is_active }) => {
       fi.package_name,
       COALESCE(fi.price, s.base_price) AS sell_price,
       s.duration_minutes,
+      COALESCE(s.therapist_qty_required, 1) AS therapist_qty_required,
       s.is_active,
       CASE WHEN s.type = 'FNB' THEN COALESCE(fi.happy_hour_enabled, false) ELSE s.happy_hour_enabled END AS happy_hour_enabled,
       CASE WHEN s.type = 'FNB' THEN fi.happy_hour_price ELSE s.happy_hour_price END AS happy_hour_price,
@@ -133,18 +143,20 @@ exports.create = async (data, actor) => {
     happy_hour_enabled = false,
     happy_hour_price = null,
     package_special = false,
-    package_group = null
+    package_group = null,
+    therapist_qty_required = 1
   } = data
 
   if (!branch_id || !type || !name) {
     throw new Error("Missing required fields")
   }
 
+  await ensureServiceColumns()
   await db.query("BEGIN")
   try {
     const serviceRes = await db.query(
-      `INSERT INTO services (branch_id, type, name, base_price, duration_minutes, is_active, happy_hour_enabled, happy_hour_price)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      `INSERT INTO services (branch_id, type, name, base_price, duration_minutes, therapist_qty_required, is_active, happy_hour_enabled, happy_hour_price)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING id, branch_id`,
       [
         Number(branch_id),
@@ -152,6 +164,7 @@ exports.create = async (data, actor) => {
         name,
         Number(base_price || 0),
         duration_minutes || null,
+        Number(therapist_qty_required || 1),
         is_active,
         Boolean(happy_hour_enabled),
         happy_hour_price ?? null
@@ -208,6 +221,7 @@ exports.create = async (data, actor) => {
 }
 
 exports.update = async (id, data) => {
+  await ensureServiceColumns()
   const existingRes = await db.query(
     `SELECT id, branch_id, type, base_price FROM services WHERE id=$1`,
     [id]
@@ -233,8 +247,9 @@ exports.update = async (id, data) => {
         duration_minutes=$4,
         is_active=$5,
         happy_hour_enabled=$6,
-        happy_hour_price=$7
-      WHERE id=$8
+        happy_hour_price=$7,
+        therapist_qty_required=$8
+      WHERE id=$9
     `, [
       data.name,
       nextType,
@@ -243,6 +258,7 @@ exports.update = async (id, data) => {
       data.is_active,
       Boolean(data.happy_hour_enabled),
       data.happy_hour_price ?? null,
+      Number(data.therapist_qty_required || existing.therapist_qty_required || 1),
       id
     ])
 
