@@ -300,14 +300,14 @@ const accept = async (id, fromModal = false) => {
   const latest = barInbox.value.find(item => item.id === id) || previousOrder
   const items = Array.isArray(latest?.items_snapshot) ? latest.items_snapshot : []
   const normalizeText = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const pickHighestStock = (rows = []) => rows.sort((a, b) => Number(b.stock || 0) - Number(a.stock || 0))[0]
   const stockRows = items.map((item) => {
-    const stockItem = fnbItems.value.find((f) => {
-      const sameFnbItemId = Number(f.id || 0) > 0 && Number(f.id) === Number(item.fnb_item_id || 0)
-      const sameVariantService = Number(f.service_id || 0) > 0 && Number(f.service_id) === Number(item.variant_service_id || 0)
-      const sameServiceId = Number(f.service_id || 0) > 0 && Number(f.service_id) === Number(item.service_id || 0)
-      const sameName = normalizeText(f.name) && normalizeText(f.name) === normalizeText(item.service_name)
-      return sameFnbItemId || sameVariantService || sameServiceId || sameName
-    })
+    const byFnbItemId = fnbItems.value.find((f) => Number(f.id || 0) > 0 && Number(f.id) === Number(item.fnb_item_id || 0))
+    const byVariantService = fnbItems.value.filter((f) => Number(f.service_id || 0) > 0 && Number(f.service_id) === Number(item.variant_service_id || 0))
+    const byServiceId = fnbItems.value.filter((f) => Number(f.service_id || 0) > 0 && Number(f.service_id) === Number(item.service_id || 0))
+    const byName = fnbItems.value.filter((f) => normalizeText(f.name) && normalizeText(f.name) === normalizeText(item.service_name))
+
+    const stockItem = byFnbItemId || pickHighestStock(byVariantService) || pickHighestStock(byServiceId) || pickHighestStock(byName)
 
     return {
       name: item.service_name,
