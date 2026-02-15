@@ -172,6 +172,38 @@ exports.startTimer = async (req, res) => {
     return assigned
   }
 
+
+  const ensureBarOrdersTable = async (db) => {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS bar_orders (
+        id SERIAL PRIMARY KEY,
+        order_id INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        branch_id INT NOT NULL,
+        status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+        items_snapshot JSONB NOT NULL,
+        note TEXT,
+        requested_by INT,
+        accepted_by INT,
+        delivered_by INT,
+        cancelled_by INT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        accepted_at TIMESTAMP,
+        delivered_at TIMESTAMP,
+        cancelled_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `)
+  }
+
+  const emitBarOrderNew = (req, payload) => {
+    const io = req.app.get('io')
+    if (!io || !payload?.branch_id) return
+    const roleRoom = (branchId, role = '') => `branch:${branchId}:role:${String(role).toLowerCase().replace(/\s+/g, '-')}`
+    io.to(roleRoom(payload.branch_id, 'Staff Bar')).emit('bar:order:new', payload)
+    io.to(roleRoom(payload.branch_id, 'Supervisor')).emit('bar:order:new', payload)
+    io.to(roleRoom(payload.branch_id, 'Manager')).emit('bar:order:new', payload)
+  }
+
   try {
     const db = req.app.get("db")
     const user = req.user
