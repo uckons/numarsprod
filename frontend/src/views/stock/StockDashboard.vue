@@ -258,6 +258,14 @@
               Nama Paket (opsional)
               <input v-model="form.package_name" class="input" :disabled="!form.is_package" />
             </label>
+            <label>
+              KTV Group Tags (pisahkan koma)
+              <input v-model="form.ktv_group_tags" class="input" placeholder="KTV,KTV-2K" />
+            </label>
+            <label>
+              Qty Default Popup KTV
+              <input v-model.number="form.ktv_default_qty" type="number" min="0" class="input" />
+            </label>
             <label class="inline-toggle">
               <span>Happy Hour Aktif</span>
               <input v-model="form.happy_hour_enabled" type="checkbox" />
@@ -499,7 +507,9 @@ const openAdd = () => {
     stock: 0,
     alert_stock: 0,
     branch_id: selectedBranch.value !== "ALL" ? String(selectedBranch.value) : (branches.value[0] ? String(branches.value[0].id) : ""),
-    item_group: "NORMAL"
+    item_group: "NORMAL",
+    ktv_group_tags: '',
+    ktv_default_qty: 0
   }
   showForm.value = true
 }
@@ -522,7 +532,9 @@ const openEdit = (item) => {
     stock: Number(item.stock || 0),
     alert_stock: Number(item.alert_stock || 0),
     branch_id: String(item.branch_id || ""),
-    item_group: item.item_group || "NORMAL"
+    item_group: item.item_group || "NORMAL",
+    ktv_group_tags: Array.isArray(item.ktv_group_tags) ? item.ktv_group_tags.join(',') : '',
+    ktv_default_qty: Number(item.ktv_default_qty || 0)
   }
   showForm.value = true
 }
@@ -551,6 +563,8 @@ const submitForm = async () => {
     package_price: form.value.is_package ? Number(form.value.package_price || 0) : null,
     package_name: form.value.is_package ? (form.value.package_name || null) : null,
     package_special: Boolean(form.value.is_package && form.value.package_special),
+    ktv_group_tags: String(form.value.ktv_group_tags || '').split(',').map(v => v.trim()).filter(Boolean),
+    ktv_default_qty: Number(form.value.ktv_default_qty || 0),
     happy_hour_enabled: Boolean(form.value.happy_hour_enabled),
     happy_hour_price: form.value.happy_hour_enabled
       ? Number(form.value.happy_hour_price || 0)
