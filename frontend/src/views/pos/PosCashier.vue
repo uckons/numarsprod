@@ -52,6 +52,8 @@ const loadOrder = async (orderId) => {
           ? Math.round(itemSubtotal)
           : Math.round(itemPrice)
 
+        const isKtvMainService = /^KTV\s*\d/i.test(String(item.service_name || ''))
+
         const cartItem = {
           id: item.service_id,
           name: item.service_name,
@@ -59,6 +61,8 @@ const loadOrder = async (orderId) => {
           price_label: item.price_label || null,
           is_package: Boolean(item.is_package),
           locked_package: Boolean(item.is_package),
+          locked_main: Boolean(isKtvMainService),
+          therapist_name: item.therapist_name || null,
           seed_qty: normalizedQty,
           qty: 1
         }

@@ -306,8 +306,58 @@ const maybeOfferPackage = (cartKey) => {
   })
 }
 
-const select = (service) => {
+
+const chooseTherapistForService = async (service) => {
+  if (String(service?.type || '').toUpperCase() !== 'LC') return null
+
+  const res = await api.get('/timers/therapists', { params: { service_type: 'LC' } })
+  const therapists = Array.isArray(res.data) ? res.data : []
+  if (!therapists.length) {
+    await Swal.fire({ icon: 'warning', title: 'Terapis tidak tersedia', text: 'Belum ada terapis LC yang bisa dipilih.' })
+    return undefined
+  }
+
+  const options = therapists.map((t) => `<option value="${t.id}">${t.name}${t.grade_name ? ` (${t.grade_name})` : ''}</option>`).join('')
+  const pick = await Swal.fire({
+    title: `Pilih Terapis - ${service.name}`,
+    html: `<select id="lc-therapist-select" class="swal2-select"><option value="">-- Pilih Terapis --</option>${options}</select>`,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Gunakan',
+    cancelButtonText: 'Batal',
+    preConfirm: () => {
+      const el = document.getElementById('lc-therapist-select')
+      const id = Number(el?.value || 0)
+      if (!id) {
+        Swal.showValidationMessage('Pilih terapis dulu')
+        return false
+      }
+      const selected = therapists.find((t) => Number(t.id) === id)
+      if (!selected) {
+        Swal.showValidationMessage('Terapis tidak valid')
+        return false
+      }
+      return { id: Number(selected.id), name: selected.name }
+    }
+  })
+
+  if (!pick.isConfirmed) return undefined
+  return pick.value || null
+}
+
+const select = async (service) => {
   const enriched = enrichService(service)
+
+  const selectedTherapist = await chooseTherapistForService(enriched)
+  if (selectedTherapist === undefined) return
+  if (selectedTherapist) {
+    enriched.therapist_id = selectedTherapist.id
+    enriched.therapist_name = selectedTherapist.name
+  }
+
+  if (String(enriched.type || "").toUpperCase() === "KARAOKE") {
+    enriched.locked_main = true
+  }
 
   if (enriched.type === 'FNB' && enriched.is_package && enriched.package_special) {
     return choosePackageVariantBreakdown(enriched, true, Number(enriched.package_qty || 0)).then((breakdown) => {

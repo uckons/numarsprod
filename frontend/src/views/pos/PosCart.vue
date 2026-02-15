@@ -10,20 +10,22 @@
       v-for="i in items"
       :key="i.cart_key || `${i.id}-${i.base_price}-${i.price_label || ''}`"
       class="cart-item"
-      :class="{ locked: i.locked_package }"
+      :class="{ locked: i.locked_package || i.locked_main }"
     >
       <div class="info">
         <strong>{{ i.name }}</strong>
         <small>Rp {{ format(i.base_price) }}</small>
         <small v-if="i.price_label" class="item-label">{{ i.price_label }}</small>
         <small v-if="i.variant_name" class="item-label">Varian: {{ i.variant_name }}</small>
+        <small v-if="i.therapist_name" class="item-label">Terapis: {{ i.therapist_name }}</small>
+        <small v-if="i.locked_main" class="item-locked">LOCKED MAIN SERVICE</small>
         <small v-if="i.locked_package" class="item-locked">LOCKED PAKET</small>
       </div>
 
       <div class="qty">
-        <button @click="dec(i)" :disabled="i.locked_package">−</button>
+        <button @click="dec(i)" :disabled="i.locked_package || i.locked_main">−</button>
         <span>{{ i.qty }}</span>
-        <button @click="inc(i)" :disabled="i.locked_package">+</button>
+        <button @click="inc(i)" :disabled="i.locked_package || i.locked_main">+</button>
       </div>
 
       <div class="total">
@@ -351,7 +353,9 @@ const toPayloadItems = () => {
       price_label: i.price_label,
       is_package: Boolean(i.is_package),
       variant_name: i.variant_name || null,
-      variant_service_id: i.variant_service_id || null
+      variant_service_id: i.variant_service_id || null,
+      therapist_id: i.therapist_id || null,
+      therapist_name: i.therapist_name || null
     })
   }
 

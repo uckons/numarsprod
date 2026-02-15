@@ -214,11 +214,14 @@ const createManualTimer = async (data) => {
       slot: selectedSlot.value,
       service_id: data.service_id,
       service_ids: data.service_ids || [data.service_id],
+      service_type: data.service_type,
       therapist_id: data.therapist_id,
       therapist_ids: data.therapist_ids || [],
       combo_qty: data.combo_qty || 1,
       room_id: data.room_id,
-      duration_minutes: data.duration_minutes
+      duration_minutes: data.duration_minutes,
+      order_type: data.order_type,
+      karaoke_fnb_items: Array.isArray(data.karaoke_fnb_items) ? data.karaoke_fnb_items : []
     })
 
     await syncTimers()
