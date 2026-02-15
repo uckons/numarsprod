@@ -239,7 +239,6 @@
           </div>
           <div class="stock-card-footer">
             <small class="muted">Outlet: {{ item.branch_name || '-' }}</small>
-            <span class="badge">View only</span>
           </div>
         </article>
       </div>
