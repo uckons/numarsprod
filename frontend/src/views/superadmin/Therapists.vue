@@ -14,7 +14,7 @@
         <select v-model="filters.grade_id" @change="fetchTherapists">
           <option value="">Semua Grade</option>
           <option v-for="grade in grades" :key="grade.id" :value="grade.id">
-            {{ grade.name }} ({{ grade.commission_percent }}%)
+            {{ grade.name }} ({{ formatAccounting(getGradeCommission(grade)) }})
           </option>
         </select>
       </div>
@@ -76,7 +76,7 @@
                 {{ therapist.grade_name }}
               </span>
             </td>
-            <td>{{ therapist.commission_percent }}%</td>
+            <td>{{ formatAccounting(getTherapistCommission(therapist)) }}</td>
             <td>{{ therapist.branch_name }}</td>
             <td>
               <span class="status" :class="therapist.active ? 'status-active' : 'status-inactive'">
@@ -148,7 +148,7 @@
             <select v-model="form.grade_id" required>
               <option value="">Pilih Grade</option>
               <option v-for="grade in grades" :key="grade.id" :value="grade.id">
-                {{ grade.name }} - Komisi {{ grade.commission_percent }}%
+                {{ grade.name }} - Komisi {{ formatAccounting(getGradeCommission(grade)) }}
               </option>
             </select>
           </div>
@@ -224,6 +224,15 @@ const SwalTheme = Swal.mixin({
   },
   buttonsStyling: false
 })
+
+const formatAccounting = (value) => {
+  const amount = Number(value || 0)
+  const formatted = Math.abs(amount).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+  return amount < 0 ? `(Rp ${formatted})` : `Rp ${formatted}`
+}
+
+const getGradeCommission = (grade) => Number(grade?.commission_amount ?? grade?.commission_percent ?? 0)
+const getTherapistCommission = (therapist) => Number(therapist?.commission_amount ?? therapist?.commission_percent ?? 0)
 
 // Fetch Therapists
 const fetchTherapists = async () => {
