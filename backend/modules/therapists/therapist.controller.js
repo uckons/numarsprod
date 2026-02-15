@@ -17,6 +17,11 @@ const ensureGradeCommissionStorage = async (db) => {
       END IF;
     END $$;
   `)
+
+  await db.query(`
+    ALTER TABLE therapist_grades
+    ADD COLUMN IF NOT EXISTS service_addon_amount NUMERIC(14,2) NOT NULL DEFAULT 0
+  `)
 }
 
 const resolveGradeCommissionExpression = async (db) => {
@@ -237,6 +242,17 @@ exports.updateTherapist = async (req, res) => {
       paramIndex++
     }
 
+
+    if (service_addon_amount !== undefined) {
+      const normalizedAddon = Number(service_addon_amount)
+      if (Number.isNaN(normalizedAddon) || normalizedAddon < 0) {
+        return res.status(400).json({ message: "Service addon amount must be greater than or equal to 0" })
+      }
+      updateFields.push(`service_addon_amount = $${paramIndex}`)
+      params.push(normalizedAddon)
+      paramIndex++
+    }
+
     if (updateFields.length === 0) {
       return res.status(400).json({ message: "No fields to update" })
     }
@@ -328,7 +344,8 @@ exports.getGrades = async (req, res) => {
     const { rows } = await db.query(`
       SELECT id, name,
         ${gradeCommissionExpr} AS commission_amount,
-        ${gradeCommissionExpr} AS commission_percent
+        ${gradeCommissionExpr} AS commission_percent,
+        COALESCE(service_addon_amount, 0) AS service_addon_amount
       FROM therapist_grades tg
       ORDER BY ${gradeCommissionExpr} ASC
     `)
@@ -344,7 +361,7 @@ exports.getGrades = async (req, res) => {
 exports.createGrade = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const { name, commission_amount, commission_percent } = req.body
+    const { name, commission_amount, commission_percent, service_addon_amount } = req.body
 
     // Validation
     const commissionValue = Number(commission_amount ?? commission_percent)
@@ -378,19 +395,19 @@ exports.createGrade = async (req, res) => {
 
     const insertSql = hasCommissionAmount
       ? `
-      INSERT INTO therapist_grades (name, commission_amount, commission_percent)
-      VALUES ($1, $2, $3)
-      RETURNING id, name, ${gradeCommissionExpr} AS commission_amount, ${gradeCommissionExpr} AS commission_percent
+      INSERT INTO therapist_grades (name, commission_amount, commission_percent, service_addon_amount)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, name, ${gradeCommissionExpr} AS commission_amount, ${gradeCommissionExpr} AS commission_percent, COALESCE(service_addon_amount, 0) AS service_addon_amount
     `
       : `
-      INSERT INTO therapist_grades (name, commission_percent)
-      VALUES ($1, $2)
-      RETURNING id, name, ${gradeCommissionExpr} AS commission_amount, ${gradeCommissionExpr} AS commission_percent
+      INSERT INTO therapist_grades (name, commission_percent, service_addon_amount)
+      VALUES ($1, $2, $3)
+      RETURNING id, name, ${gradeCommissionExpr} AS commission_amount, ${gradeCommissionExpr} AS commission_percent, COALESCE(service_addon_amount, 0) AS service_addon_amount
     `
 
     const insertParams = hasCommissionAmount
-      ? [name, commissionValue, commissionValue]
-      : [name, commissionValue]
+      ? [name, commissionValue, commissionValue, Number(service_addon_amount || 0)]
+      : [name, commissionValue, Number(service_addon_amount || 0)]
 
     const { rows } = await db.query(insertSql, insertParams)
 
@@ -406,7 +423,7 @@ exports.updateGrade = async (req, res) => {
   try {
     const db = req.app.get("db")
     const { id } = req.params
-    const { name, commission_amount, commission_percent } = req.body
+    const { name, commission_amount, commission_percent, service_addon_amount } = req.body
 
     // Build update fields
     let updateFields = []
@@ -453,6 +470,17 @@ exports.updateGrade = async (req, res) => {
       paramIndex++
     }
 
+
+    if (service_addon_amount !== undefined) {
+      const normalizedAddon = Number(service_addon_amount)
+      if (Number.isNaN(normalizedAddon) || normalizedAddon < 0) {
+        return res.status(400).json({ message: "Service addon amount must be greater than or equal to 0" })
+      }
+      updateFields.push(`service_addon_amount = $${paramIndex}`)
+      params.push(normalizedAddon)
+      paramIndex++
+    }
+
     if (updateFields.length === 0) {
       return res.status(400).json({ message: "No fields to update" })
     }
@@ -463,7 +491,7 @@ exports.updateGrade = async (req, res) => {
       UPDATE therapist_grades
       SET ${updateFields.join(', ')}
       WHERE id = $${paramIndex}
-      RETURNING id, name, COALESCE(commission_amount, commission_percent, 0) AS commission_amount, COALESCE(commission_amount, commission_percent, 0) AS commission_percent
+      RETURNING id, name, COALESCE(commission_amount, commission_percent, 0) AS commission_amount, COALESCE(commission_amount, commission_percent, 0) AS commission_percent, COALESCE(service_addon_amount, 0) AS service_addon_amount
     `, params)
 
     if (rows.length === 0) {

@@ -66,6 +66,18 @@ exports.startTimer = async (req, res) => {
     .replace(/\s+/g, ' ')
     .trim()
 
+  const normalizeKtvTag = (value) => String(value || '')
+    .toUpperCase()
+    .replace(/\s+/g, '')
+
+  const resolveKtvPackageTag = (serviceName) => {
+    const normalized = normalizeKtvTag(serviceName)
+    if (normalized.includes('KTV-2K') || normalized.includes('KTV2K')) return 'KTV-2K'
+    if (normalized.includes('KTV-3K') || normalized.includes('KTV3K')) return 'KTV-3K'
+    if (normalized.includes('KTV-4K') || normalized.includes('KTV4K')) return 'KTV-4K'
+    return 'KTV'
+  }
+
   const extractServiceGradeRule = (serviceName, therapistRows) => {
     const normalizedServiceName = normalizeLabel(serviceName)
     if (!normalizedServiceName) return null
@@ -153,7 +165,8 @@ exports.startTimer = async (req, res) => {
       therapist_ids,
       room_id,
       duration_minutes,
-      slot
+      slot,
+      karaoke_fnb_items
     } = req.body
 
     if (!service_id || !room_id || !duration_minutes) {
@@ -219,7 +232,7 @@ exports.startTimer = async (req, res) => {
     }
 
     const selectedService = serviceRows[0]
-    const requiresTherapist = !['LOUNGE', 'KARAOKE'].includes(selectedService.type)
+    const requiresTherapist = !['LOUNGE'].includes(selectedService.type)
     const requestedComboQty = Number(req.body.combo_qty || 0)
     const comboQtyFromName = parseComboQtyFromName(selectedService.name, selectedService.type)
     const comboQtyFromPayload = Math.max(
@@ -382,14 +395,16 @@ exports.startTimer = async (req, res) => {
       )
 
       let therapistNameById = new Map()
+      let therapistRows = []
       if (requiresTherapist) {
-        const { rows: therapistRows } = await db.query(
-          `SELECT t.id, t.name, tg.name AS grade_name
+        const therapistRes = await db.query(
+          `SELECT t.id, t.name, tg.name AS grade_name, COALESCE(tg.service_addon_amount, 0) AS service_addon_amount
            FROM therapists t
            LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
            WHERE t.id = ANY($1::int[])`,
           [therapistIds]
         )
+        therapistRows = therapistRes.rows
         therapistNameById = new Map(therapistRows.map(t => [Number(t.id), t.name]))
 
         if (therapistNameById.size !== therapistIds.length) {
@@ -418,7 +433,23 @@ exports.startTimer = async (req, res) => {
         (sum, selection) => sum + Number(selection.service.base_price || 0),
         0
       )
-      const comboTotal = Math.round(comboTotalRaw)
+      let comboTotal = Math.round(comboTotalRaw)
+
+      const isKaraokeService = selectedService.type === 'KARAOKE'
+      const normalizedKtvFnbItems = Array.isArray(karaoke_fnb_items)
+        ? karaoke_fnb_items
+            .map((item) => ({
+              service_id: Number(item?.service_id || item?.id),
+              qty: Number(item?.qty || 0)
+            }))
+            .filter((item) => Number.isInteger(item.service_id) && item.service_id > 0 && item.qty > 0)
+        : []
+
+      if (isKaraokeService && therapistIds.length) {
+        const addonPerTherapist = therapistRows.reduce((sum, t) => sum + Number(t.service_addon_amount || 0), 0)
+        comboTotal += Math.round(addonPerTherapist)
+      }
+
       const comboDurationMinutes = comboSelections.reduce(
         (sum, selection) => sum + Number(selection.service.duration_minutes || durationNum || 0),
         0
@@ -453,6 +484,32 @@ exports.startTimer = async (req, res) => {
             selection.therapistId ? therapistNameById.get(selection.therapistId) || null : null
           ]
         )
+      }
+
+      if (selectedService.type === 'KARAOKE' && normalizedKtvFnbItems.length) {
+        const serviceIds = normalizedKtvFnbItems.map((item) => item.service_id)
+        const { rows: fnbServices } = await db.query(
+          `SELECT s.id, s.name, COALESCE(fi.price, s.base_price, 0) AS base_price
+           FROM services s
+           JOIN fnb_items fi ON fi.service_id = s.id
+           WHERE s.id = ANY($1::int[])`,
+          [serviceIds]
+        )
+        const fnbMap = new Map(fnbServices.map((row) => [Number(row.id), row]))
+
+        for (const item of normalizedKtvFnbItems) {
+          const fnbService = fnbMap.get(item.service_id)
+          if (!fnbService) continue
+          const qty = Number(item.qty || 0)
+          const unitPrice = Math.round(Number(fnbService.base_price || 0))
+          const subtotal = unitPrice * qty
+          comboTotal += subtotal
+          await db.query(
+            `INSERT INTO order_items (order_id, service_id, service_name, qty, price, subtotal)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [finalOrderId, fnbService.id, fnbService.name, qty, unitPrice, subtotal]
+          )
+        }
       }
 
       await db.query(

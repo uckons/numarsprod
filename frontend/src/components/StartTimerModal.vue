@@ -21,7 +21,7 @@
       <select
         v-model.number="selectedServiceQty"
         @change="onQtyChange"
-        :disabled="loadingServices || selectedOrderType === 'SINGLE'"
+        :disabled="loadingServices || selectedOrderType === 'SINGLE' || serviceType === 'KARAOKE'"
       >
         <option v-for="n in serviceQtyOptions" :key="n" :value="n">{{ n }}</option>
       </select>
@@ -46,7 +46,7 @@
       <span v-if="loadingServices" class="loading-text">Memuat service…</span>
     </div>
 
-    <div class="field" v-if="serviceType && !['LOUNGE', 'KARAOKE'].includes(serviceType)">
+    <div class="field" v-if="serviceType && !['LOUNGE'].includes(serviceType)">
       <label>
         Nama Terapis
         <small v-if="selectedServiceQty > 1">(wajib {{ selectedServiceQty }} terapis)</small>
@@ -98,6 +98,22 @@
       <strong>{{ duration }} menit</strong>
     </div>
 
+
+    <div class="field" v-if="serviceType === 'KARAOKE'">
+      <label>FNB KTV (otomatis)</label>
+      <div class="therapist-grid">
+        <div v-for="item in karaokeBaseItems" :key="`base-${item.id}`" style="display:flex;gap:8px;align-items:center">
+          <span style="flex:1">{{ item.name }}</span>
+          <input type="number" min="0" style="width:90px" :value="(selectedKtvFnbItems.find(v => Number(v.service_id)===Number(item.service_id)) || { qty: item.ktv_default_qty || 0 }).qty" @input="updateKtvBaseQty(item, $event)" />
+        </div>
+        <div v-if="karaokePackageItems.length" style="margin-top:6px;font-size:12px;color:#bbb">Pilih 1 item paket sesuai {{ selectedKtvPackageTag }}</div>
+        <label v-for="item in karaokePackageItems" :key="`pkg-${item.id}`" style="display:flex;gap:8px;align-items:center">
+          <input type="radio" name="ktv-package" :checked="selectedKtvFnbItems.some(v => Number(v.service_id)===Number(item.service_id) && Number(v.qty)>0)" @change="selectKtvPackageItem(item)" />
+          <span>{{ item.name }}</span>
+        </label>
+      </div>
+    </div>
+
     <div v-if="errorMessage" class="error-message">
       {{ errorMessage }}
     </div>
@@ -122,6 +138,8 @@ const emit = defineEmits(["close", "start"])
 const services = ref([])
 const therapists = ref([])
 const rooms = ref([])
+const ktvFnbItems = ref([])
+const selectedKtvFnbItems = ref([])
 
 const selectedOrderType = ref("SINGLE")
 const selectedServiceQty = ref(1)
@@ -170,6 +188,31 @@ const duration = computed(() => {
 const effectiveDuration = computed(() => duration.value || manualDuration.value)
 const isComboMode = computed(() => selectedOrderType.value === "COMBO" && Number(selectedServiceQty.value || 1) > 1)
 const timerServiceTypes = ['SPA', 'LC', 'LOUNGE', 'KARAOKE']
+
+const requiredTherapistQty = computed(() => {
+  if (serviceType.value !== 'KARAOKE') return Number(selectedServiceQty.value || 1)
+  return Math.max(1, Number(selectedService.value?.therapist_qty_required || 1))
+})
+
+const selectedKtvPackageTag = computed(() => {
+  const name = String(selectedService.value?.name || '').toUpperCase().replace(/\s+/g, '')
+  if (name.includes('KTV-2K') || name.includes('KTV2K')) return 'KTV-2K'
+  if (name.includes('KTV-3K') || name.includes('KTV3K')) return 'KTV-3K'
+  if (name.includes('KTV-4K') || name.includes('KTV4K')) return 'KTV-4K'
+  return 'KTV'
+})
+
+const karaokeBaseItems = computed(() => ktvFnbItems.value.filter((item) =>
+  (item.ktv_group_tags || []).map((t) => String(t || '').toUpperCase()).includes('KTV')
+))
+
+const karaokePackageItems = computed(() => {
+  const target = selectedKtvPackageTag.value
+  return ktvFnbItems.value.filter((item) =>
+    (item.ktv_group_tags || []).map((t) => String(t || '').toUpperCase()).includes(target)
+  )
+})
+
 
 const roomLabel = computed(() => {
   if (serviceType.value === 'SPA') return 'Room'
@@ -220,6 +263,9 @@ const resizeSelection = (currentValues, qty, { keepFirstValue = false } = {}) =>
 }
 
 const initSelections = () => {
+  if (serviceType.value === 'KARAOKE') {
+    selectedServiceQty.value = Number(requiredTherapistQty.value || 1)
+  }
   const qty = Number(selectedServiceQty.value || 1)
   selectedServiceIds.value = resizeSelection(selectedServiceIds.value, qty, { keepFirstValue: true })
   selectedTherapistIds.value = resizeSelection(selectedTherapistIds.value, qty)
@@ -257,6 +303,7 @@ const onServiceSelectionChange = async () => {
   if (!serviceType.value) return
   await fetchTherapists()
   await fetchRooms()
+  await fetchKtvFnbItems()
 }
 
 const isTherapistDisabled = (therapistId, currentIndex) => {
@@ -275,7 +322,7 @@ const isTherapistDisabled = (therapistId, currentIndex) => {
 
 const isRoomDisabled = (room) => {
   if (!room) return false
-  if (['LC', 'LOUNGE'].includes(serviceType.value)) return false
+  if (['LC', 'LOUNGE', 'KARAOKE'].includes(serviceType.value)) return false
   return Boolean(room.is_occupied)
 }
 
@@ -365,6 +412,7 @@ const fetchServices = async () => {
     const first = services.value.find(s => ["SPA", "LC"].includes(s.type)) || services.value[0]
     selectedServiceIds.value = [String(first.id)]
     await onServiceSelectionChange()
+    await fetchKtvFnbItems()
   } catch (err) {
     console.error("Error fetching services:", err)
     errorMessage.value = err.response?.data?.message || "Gagal memuat daftar service"
@@ -374,7 +422,7 @@ const fetchServices = async () => {
 }
 
 const fetchTherapists = async () => {
-  if (!serviceType.value || ['LOUNGE', 'KARAOKE'].includes(serviceType.value)) return
+  if (!serviceType.value || ['LOUNGE'].includes(serviceType.value)) return
   try {
     loadingTherapists.value = true
     errorMessage.value = ""
@@ -388,6 +436,45 @@ const fetchTherapists = async () => {
     errorMessage.value = "Gagal memuat daftar terapis"
   } finally {
     loadingTherapists.value = false
+  }
+}
+
+
+
+const updateKtvBaseQty = (item, event) => {
+  const qty = Number(event?.target?.value || 0)
+  const sid = Number(item?.service_id || 0)
+  const idx = selectedKtvFnbItems.value.findIndex(v => Number(v.service_id) === sid)
+  if (idx >= 0) selectedKtvFnbItems.value[idx].qty = qty
+  else selectedKtvFnbItems.value.push({ service_id: sid, qty })
+}
+
+const selectKtvPackageItem = (item) => {
+  const packageIds = new Set(karaokePackageItems.value.map(it => Number(it.service_id)))
+  selectedKtvFnbItems.value = selectedKtvFnbItems.value.filter(v => !packageIds.has(Number(v.service_id)))
+  selectedKtvFnbItems.value.push({ service_id: Number(item.service_id), qty: Number(item.ktv_default_qty || 1) || 1 })
+}
+
+const fetchKtvFnbItems = async () => {
+  if (serviceType.value !== 'KARAOKE') {
+    ktvFnbItems.value = []
+    selectedKtvFnbItems.value = []
+    return
+  }
+  try {
+    const res = await api.get('/fnb')
+    const rows = Array.isArray(res.data) ? res.data : []
+    ktvFnbItems.value = rows.filter((item) => Array.isArray(item.ktv_group_tags) && item.ktv_group_tags.length)
+    const preselect = []
+    ktvFnbItems.value.forEach((item) => {
+      const tags = (item.ktv_group_tags || []).map((t) => String(t || '').toUpperCase())
+      if (tags.includes('KTV') && Number(item.ktv_default_qty || 0) > 0) {
+        preselect.push({ service_id: Number(item.service_id), qty: Number(item.ktv_default_qty || 0), required: false })
+      }
+    })
+    selectedKtvFnbItems.value = preselect
+  } catch (err) {
+    ktvFnbItems.value = []
   }
 }
 
@@ -416,11 +503,15 @@ watch(serviceType, async (newType, oldType) => {
   selectedTherapistIds.value = Array(selectedServiceQty.value).fill("")
   await fetchTherapists()
   await fetchRooms()
+  await fetchKtvFnbItems()
 })
 
 const submit = () => {
   errorMessage.value = ""
 
+  if (serviceType.value === 'KARAOKE') {
+    selectedServiceQty.value = Number(requiredTherapistQty.value || 1)
+  }
   const qty = Number(selectedServiceQty.value || 1)
   const normalizedServiceIds = selectedServiceIds.value
     .map(id => Number(id))
@@ -451,7 +542,7 @@ const submit = () => {
     .map(id => Number(id))
     .filter(id => Number.isInteger(id) && id > 0)
 
-  if (!['LOUNGE', 'KARAOKE'].includes(selectedType)) {
+  if (!['LOUNGE'].includes(selectedType)) {
     if (normalizedTherapistIds.length !== qty) {
       errorMessage.value = "Pilih terapis sesuai Qty Service"
       return
@@ -479,6 +570,14 @@ const submit = () => {
     return
   }
 
+  if (selectedType === 'KARAOKE' && karaokePackageItems.value.length) {
+    const pickedPackage = selectedKtvFnbItems.value.find((item) => Number(item.qty || 0) > 0 && karaokePackageItems.value.some((it) => Number(it.service_id) === Number(item.service_id)))
+    if (!pickedPackage) {
+      errorMessage.value = 'Pilih salah satu item FNB paket KTV sesuai service karaoke'
+      return
+    }
+  }
+
   isSubmitting.value = true
 
   emit("start", {
@@ -490,7 +589,10 @@ const submit = () => {
     combo_qty: qty,
     room_id: parseInt(selectedRoomId.value),
     duration_minutes: effectiveDuration.value,
-    order_type: selectedOrderType.value
+    order_type: selectedOrderType.value,
+    karaoke_fnb_items: selectedKtvFnbItems.value
+      .filter((item) => Number(item.qty || 0) > 0)
+      .map((item) => ({ service_id: Number(item.service_id), qty: Number(item.qty || 0) }))
   })
 
   setTimeout(() => {
