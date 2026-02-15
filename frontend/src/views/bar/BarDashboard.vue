@@ -58,9 +58,9 @@
         </button>
 
         <div class="actions" v-if="!['DELIVERED','CANCELLED'].includes(order.status)">
-          <button class="btn-light" :disabled="order.status === 'ACCEPTED'" @click="accept(order.id)">Accept</button>
-          <button class="btn-success" @click="deliver(order.id)">Deliver</button>
-          <button class="btn-danger" @click="cancel(order.id)">Cancel</button>
+          <button v-if="order.status === 'PENDING'" class="btn-accept" @click="accept(order.id)">Accept</button>
+          <button v-if="order.status === 'ACCEPTED'" class="btn-success" @click="deliver(order.id)">Deliver</button>
+          <button v-if="order.status === 'ACCEPTED'" class="btn-danger" @click="cancel(order.id)">Cancel</button>
         </div>
       </div>
 
@@ -143,9 +143,9 @@
         </ul>
 
         <div class="modal-actions" v-if="!['DELIVERED','CANCELLED'].includes(selectedInboxOrder.status)">
-          <button class="btn-light" :disabled="selectedInboxOrder.status === 'ACCEPTED'" @click="accept(selectedInboxOrder.id, true)">Accept</button>
-          <button class="btn-success" @click="deliver(selectedInboxOrder.id, true)">Deliver</button>
-          <button class="btn-danger" @click="cancel(selectedInboxOrder.id, true)">Cancel</button>
+          <button v-if="selectedInboxOrder.status === 'PENDING'" class="btn-accept" @click="accept(selectedInboxOrder.id, true)">Accept</button>
+          <button v-if="selectedInboxOrder.status === 'ACCEPTED'" class="btn-success" @click="deliver(selectedInboxOrder.id, true)">Deliver</button>
+          <button v-if="selectedInboxOrder.status === 'ACCEPTED'" class="btn-danger" @click="cancel(selectedInboxOrder.id, true)">Cancel</button>
         </div>
 
         <div class="modal-actions">
@@ -292,12 +292,34 @@ const closeInboxDetail = () => {
 }
 
 const accept = async (id, fromModal = false) => {
+  const previousOrder = barInbox.value.find(item => item.id === id) || selectedInboxOrder.value
+
   await api.post(`/orders/bar/${id}/accept`)
   await loadAll({ silent: true })
-  await Swal.fire({ icon: "success", title: "Order diterima bar" })
+
+  const latest = barInbox.value.find(item => item.id === id) || previousOrder
+  const items = Array.isArray(latest?.items_snapshot) ? latest.items_snapshot : []
+  const stockRows = items.map((item) => {
+    const stockItem = fnbItems.value.find((f) => Number(f.id) === Number(item.service_id) || String(f.name || '').toLowerCase() === String(item.service_name || '').toLowerCase())
+    return {
+      name: item.service_name,
+      qty: Number(item.qty || 0),
+      stock: Number(stockItem?.stock || 0)
+    }
+  })
+
+  const detailHtml = stockRows.length
+    ? `<div style="text-align:left">${stockRows.map((row) => `<div style="margin-bottom:6px"><strong>${row.name}</strong><br/>Qty order: ${row.qty} • Stock tersedia: ${row.stock}</div>`).join('')}</div>`
+    : '<div>Tidak ada item pada order ini.</div>'
+
+  await Swal.fire({
+    icon: 'info',
+    title: 'Order diterima',
+    html: detailHtml,
+    confirmButtonText: 'OK'
+  })
 
   if (fromModal && selectedInboxOrder.value?.id === id) {
-    const latest = barInbox.value.find(item => item.id === id)
     selectedInboxOrder.value = latest || selectedInboxOrder.value
   }
 }
@@ -428,11 +450,12 @@ onBeforeUnmount(() => {
 .actions, .toolbar, .pagination { display:flex; gap:8px; align-items:center; }
 .toolbar { margin-bottom:10px; flex-wrap: wrap; }
 .input { background:#171717; border:1px solid #333; color:#fff; border-radius:10px; padding:9px 10px; }
-.btn-primary,.btn-success,.btn-danger,.btn-light { border:none; border-radius:10px; padding:9px 12px; cursor:pointer; font-weight:600; }
+.btn-primary,.btn-success,.btn-danger,.btn-light,.btn-accept { border:none; border-radius:10px; padding:9px 12px; cursor:pointer; font-weight:600; }
 .btn-primary { background:#f5c518; color:#111; }
 .btn-success { background:#2ecc71; color:#081b10; }
 .btn-danger { background:#c0392b; color:#fff; }
 .btn-light { background:#282828; color:#fff; }
+.btn-accept { background:#f5c518; color:#111; }
 .btn-light:disabled { opacity: .5; cursor: not-allowed; }
 .empty { color:#8e95a6; padding:10px 0; }
 .pagination { justify-content:flex-end; margin-top:10px; }
