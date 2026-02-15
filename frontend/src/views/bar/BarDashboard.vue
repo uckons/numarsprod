@@ -367,6 +367,20 @@ const stockLevelClass = (item) => {
   return 'ok'
 }
 
+const stockLevelLabel = (item) => {
+  const stock = Number(item?.stock || 0)
+  const alert = Number(item?.alert_stock || 0)
+  if (stock <= 0) return 'Out of Stock'
+  if (stock <= alert) return 'Low Stock'
+  return 'Aman'
+}
+const stockLevelClass = (item) => {
+  const status = stockLevelLabel(item)
+  if (status === 'Out of Stock') return 'closed'
+  if (status === 'Low Stock') return 'warn'
+  return 'ok'
+}
+
 const formatItems = (items) => Array.isArray(items) ? items.map(i => `${i.service_name} x${i.qty}`).join(", ") : "-"
 const formatCurrency = (v) => Number(v || 0).toLocaleString("id-ID")
 const formatAuditDate = (v) => v ? new Date(v).toLocaleString("id-ID", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"
