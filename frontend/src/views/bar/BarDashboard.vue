@@ -98,7 +98,7 @@
               <div class="order-title">{{ item.name }}</div>
               <small class="muted">Group: {{ item.item_group || 'NORMAL' }}</small>
             </div>
-            <span class="badge" :class="stockLevelClass(item)">{{ stockLevelLabel(item) }}</span>
+            <span class="badge" :class="barStockLevelClass(item)">{{ barStockLevelLabel(item) }}</span>
           </div>
 
           <div class="stock-metrics">
@@ -353,29 +353,15 @@ const cancel = async (id, fromModal = false) => {
   if (fromModal) closeInboxDetail()
 }
 
-const stockLevelLabel = (item) => {
+const barStockLevelLabel = (item) => {
   const stock = Number(item?.stock || 0)
   const alert = Number(item?.alert_stock || 0)
   if (stock <= 0) return 'Out of Stock'
   if (stock <= alert) return 'Low Stock'
   return 'Aman'
 }
-const stockLevelClass = (item) => {
-  const status = stockLevelLabel(item)
-  if (status === 'Out of Stock') return 'closed'
-  if (status === 'Low Stock') return 'warn'
-  return 'ok'
-}
-
-const stockLevelLabel = (item) => {
-  const stock = Number(item?.stock || 0)
-  const alert = Number(item?.alert_stock || 0)
-  if (stock <= 0) return 'Out of Stock'
-  if (stock <= alert) return 'Low Stock'
-  return 'Aman'
-}
-const stockLevelClass = (item) => {
-  const status = stockLevelLabel(item)
+const barStockLevelClass = (item) => {
+  const status = barStockLevelLabel(item)
   if (status === 'Out of Stock') return 'closed'
   if (status === 'Low Stock') return 'warn'
   return 'ok'
