@@ -139,7 +139,8 @@
     <div class="field">
       <label>FNB KTV</label>
       <div class="therapist-grid">
-        <small class="loading-text" v-if="!karaokeBaseItems.length && !karaokePackageItems.length">Belum ada FNB bertag KTV untuk outlet ini.</small>
+        <small class="loading-text" v-if="loadingKtvFnb">Memuat FNB KTV…</small>
+        <small class="loading-text" v-else-if="!karaokeBaseItems.length && !karaokePackageItems.length">Belum ada FNB bertag KTV untuk outlet ini.</small>
 
         <div v-for="item in karaokeBaseItems" :key="`base-${item.id}`" style="display:flex;gap:8px;align-items:center">
           <input type="checkbox" :checked="isKtvItemChecked(item)" @change="toggleKtvItem(item, 'KTV', $event.target.checked)" />
@@ -191,6 +192,7 @@ const manualDuration = ref(0)
 const loadingServices = ref(false)
 const loadingTherapists = ref(false)
 const loadingRooms = ref(false)
+const loadingKtvFnb = ref(false)
 const isSubmitting = ref(false)
 const errorMessage = ref("")
 
@@ -320,6 +322,30 @@ const normalizeServicePayload = (payload) => {
     payload?.data?.items,
     payload?.data?.results,
     payload?.data?.services
+  ]
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate
+  }
+
+  return []
+}
+
+
+const normalizeFnbPayload = (payload) => {
+  if (Array.isArray(payload)) return payload
+
+  const candidates = [
+    payload?.data,
+    payload?.rows,
+    payload?.items,
+    payload?.results,
+    payload?.fnb,
+    payload?.data?.data,
+    payload?.data?.rows,
+    payload?.data?.items,
+    payload?.data?.results,
+    payload?.data?.fnb
   ]
 
   for (const candidate of candidates) {
@@ -556,8 +582,9 @@ const fetchKtvFnbItems = async () => {
     return
   }
   try {
+    loadingKtvFnb.value = true
     const res = await api.get('/fnb')
-    const rows = Array.isArray(res.data) ? res.data : []
+    const rows = normalizeFnbPayload(res.data)
     ktvFnbItems.value = rows.filter((item) => normalizeKtvTagsClient(item.ktv_group_tags).length)
     const preselect = []
     ktvFnbItems.value.forEach((item) => {
@@ -570,6 +597,8 @@ const fetchKtvFnbItems = async () => {
     selectedKtvFnbItems.value = preselect
   } catch (err) {
     ktvFnbItems.value = []
+  } finally {
+    loadingKtvFnb.value = false
   }
 }
 
