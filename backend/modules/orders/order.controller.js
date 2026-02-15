@@ -721,25 +721,26 @@ exports.createFromPos = async (req, res) => {
       await db.query(
         `
         INSERT INTO order_items
-          (order_id, service_id, variant_service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
+          (order_id, service_id, variant_service_id, service_name, qty, price, subtotal, therapist_name, room_name, price_label, is_package_snapshot)
         VALUES
-          ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
         `,
-        [orderId, svc.id, i.variant_service_id ? Number(i.variant_service_id) : null, i.name || svc.name, qty, unitPrice, subtotal, i.price_label || null, Boolean(i.is_package)]
+        [orderId, svc.id, i.variant_service_id ? Number(i.variant_service_id) : null, i.name || svc.name, qty, unitPrice, subtotal, i.therapist_name || null, i.room_name || null, i.price_label || null, Boolean(i.is_package)]
       )
 
       if (svc.duration_minutes && svc.duration_minutes > 0) {
         await db.query(
           `
           INSERT INTO timers
-            (order_id, service_id, branch_id, start_time, planned_end_time)
+            (order_id, service_id, therapist_id, branch_id, start_time, planned_end_time)
           VALUES
-            ($1,$2,$3, now(),
-             now() + ($4 || ' minutes')::interval)
+            ($1,$2,$3,$4, now(),
+             now() + ($5 || ' minutes')::interval)
           `,
           [
             orderId,
             svc.id,
+            i.therapist_id ? Number(i.therapist_id) : null,
             branchId,
             `${svc.duration_minutes} minutes`
           ]
@@ -845,11 +846,11 @@ exports.createDraftFromPos = async (req, res) => {
       await db.query(
         `
         INSERT INTO order_items
-          (order_id, service_id, variant_service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
+          (order_id, service_id, variant_service_id, service_name, qty, price, subtotal, therapist_name, room_name, price_label, is_package_snapshot)
         VALUES
-          ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
         `,
-        [orderId, svc.id, i.variant_service_id ? Number(i.variant_service_id) : null, i.name || svc.name, qty, unitPrice, subtotal, i.price_label || null, Boolean(i.is_package)]
+        [orderId, svc.id, i.variant_service_id ? Number(i.variant_service_id) : null, i.name || svc.name, qty, unitPrice, subtotal, i.therapist_name || null, i.room_name || null, i.price_label || null, Boolean(i.is_package)]
       )
     }
 
@@ -925,9 +926,9 @@ exports.saveDraft = async (req, res) => {
       total += subtotal
 
       await db.query(
-        `INSERT INTO order_items (order_id, service_id, variant_service_id, service_name, qty, price, subtotal, price_label, is_package_snapshot)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [idOrder, item.id, item.variant_service_id ? Number(item.variant_service_id) : null, item.name || svcRes.rows[0].name, qty, unitPrice, subtotal, item.price_label || null, Boolean(item.is_package)]
+        `INSERT INTO order_items (order_id, service_id, variant_service_id, service_name, qty, price, subtotal, therapist_name, room_name, price_label, is_package_snapshot)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [idOrder, item.id, item.variant_service_id ? Number(item.variant_service_id) : null, item.name || svcRes.rows[0].name, qty, unitPrice, subtotal, item.therapist_name || null, item.room_name || null, item.price_label || null, Boolean(item.is_package)]
       )
     }
 

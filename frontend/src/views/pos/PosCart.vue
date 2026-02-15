@@ -354,6 +354,7 @@ const toPayloadItems = () => {
       is_package: Boolean(i.is_package),
       variant_name: i.variant_name || null,
       variant_service_id: i.variant_service_id || null,
+      therapist_id: i.therapist_id || null,
       therapist_name: i.therapist_name || null
     })
   }
