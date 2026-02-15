@@ -29,7 +29,9 @@ const selectedRoom = ref(null)
     service.is_package ? 'P' : 'N',
     String(service.name || '').trim().toLowerCase(),
     service.variant_name || '',
-    service.item_group || ''
+    service.item_group || '',
+    service.therapist_id || '',
+    service.therapist_name || ''
   ].join(':')
 
   function addService(service) {
@@ -62,6 +64,10 @@ const selectedRoom = ref(null)
       variant_name: service.variant_name || null,
       variant_service_id: service.variant_service_id || null,
       item_group: service.item_group || null,
+      type: service.type || null,
+      therapist_id: service.therapist_id || null,
+      therapist_name: service.therapist_name || null,
+      locked_main: Boolean(service.locked_main),
       locked_package: Boolean(service.locked_package),
       cart_key: uniqueLockedKey,
       qty: seedQty
