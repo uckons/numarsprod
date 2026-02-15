@@ -258,6 +258,25 @@
               Nama Paket (opsional)
               <input v-model="form.package_name" class="input" :disabled="!form.is_package" />
             </label>
+            <div>
+              <div style="margin-bottom:8px;font-weight:600">KTV Group Tags</div>
+              <div v-for="tag in KTV_TAG_OPTIONS" :key="`tag-${tag}`" style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <label style="display:flex;align-items:center;gap:8px;min-width:130px">
+                  <input type="checkbox" :checked="isKtvTagChecked(tag)" @change="toggleKtvTag(tag, $event.target.checked)" />
+                  <span>{{ tag }}</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  class="input"
+                  style="max-width:160px"
+                  :disabled="!isKtvTagChecked(tag)"
+                  :value="Number(form.ktv_group_default_qty?.[tag] || 0)"
+                  @input="setKtvTagQty(tag, $event.target.value)"
+                  placeholder="Default Qty"
+                />
+              </div>
+            </div>
             <label class="inline-toggle">
               <span>Happy Hour Aktif</span>
               <input v-model="form.happy_hour_enabled" type="checkbox" />
@@ -334,6 +353,8 @@ const happyHours = ref([
 ])
 const showForm = ref(false)
 const editingItem = ref(null)
+const KTV_TAG_OPTIONS = ["KTV", "KTV-2K", "KTV-3K", "KTV-4K"]
+
 const form = ref({
   name: "",
   cost_price: 0,
@@ -350,7 +371,10 @@ const form = ref({
   stock: 0,
   alert_stock: 0,
   branch_id: "",
-  item_group: "NORMAL"
+  item_group: "NORMAL",
+  ktv_group_tags: [],
+  ktv_default_qty: 0,
+  ktv_group_default_qty: {}
 })
 
 const loadItems = async () => {
@@ -499,7 +523,10 @@ const openAdd = () => {
     stock: 0,
     alert_stock: 0,
     branch_id: selectedBranch.value !== "ALL" ? String(selectedBranch.value) : (branches.value[0] ? String(branches.value[0].id) : ""),
-    item_group: "NORMAL"
+    item_group: "NORMAL",
+    ktv_group_tags: [],
+    ktv_default_qty: 0,
+    ktv_group_default_qty: {}
   }
   showForm.value = true
 }
@@ -522,7 +549,10 @@ const openEdit = (item) => {
     stock: Number(item.stock || 0),
     alert_stock: Number(item.alert_stock || 0),
     branch_id: String(item.branch_id || ""),
-    item_group: item.item_group || "NORMAL"
+    item_group: item.item_group || "NORMAL",
+    ktv_group_tags: Array.isArray(item.ktv_group_tags) ? item.ktv_group_tags : [],
+    ktv_default_qty: Number(item.ktv_default_qty || 0),
+    ktv_group_default_qty: (item.ktv_group_default_qty && typeof item.ktv_group_default_qty === 'object') ? item.ktv_group_default_qty : {}
   }
   showForm.value = true
 }
@@ -530,6 +560,27 @@ const openEdit = (item) => {
 const closeForm = () => {
   showForm.value = false
   editingItem.value = null
+}
+
+const isKtvTagChecked = (tag) => Array.isArray(form.value.ktv_group_tags) && form.value.ktv_group_tags.includes(tag)
+
+const toggleKtvTag = (tag, checked) => {
+  const current = new Set(Array.isArray(form.value.ktv_group_tags) ? form.value.ktv_group_tags : [])
+  if (checked) current.add(tag)
+  else current.delete(tag)
+  form.value.ktv_group_tags = [...current]
+
+  const qtyMap = { ...(form.value.ktv_group_default_qty || {}) }
+  if (!checked) delete qtyMap[tag]
+  else if (qtyMap[tag] === undefined) qtyMap[tag] = 0
+  form.value.ktv_group_default_qty = qtyMap
+}
+
+const setKtvTagQty = (tag, value) => {
+  const qtyMap = { ...(form.value.ktv_group_default_qty || {}) }
+  const qty = Number(value || 0)
+  qtyMap[tag] = Number.isFinite(qty) && qty > 0 ? Math.floor(qty) : 0
+  form.value.ktv_group_default_qty = qtyMap
 }
 
 const submitForm = async () => {
@@ -551,6 +602,9 @@ const submitForm = async () => {
     package_price: form.value.is_package ? Number(form.value.package_price || 0) : null,
     package_name: form.value.is_package ? (form.value.package_name || null) : null,
     package_special: Boolean(form.value.is_package && form.value.package_special),
+    ktv_group_tags: Array.isArray(form.value.ktv_group_tags) ? form.value.ktv_group_tags : [],
+    ktv_default_qty: Number(form.value.ktv_default_qty || 0),
+    ktv_group_default_qty: form.value.ktv_group_default_qty || {},
     happy_hour_enabled: Boolean(form.value.happy_hour_enabled),
     happy_hour_price: form.value.happy_hour_enabled
       ? Number(form.value.happy_hour_price || 0)
