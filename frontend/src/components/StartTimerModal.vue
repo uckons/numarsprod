@@ -46,7 +46,7 @@
       <span v-if="loadingServices" class="loading-text">Memuat service…</span>
     </div>
 
-    <div class="field" v-if="serviceType && !['LOUNGE', 'KARAOKE'].includes(serviceType)">
+    <div class="field" v-if="serviceType && !['LOUNGE'].includes(serviceType)">
       <label>
         Nama Terapis
         <small v-if="therapistSelectionCount > 1">(wajib {{ therapistSelectionCount }} terapis)</small>
@@ -56,6 +56,7 @@
           v-for="idx in therapistSelectionCount"
           :key="`ther-${idx}`"
           v-model="selectedTherapistIds[idx - 1]"
+          @change="onTherapistSelectionChange(idx - 1, $event.target.value)"
           :disabled="loadingTherapists || !serviceType"
         >
           <option value="">-- Pilih Terapis #{{ idx }} --</option>
@@ -100,6 +101,22 @@
     <div class="field" v-if="serviceType === 'KARAOKE'">
       <label>Konfirmasi Karaoke</label>
       <small class="loading-text">Pilihan FNB dan terapis akan muncul setelah klik "Mulai Timer".</small>
+    </div>
+
+
+    <div class="field" v-if="serviceType === 'KARAOKE'">
+      <label>FNB KTV (otomatis)</label>
+      <div class="therapist-grid">
+        <div v-for="item in karaokeBaseItems" :key="`base-${item.id}`" style="display:flex;gap:8px;align-items:center">
+          <span style="flex:1">{{ item.name }}</span>
+          <input type="number" min="0" style="width:90px" :value="(selectedKtvFnbItems.find(v => Number(v.service_id)===Number(item.service_id)) || { qty: getKtvDefaultQtyByTag(item, 'KTV') }).qty" @input="updateKtvBaseQty(item, $event)" />
+        </div>
+        <div v-if="karaokePackageItems.length" style="margin-top:6px;font-size:12px;color:#bbb">Pilih 1 item paket sesuai {{ selectedKtvPackageTag }}</div>
+        <label v-for="item in karaokePackageItems" :key="`pkg-${item.id}`" style="display:flex;gap:8px;align-items:center">
+          <input type="radio" name="ktv-package" :checked="selectedKtvFnbItems.some(v => Number(v.service_id)===Number(item.service_id) && Number(v.qty)>0)" @change="selectKtvPackageItem(item)" />
+          <span>{{ item.name }}</span>
+        </label>
+      </div>
     </div>
 
     <div v-if="errorMessage" class="error-message">
@@ -313,9 +330,13 @@ const resizeSelection = (currentValues, qty, { keepFirstValue = false } = {}) =>
 }
 
 const initSelections = () => {
+  if (serviceType.value === 'KARAOKE') {
+    selectedServiceQty.value = Number(requiredTherapistQty.value || 1)
+  }
   const qty = Number(selectedServiceQty.value || 1)
   selectedServiceIds.value = resizeSelection(selectedServiceIds.value, qty, { keepFirstValue: true })
   selectedTherapistIds.value = resizeSelection(selectedTherapistIds.value, qty)
+  therapistSelectionsTouched.value = Array.from({ length: qty }, () => false)
 }
 
 const ensureComboBaseService = () => {
@@ -625,6 +646,9 @@ const confirmKaraokePopup = () => {
 const submit = () => {
   errorMessage.value = ""
 
+  if (serviceType.value === 'KARAOKE') {
+    selectedServiceQty.value = Number(requiredTherapistQty.value || 1)
+  }
   const qty = Number(selectedServiceQty.value || 1)
   const normalizedServiceIds = selectedServiceIds.value
     .map(id => Number(id))
