@@ -412,6 +412,23 @@ const onServiceSelectionChange = async () => {
   await fetchKtvFnbItems()
 }
 
+const onTherapistSelectionChange = (idx, value) => {
+  const therapistId = Number(value)
+  if (!Number.isInteger(therapistId) || therapistId <= 0) {
+    selectedTherapistIds.value[idx] = ''
+    return
+  }
+
+  if (selectedTherapistIds.value.some((id, currentIdx) => currentIdx !== idx && Number(id) === therapistId)) {
+    selectedTherapistIds.value[idx] = ''
+    errorMessage.value = 'Terapis harus berbeda'
+    return
+  }
+
+  errorMessage.value = ''
+  selectedTherapistIds.value[idx] = String(therapistId)
+}
+
 const isTherapistDisabled = (therapistId, currentIndex) => {
   const normalizedId = Number(therapistId)
   if (!Number.isInteger(normalizedId) || normalizedId <= 0) return false
