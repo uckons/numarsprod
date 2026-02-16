@@ -1,38 +1,39 @@
 <template>
   <div class="cart">
     <h3>🛒 Cart</h3>
-
-    <div v-if="items.length === 0" class="empty">
-      Belum ada item
-    </div>
-
-    <div
-      v-for="i in items"
-      :key="i.cart_key || `${i.id}-${i.base_price}-${i.price_label || ''}`"
-      class="cart-item"
-      :class="{ locked: i.locked_package || i.locked_main }"
-    >
-      <div class="info">
-        <strong>{{ i.name }}</strong>
-        <small>Rp {{ format(i.base_price) }}</small>
-        <small v-if="i.price_label" class="item-label">{{ i.price_label }}</small>
-        <small v-if="i.variant_name" class="item-label">Varian: {{ i.variant_name }}</small>
-        <small v-if="i.therapist_name" class="item-label">Terapis: {{ i.therapist_name }}</small>
-        <small v-if="i.locked_main" class="item-locked">LOCKED MAIN SERVICE</small>
-        <small v-if="i.locked_package" class="item-locked">LOCKED PAKET</small>
+    <div class="items-scroll">
+      <div v-if="items.length === 0" class="empty">
+        Belum ada item
       </div>
 
-      <div class="qty">
-        <button @click="dec(i)" :disabled="i.locked_package || i.locked_main">−</button>
-        <span>{{ i.qty }}</span>
-        <button @click="inc(i)" :disabled="i.locked_package || i.locked_main">+</button>
-      </div>
+      <div
+        v-for="i in items"
+        :key="i.cart_key || `${i.id}-${i.base_price}-${i.price_label || ''}`"
+        class="cart-item"
+        :class="{ locked: i.locked_package || i.locked_main }"
+      >
+        <div class="info">
+          <strong>{{ i.name }}</strong>
+          <small>Rp {{ format(i.base_price) }}</small>
+          <small v-if="i.price_label" class="item-label">{{ i.price_label }}</small>
+          <small v-if="i.variant_name" class="item-label">Varian: {{ i.variant_name }}</small>
+          <small v-if="i.therapist_name" class="item-label">Terapis: {{ i.therapist_name }}</small>
+          <small v-if="i.locked_main" class="item-locked">LOCKED MAIN SERVICE</small>
+          <small v-if="i.locked_package" class="item-locked">LOCKED PAKET</small>
+        </div>
 
-      <div class="total">
-        Rp {{ format(i.base_price * i.qty) }}
-      </div>
+        <div class="qty">
+          <button @click="dec(i)" :disabled="i.locked_package || i.locked_main">−</button>
+          <span>{{ i.qty }}</span>
+          <button @click="inc(i)" :disabled="i.locked_package || i.locked_main">+</button>
+        </div>
 
-      <button class="remove" @click="remove(i)" :disabled="i.locked_package">✕</button>
+        <div class="total">
+          Rp {{ format(i.base_price * i.qty) }}
+        </div>
+
+        <button class="remove" @click="remove(i)" :disabled="i.locked_package">✕</button>
+      </div>
     </div>
 
     <div v-if="items.length" class="summary">
@@ -628,6 +629,14 @@ const saveDraft = async () => {
   color: #fff;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+}
+
+.items-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 /* ======================
@@ -756,9 +765,10 @@ const saveDraft = async () => {
    SUMMARY
 ====================== */
 .summary {
-  margin-top: auto;
+  margin-top: 10px;
   padding-top: 14px;
   border-top: 1px solid #222;
+  background: #0e0e0e;
 }
 
 .summary .row {

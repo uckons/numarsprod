@@ -97,12 +97,16 @@ const addToCart = (service) => {
   display: grid;
   grid-template-columns: 1fr 420px;
   height: 100%;
+  min-height: 0;
 }
 .left {
   padding: 16px;
   overflow-y: auto;
+  min-height: 0;
 }
 .right {
   border-left: 1px solid #222;
+  min-height: 0;
+  overflow: hidden;
 }
 </style>
