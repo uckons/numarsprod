@@ -296,12 +296,8 @@ exports.kasirAnalytics = async (user, query = {}) => {
            END,
            false
          ) AS is_happy,
-         COALESCE(NULLIF(array_length(regexp_split_to_array(regexp_replace(COALESCE(oi.therapist_name, ''), '\s*,\s*', ',', 'g'), ','), 1), 0), 1) AS therapist_count,
          CASE
-           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN (
-             GREATEST(COALESCE(oi.price, 0) - COALESCE(s.base_price, 0), 0)
-             / COALESCE(NULLIF(array_length(regexp_split_to_array(regexp_replace(COALESCE(oi.therapist_name, ''), '\s*,\s*', ',', 'g'), ','), 1), 0), 1)
-           )
+           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN COALESCE(s.base_price, oi.price, 0)
            WHEN (
              COALESCE(
                CASE
@@ -561,12 +557,8 @@ exports.kasirAnalytics = async (user, query = {}) => {
            END,
            false
          ) AS is_happy,
-         COALESCE(NULLIF(array_length(regexp_split_to_array(regexp_replace(COALESCE(oi.therapist_name, ''), '\s*,\s*', ',', 'g'), ','), 1), 0), 1) AS therapist_count,
          CASE
-           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN (
-             GREATEST(COALESCE(oi.price, 0) - COALESCE(s.base_price, 0), 0)
-             / COALESCE(NULLIF(array_length(regexp_split_to_array(regexp_replace(COALESCE(oi.therapist_name, ''), '\s*,\s*', ',', 'g'), ','), 1), 0), 1)
-           )
+           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN COALESCE(s.base_price, oi.price, 0)
            WHEN (
              COALESCE(
                CASE
