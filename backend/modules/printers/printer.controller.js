@@ -28,7 +28,7 @@ exports.printOrder = async (req, res) => {
     // 🔹 ambil items
     const itemsRes = await db.query(
       `
-      SELECT service_name, qty, subtotal
+      SELECT service_name, qty, subtotal, therapist_name
       FROM order_items
       WHERE order_id = $1
       `,

@@ -1076,6 +1076,8 @@ exports.getKasirOrders = async (req, res) => {
             'service_name', oi.service_name,
             'qty', oi.qty,
             'subtotal', oi.subtotal,
+            'therapist_name', oi.therapist_name,
+            'room_name', oi.room_name,
             'is_fnb', (s.type = 'FNB'),
             'is_delivered', (
               s.type = 'FNB' AND EXISTS (
@@ -1190,13 +1192,20 @@ exports.getOrderDetail = async (req, res) => {
         o.total,
         o.payment_method,
         o.created_at,
-        th.name AS therapist_name,
+        COALESCE(ot.therapist_name, th.name) AS therapist_name,
         r.name AS room_name,
         b.name AS branch_name,
         b.address AS branch_address,
         u.name AS cashier_name
       FROM orders o
       LEFT JOIN therapists th ON th.id = o.therapist_id
+      LEFT JOIN LATERAL (
+        SELECT string_agg(DISTINCT oi2.therapist_name, ', ' ORDER BY oi2.therapist_name) AS therapist_name
+        FROM order_items oi2
+        WHERE oi2.order_id = o.id
+          AND oi2.therapist_name IS NOT NULL
+          AND oi2.therapist_name <> ''
+      ) ot ON true
       LEFT JOIN rooms r ON r.id = o.room_id
       LEFT JOIN branches b ON b.id = o.branch_id
       LEFT JOIN users u ON u.id = o.user_id
@@ -1217,6 +1226,8 @@ exports.getOrderDetail = async (req, res) => {
         qty,
         price,
         subtotal,
+        therapist_name,
+        room_name,
         price_label,
         is_package_snapshot AS is_package
       FROM order_items
