@@ -1076,7 +1076,23 @@ exports.getKasirOrders = async (req, res) => {
             'service_name', oi.service_name,
             'qty', oi.qty,
             'subtotal', oi.subtotal,
-            'therapist_name', oi.therapist_name,
+            'therapist_name', (
+              SELECT string_agg(DISTINCT therapist_name.name, ', ' ORDER BY therapist_name.name)
+              FROM (
+                SELECT NULLIF(BTRIM(regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',')), '') AS name
+                UNION ALL
+                SELECT t2.name AS name
+                FROM timers tm2
+                JOIN therapists t2 ON t2.id = tm2.therapist_id
+                WHERE tm2.order_id = o.id
+                  AND (
+                    s.type::text IN ('KARAOKE', 'KTV')
+                    OR tm2.service_id = oi.service_id
+                  )
+              ) therapist_name
+              WHERE therapist_name.name IS NOT NULL
+                AND therapist_name.name <> ''
+            ),
             'room_name', oi.room_name,
             'is_fnb', (s.type = 'FNB'),
             'is_delivered', (
@@ -1226,11 +1242,28 @@ exports.getOrderDetail = async (req, res) => {
         qty,
         price,
         subtotal,
-        therapist_name,
+        (
+          SELECT string_agg(DISTINCT therapist_name.name, ', ' ORDER BY therapist_name.name)
+          FROM (
+            SELECT NULLIF(BTRIM(regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',')), '') AS name
+            UNION ALL
+            SELECT t2.name AS name
+            FROM timers tm2
+            JOIN therapists t2 ON t2.id = tm2.therapist_id
+            JOIN services s2 ON s2.id = oi.service_id
+            WHERE tm2.order_id = oi.order_id
+              AND (
+                s2.type::text IN ('KARAOKE', 'KTV')
+                OR tm2.service_id = oi.service_id
+              )
+          ) therapist_name
+          WHERE therapist_name.name IS NOT NULL
+            AND therapist_name.name <> ''
+        ) AS therapist_name,
         room_name,
         price_label,
         is_package_snapshot AS is_package
-      FROM order_items
+      FROM order_items oi
       WHERE order_id = $1
       ORDER BY id ASC
     `, [orderId])
