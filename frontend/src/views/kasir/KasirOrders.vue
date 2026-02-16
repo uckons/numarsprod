@@ -127,8 +127,11 @@
         :key="idx"
         class="service-item"
       >
-        {{ i.service_name }}
-        <small>×{{ i.qty }} <span v-if="i.is_fnb && i.is_delivered" class="delivered-check">✅</span></small>
+        <div class="service-line">
+          <span>{{ i.service_name }}</span>
+          <small>×{{ i.qty }} <span v-if="i.is_fnb && i.is_delivered" class="delivered-check">✅</span></small>
+        </div>
+        <small v-if="i.therapist_name" class="service-meta">Terapis: {{ i.therapist_name }}</small>
       </div>
     </td>
 
@@ -348,8 +351,11 @@
               <span>Qty</span>
               <span>Subtotal</span>
             </div>
-            <div v-for="item in printOrder?.items" :key="item.service_id" class="item-row">
-              <div class="item-name">{{ item.service_name }}</div>
+            <div v-for="(item, idx) in printOrder?.items" :key="`${item.service_id}-${idx}`" class="item-row">
+              <div class="item-name">
+                <div>{{ item.service_name }}</div>
+                <small v-if="item.therapist_name" class="item-meta">Terapis: {{ item.therapist_name }}</small>
+              </div>
               <div class="item-detail">
                 <span>{{ item.qty }}x</span>
                 <span>{{ formatRupiah(item.price) }}</span>
@@ -1705,5 +1711,9 @@ th {
 }
 
 .delivered-check { margin-left: 4px; }
+
+.service-line { display:flex; justify-content:space-between; gap:8px; width:100%; }
+.service-meta { display:block; font-size:11px; color:#b9b9b9; }
+.item-meta { display:block; font-size:10px; color:#666; }
 </style>
 
