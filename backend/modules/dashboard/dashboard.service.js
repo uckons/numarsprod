@@ -369,7 +369,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
      SELECT
        tr.therapist_name,
        COALESCE(grade_info.grade_name, '-') AS grade_name,
-       COUNT(DISTINCT tr.order_id) AS orders,
+       COALESCE(SUM(tr.qty), 0) AS orders,
        COALESCE(SUM(tr.qty * tr.effective_unit_price), 0) AS revenue
      FROM therapist_rows tr
      LEFT JOIN LATERAL (
@@ -382,8 +382,9 @@ exports.kasirAnalytics = async (user, query = {}) => {
        LIMIT 1
      ) grade_info ON true
      WHERE tr.therapist_name <> ''
+       AND tr.category IN ('SPA', 'LC', 'KTV')
      GROUP BY tr.therapist_name, grade_info.grade_name
-     ORDER BY revenue DESC, orders DESC
+     ORDER BY orders DESC, revenue DESC
      LIMIT 5`,
     [branchId, from, to]
   )

@@ -19,6 +19,9 @@ exports.printOrder = async (order) => {
 
       order.items.forEach(i => {
         printer.text(`${i.service_name} x${i.qty}`)
+        if (i.therapist_name) {
+          printer.text(`  Terapis: ${i.therapist_name}`)
+        }
         printer.text(`Rp ${Number(i.subtotal).toLocaleString("id-ID")}`)
       })
 
