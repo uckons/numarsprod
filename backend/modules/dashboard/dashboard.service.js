@@ -298,7 +298,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
          ) AS is_happy,
          COALESCE(grade_match.commission_amount, 0) AS therapist_grade_base_price,
          CASE
-           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN COALESCE(NULLIF(grade_match.commission_amount, 0), s.base_price, oi.price, 0)
+           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN COALESCE(NULLIF(grade_match.grade_service_base_price, 0), NULLIF(grade_match.commission_amount, 0), s.base_price, oi.price, 0)
            WHEN (
              COALESCE(
                CASE
@@ -347,7 +347,17 @@ exports.kasirAnalytics = async (user, query = {}) => {
        ) hh_match ON true
        CROSS JOIN LATERAL regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS raw_name
        LEFT JOIN LATERAL (
-         SELECT COALESCE(tg.commission_amount, tg.commission_percent, 0) AS commission_amount
+         SELECT
+           COALESCE(tg.commission_amount, tg.commission_percent, 0) AS commission_amount,
+           (
+             SELECT s2.base_price
+             FROM services s2
+             WHERE s2.branch_id = t.branch_id
+               AND s2.type::text IN ('LC', 'LOUNGE')
+               AND LOWER(regexp_replace(s2.name, '[^a-z0-9]', '', 'gi')) LIKE '%' || LOWER(regexp_replace(COALESCE(tg.name, ''), '[^a-z0-9]', '', 'gi')) || '%'
+             ORDER BY s2.base_price DESC NULLS LAST, s2.id DESC
+             LIMIT 1
+           ) AS grade_service_base_price
          FROM therapists t
          LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
          WHERE LOWER(regexp_replace(BTRIM(t.name), '[^a-z0-9]', '', 'gi')) = LOWER(regexp_replace(BTRIM(raw_name), '[^a-z0-9]', '', 'gi'))
@@ -569,7 +579,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
          ) AS is_happy,
          COALESCE(grade_match.commission_amount, 0) AS therapist_grade_base_price,
          CASE
-           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN COALESCE(NULLIF(grade_match.commission_amount, 0), s.base_price, oi.price, 0)
+           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN COALESCE(NULLIF(grade_match.grade_service_base_price, 0), NULLIF(grade_match.commission_amount, 0), s.base_price, oi.price, 0)
            WHEN (
              COALESCE(
                CASE
@@ -618,7 +628,17 @@ exports.kasirAnalytics = async (user, query = {}) => {
        ) hh_match ON true
        CROSS JOIN LATERAL regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS raw_name
        LEFT JOIN LATERAL (
-         SELECT COALESCE(tg.commission_amount, tg.commission_percent, 0) AS commission_amount
+         SELECT
+           COALESCE(tg.commission_amount, tg.commission_percent, 0) AS commission_amount,
+           (
+             SELECT s2.base_price
+             FROM services s2
+             WHERE s2.branch_id = t.branch_id
+               AND s2.type::text IN ('LC', 'LOUNGE')
+               AND LOWER(regexp_replace(s2.name, '[^a-z0-9]', '', 'gi')) LIKE '%' || LOWER(regexp_replace(COALESCE(tg.name, ''), '[^a-z0-9]', '', 'gi')) || '%'
+             ORDER BY s2.base_price DESC NULLS LAST, s2.id DESC
+             LIMIT 1
+           ) AS grade_service_base_price
          FROM therapists t
          LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
          WHERE LOWER(regexp_replace(BTRIM(t.name), '[^a-z0-9]', '', 'gi')) = LOWER(regexp_replace(BTRIM(raw_name), '[^a-z0-9]', '', 'gi'))
