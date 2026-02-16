@@ -296,8 +296,9 @@ exports.kasirAnalytics = async (user, query = {}) => {
            END,
            false
          ) AS is_happy,
+         COALESCE(grade_match.commission_amount, 0) AS therapist_grade_base_price,
          CASE
-           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN COALESCE(s.base_price, oi.price, 0)
+           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN COALESCE(NULLIF(grade_match.commission_amount, 0), s.base_price, oi.price, 0)
            WHEN (
              COALESCE(
                CASE
@@ -345,6 +346,15 @@ exports.kasirAnalytics = async (user, query = {}) => {
          LIMIT 1
        ) hh_match ON true
        CROSS JOIN LATERAL regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS raw_name
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(tg.commission_amount, tg.commission_percent, 0) AS commission_amount
+         FROM therapists t
+         LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
+         WHERE LOWER(t.name) = LOWER(BTRIM(raw_name))
+           AND t.branch_id = $1
+         ORDER BY t.active DESC NULLS LAST, t.id DESC
+         LIMIT 1
+       ) grade_match ON true
      )
      SELECT
        tr.therapist_name,
@@ -557,8 +567,9 @@ exports.kasirAnalytics = async (user, query = {}) => {
            END,
            false
          ) AS is_happy,
+         COALESCE(grade_match.commission_amount, 0) AS therapist_grade_base_price,
          CASE
-           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN COALESCE(s.base_price, oi.price, 0)
+           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN COALESCE(NULLIF(grade_match.commission_amount, 0), s.base_price, oi.price, 0)
            WHEN (
              COALESCE(
                CASE
@@ -606,6 +617,15 @@ exports.kasirAnalytics = async (user, query = {}) => {
          LIMIT 1
        ) hh_match ON true
        CROSS JOIN LATERAL regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS raw_name
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(tg.commission_amount, tg.commission_percent, 0) AS commission_amount
+         FROM therapists t
+         LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
+         WHERE LOWER(t.name) = LOWER(BTRIM(raw_name))
+           AND t.branch_id = $1
+         ORDER BY t.active DESC NULLS LAST, t.id DESC
+         LIMIT 1
+       ) grade_match ON true
      )
      SELECT
        tr.therapist_name,
