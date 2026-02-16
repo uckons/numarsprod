@@ -112,8 +112,11 @@
               <span>Qty</span>
               <span>Subtotal</span>
             </div>
-            <div v-for="item in receiptData?.items" :key="item.service_id" class="item-row">
-              <div class="item-name">{{ item.service_name }}</div>
+            <div v-for="(item, idx) in receiptData?.items" :key="`${item.service_id}-${idx}`" class="item-row">
+              <div class="item-name">
+                <div>{{ item.service_name }}</div>
+                <small v-if="item.therapist_name" class="item-meta">Terapis: {{ item.therapist_name }}</small>
+              </div>
               <div class="item-detail">
                 <span>{{ item.qty }}x</span>
                 <span>{{ formatRupiah(item.price) }}</span>
@@ -1196,4 +1199,6 @@ const saveDraft = async () => {
     width: 100%;
   }
 }
+
+.item-meta { display:block; font-size:10px; color:#666; }
 </style>
