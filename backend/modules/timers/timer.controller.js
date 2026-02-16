@@ -81,6 +81,12 @@ exports.startTimer = async (req, res) => {
     return Number.isInteger(qty) && qty > 1 ? qty : 1
   }
 
+  const parseKaraokeTherapistQtyFromName = (serviceName) => {
+    const normalized = String(serviceName || '').toUpperCase().replace(/\s+/g, '')
+    if (normalized.includes('KTV-4K') || normalized.includes('KTV4K')) return 2
+    return 1
+  }
+
   const normalizeTherapistIds = (therapist_id, therapist_ids) => {
     const raw = Array.isArray(therapist_ids) && therapist_ids.length
       ? therapist_ids
@@ -263,7 +269,23 @@ exports.startTimer = async (req, res) => {
              AND hh_active.active = true
            THEN s.happy_hour_price
            ELSE COALESCE(fi.price, s.base_price)
-         END AS base_price
+         END AS base_price,
+         COALESCE(fi.price, s.base_price) AS normal_base_price,
+         CASE
+           WHEN s.type = 'FNB'
+             AND fi.is_beverage = true
+             AND COALESCE(fi.is_package, false) = false
+             AND fi.happy_hour_enabled = true
+             AND fi.happy_hour_price IS NOT NULL
+             AND hh_active.active = true
+           THEN true
+           WHEN s.type IN ('SPA', 'LC', 'LOUNGE')
+             AND s.happy_hour_enabled = true
+             AND s.happy_hour_price IS NOT NULL
+             AND hh_active.active = true
+           THEN true
+           ELSE false
+         END AS is_happy_hour_price
        FROM services s
        LEFT JOIN fnb_items fi ON fi.service_id = s.id
        LEFT JOIN LATERAL (
@@ -319,7 +341,11 @@ exports.startTimer = async (req, res) => {
             : comboQtyFromName)
     const selectedTherapistIds = normalizeTherapistIds(therapist_id, therapist_ids)
     const requiredTherapistCount = isKaraokeService
-      ? Math.max(1, Number(selectedService.therapist_qty_required || 1))
+      ? Math.max(
+          1,
+          Number(selectedService.therapist_qty_required || 1),
+          parseKaraokeTherapistQtyFromName(selectedService.name)
+        )
       : comboQty
 
     if (comboQty > 1 && !['SPA', 'LC'].includes(selectedService.type)) {
@@ -374,7 +400,23 @@ exports.startTimer = async (req, res) => {
              AND hh_active.active = true
            THEN s.happy_hour_price
            ELSE COALESCE(fi.price, s.base_price)
-         END AS base_price
+         END AS base_price,
+         COALESCE(fi.price, s.base_price) AS normal_base_price,
+         CASE
+           WHEN s.type = 'FNB'
+             AND fi.is_beverage = true
+             AND COALESCE(fi.is_package, false) = false
+             AND fi.happy_hour_enabled = true
+             AND fi.happy_hour_price IS NOT NULL
+             AND hh_active.active = true
+           THEN true
+           WHEN s.type IN ('SPA', 'LC', 'LOUNGE')
+             AND s.happy_hour_enabled = true
+             AND s.happy_hour_price IS NOT NULL
+             AND hh_active.active = true
+           THEN true
+           ELSE false
+         END AS is_happy_hour_price
        FROM services s
        LEFT JOIN fnb_items fi ON fi.service_id = s.id
        LEFT JOIN LATERAL (
@@ -540,8 +582,22 @@ exports.startTimer = async (req, res) => {
 
       const comboLabel = comboQty > 1 ? `COMBO SERVICE (${comboQty})` : null
 
-      for (const selection of comboSelections) {
-        const unitPrice = Math.round(Number(selection.service.base_price || 0))
+      for (let idx = 0; idx < comboSelections.length; idx += 1) {
+        const selection = comboSelections[idx]
+        let unitPrice = Math.round(Number(selection.service.base_price || 0))
+        let priceLabel = null
+
+        if (isKaraokeService) {
+          const normalBasePrice = Math.round(Number(selection.service.normal_base_price || selection.service.base_price || 0))
+          unitPrice = idx === 0 ? Math.max(0, comboTotal) : 0
+          priceLabel = 'NON HH'
+          if (idx > 0 && unitPrice === 0 && normalBasePrice > 0) {
+            priceLabel = 'NON HH'
+          }
+        } else {
+          priceLabel = selection.service.is_happy_hour_price ? 'HH' : 'NON HH'
+        }
+
         const baseServiceName = selection.service.name || selectedService.name
         const serviceNameSnapshot = comboLabel
           ? `${comboLabel}: ${baseServiceName}`
@@ -550,9 +606,9 @@ exports.startTimer = async (req, res) => {
         await db.query(
           `
           INSERT INTO order_items
-            (order_id, service_id, service_name, qty, price, subtotal, therapist_name)
+            (order_id, service_id, service_name, qty, price, subtotal, therapist_name, price_label)
           VALUES
-            ($1, $2, $3, $4, $5, $6, $7)
+            ($1, $2, $3, $4, $5, $6, $7, $8)
           `,
           [
             finalOrderId,
@@ -563,7 +619,8 @@ exports.startTimer = async (req, res) => {
             unitPrice,
             isKaraokeService
               ? therapistRows.map((t) => t.name).filter(Boolean).join(', ') || null
-              : (selection.therapistId ? therapistNameById.get(selection.therapistId) || null : null)
+              : (selection.therapistId ? therapistNameById.get(selection.therapistId) || null : null),
+            priceLabel
           ]
         )
       }

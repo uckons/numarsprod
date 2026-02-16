@@ -417,8 +417,13 @@ exports.kasirAnalytics = async (user, query = {}) => {
          COALESCE(oi.is_package_snapshot, false) AS is_package,
          LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'non hh', 'happy', 'happy hour', 'non happy hour') AS is_hh_tagged,
          COALESCE(
-           LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
-           OR hh_match.active = true,
+           CASE
+             WHEN s.type::text IN ('KARAOKE', 'KTV') THEN false
+             ELSE (
+               LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
+               OR hh_match.active = true
+             )
+           END,
            false
          ) AS is_happy
        FROM order_items oi
@@ -483,8 +488,13 @@ exports.kasirAnalytics = async (user, query = {}) => {
          COALESCE(oi.is_package_snapshot, false) AS is_package,
          LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'non hh', 'happy', 'happy hour', 'non happy hour') AS is_hh_tagged,
          COALESCE(
-           LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
-           OR hh_match.active = true,
+           CASE
+             WHEN s.type::text IN ('KARAOKE', 'KTV') THEN false
+             ELSE (
+               LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
+               OR hh_match.active = true
+             )
+           END,
            false
          ) AS is_happy,
          BTRIM(raw_name) AS therapist_name
