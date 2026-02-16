@@ -308,25 +308,30 @@ const maybeOfferPackage = (cartKey) => {
 
 
 const chooseTherapistForService = async (service) => {
-  if (String(service?.type || '').toUpperCase() !== 'LC') return null
+  const serviceType = String(service?.type || '').toUpperCase()
+  if (!['LC', 'SPA'].includes(serviceType)) return null
 
-  const res = await api.get('/timers/therapists', { params: { service_type: 'LC' } })
+  const res = await api.get('/timers/therapists', { params: { service_type: serviceType } })
   const therapists = Array.isArray(res.data) ? res.data : []
   if (!therapists.length) {
-    await Swal.fire({ icon: 'warning', title: 'Terapis tidak tersedia', text: 'Belum ada terapis LC yang bisa dipilih.' })
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Terapis tidak tersedia',
+      text: `Belum ada terapis ${serviceType} yang bisa dipilih.`
+    })
     return undefined
   }
 
   const options = therapists.map((t) => `<option value="${t.id}">${t.name}${t.grade_name ? ` (${t.grade_name})` : ''}</option>`).join('')
   const pick = await Swal.fire({
     title: `Pilih Terapis - ${service.name}`,
-    html: `<select id="lc-therapist-select" class="swal2-select"><option value="">-- Pilih Terapis --</option>${options}</select>`,
+    html: `<select id="service-therapist-select" class="swal2-select"><option value="">-- Pilih Terapis --</option>${options}</select>`,
     focusConfirm: false,
     showCancelButton: true,
     confirmButtonText: 'Gunakan',
     cancelButtonText: 'Batal',
     preConfirm: () => {
-      const el = document.getElementById('lc-therapist-select')
+      const el = document.getElementById('service-therapist-select')
       const id = Number(el?.value || 0)
       if (!id) {
         Swal.showValidationMessage('Pilih terapis dulu')
