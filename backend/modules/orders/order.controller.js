@@ -1150,6 +1150,8 @@ exports.getById = async (req, res) => {
             'qty', oi.qty,
             'price', oi.price,
             'subtotal', oi.subtotal,
+            'therapist_name', oi.therapist_name,
+            'room_name', oi.room_name,
             'price_label', oi.price_label,
             'is_package', oi.is_package_snapshot
           ) ORDER BY oi.id
