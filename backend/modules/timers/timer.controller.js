@@ -838,6 +838,16 @@ exports.createFromOrder = async (req, res) => {
     const db = req.app.get("db")
     const { orderId } = req.params
     const user = req.user
+    let branchId = user?.branch_id || null
+
+    if (!branchId && user?.id) {
+      const userRes = await db.query("SELECT branch_id FROM users WHERE id=$1", [user.id])
+      branchId = userRes.rows[0]?.branch_id || null
+    }
+
+    if (!branchId) {
+      return res.status(400).json({ message: "User belum terikat ke branch" })
+    }
 
     // ambil item order yg punya durasi
     const itemsRes = await db.query(
