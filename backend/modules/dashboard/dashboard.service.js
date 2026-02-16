@@ -350,7 +350,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
          SELECT COALESCE(tg.commission_amount, tg.commission_percent, 0) AS commission_amount
          FROM therapists t
          LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
-         WHERE LOWER(t.name) = LOWER(BTRIM(raw_name))
+         WHERE LOWER(regexp_replace(BTRIM(t.name), '\\s+', ' ', 'g')) = LOWER(regexp_replace(BTRIM(raw_name), '\\s+', ' ', 'g'))
            AND t.branch_id = $1
          ORDER BY t.active DESC NULLS LAST, t.id DESC
          LIMIT 1
@@ -366,7 +366,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
        SELECT tg.name AS grade_name
        FROM therapists t
        LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
-       WHERE LOWER(t.name) = LOWER(tr.therapist_name)
+       WHERE LOWER(regexp_replace(BTRIM(t.name), '\\s+', ' ', 'g')) = LOWER(regexp_replace(BTRIM(tr.therapist_name), '\\s+', ' ', 'g'))
          AND t.branch_id = $1
        ORDER BY t.active DESC NULLS LAST, t.id DESC
        LIMIT 1
@@ -459,7 +459,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
        SELECT tg.name AS grade_name
        FROM therapists t
        LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
-       WHERE LOWER(t.name) = LOWER(tr.therapist_name)
+       WHERE LOWER(regexp_replace(BTRIM(t.name), '\\s+', ' ', 'g')) = LOWER(regexp_replace(BTRIM(tr.therapist_name), '\\s+', ' ', 'g'))
          AND t.branch_id = $1
        ORDER BY t.active DESC NULLS LAST, t.id DESC
        LIMIT 1
@@ -621,7 +621,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
          SELECT COALESCE(tg.commission_amount, tg.commission_percent, 0) AS commission_amount
          FROM therapists t
          LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
-         WHERE LOWER(t.name) = LOWER(BTRIM(raw_name))
+         WHERE LOWER(regexp_replace(BTRIM(t.name), '\\s+', ' ', 'g')) = LOWER(regexp_replace(BTRIM(raw_name), '\\s+', ' ', 'g'))
            AND t.branch_id = $1
          ORDER BY t.active DESC NULLS LAST, t.id DESC
          LIMIT 1
@@ -645,7 +645,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
        SELECT tg.name AS grade_name
        FROM therapists t
        LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
-       WHERE LOWER(t.name) = LOWER(tr.therapist_name)
+       WHERE LOWER(regexp_replace(BTRIM(t.name), '\\s+', ' ', 'g')) = LOWER(regexp_replace(BTRIM(tr.therapist_name), '\\s+', ' ', 'g'))
          AND t.branch_id = $1
        ORDER BY t.active DESC NULLS LAST, t.id DESC
        LIMIT 1
