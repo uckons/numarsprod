@@ -315,7 +315,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
            ) THEN s.happy_hour_price
            ELSE COALESCE(s.base_price, oi.price, 0)
          END AS effective_unit_price,
-         BTRIM(raw_name) AS therapist_name
+         therapist_names.therapist_name AS therapist_name
        FROM order_items oi
        JOIN orders_scoped o ON o.id = oi.order_id
        JOIN services s ON s.id = oi.service_id
@@ -345,7 +345,22 @@ exports.kasirAnalytics = async (user, query = {}) => {
            )
          LIMIT 1
        ) hh_match ON true
-       CROSS JOIN LATERAL regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS raw_name
+       CROSS JOIN LATERAL (
+         SELECT DISTINCT BTRIM(src.name) AS therapist_name
+         FROM (
+           SELECT regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS name
+           UNION ALL
+           SELECT t.name AS name
+           FROM timers tm
+           JOIN therapists t ON t.id = tm.therapist_id
+           WHERE tm.order_id = o.id
+             AND (
+               s.type::text IN ('KARAOKE', 'KTV')
+               OR tm.service_id = oi.service_id
+             )
+         ) src
+         WHERE BTRIM(COALESCE(src.name, '')) <> ''
+       ) therapist_names
        LEFT JOIN LATERAL (
          SELECT
            COALESCE(tg.commission_amount, tg.commission_percent, 0) AS commission_amount,
@@ -360,7 +375,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
            ) AS grade_service_base_price
          FROM therapists t
          LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
-         WHERE LOWER(regexp_replace(BTRIM(t.name), '[^a-z0-9]', '', 'gi')) = LOWER(regexp_replace(BTRIM(raw_name), '[^a-z0-9]', '', 'gi'))
+         WHERE LOWER(regexp_replace(BTRIM(t.name), '[^a-z0-9]', '', 'gi')) = LOWER(regexp_replace(BTRIM(therapist_names.therapist_name), '[^a-z0-9]', '', 'gi'))
            AND t.branch_id = $1
          ORDER BY t.active DESC NULLS LAST, t.id DESC
          LIMIT 1
@@ -455,10 +470,26 @@ exports.kasirAnalytics = async (user, query = {}) => {
        SELECT
          o.id AS order_id,
          oi.subtotal,
-         BTRIM(raw_name) AS therapist_name
+         therapist_names.therapist_name AS therapist_name
        FROM order_items oi
        JOIN orders_scoped o ON o.id = oi.order_id
-       CROSS JOIN LATERAL regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS raw_name
+       JOIN services s ON s.id = oi.service_id
+       CROSS JOIN LATERAL (
+         SELECT DISTINCT BTRIM(src.name) AS therapist_name
+         FROM (
+           SELECT regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS name
+           UNION ALL
+           SELECT t.name AS name
+           FROM timers tm
+           JOIN therapists t ON t.id = tm.therapist_id
+           WHERE tm.order_id = o.id
+             AND (
+               s.type::text IN ('KARAOKE', 'KTV')
+               OR tm.service_id = oi.service_id
+             )
+         ) src
+         WHERE BTRIM(COALESCE(src.name, '')) <> ''
+       ) therapist_names
      )
      SELECT
        tr.therapist_name,
@@ -597,7 +628,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
            ) THEN s.happy_hour_price
            ELSE COALESCE(s.base_price, oi.price, 0)
          END AS effective_unit_price,
-         BTRIM(raw_name) AS therapist_name
+         therapist_names.therapist_name AS therapist_name
        FROM order_items oi
        JOIN orders_scoped o ON o.id = oi.order_id
        JOIN services s ON s.id = oi.service_id
@@ -627,7 +658,22 @@ exports.kasirAnalytics = async (user, query = {}) => {
            )
          LIMIT 1
        ) hh_match ON true
-       CROSS JOIN LATERAL regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS raw_name
+       CROSS JOIN LATERAL (
+         SELECT DISTINCT BTRIM(src.name) AS therapist_name
+         FROM (
+           SELECT regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS name
+           UNION ALL
+           SELECT t.name AS name
+           FROM timers tm
+           JOIN therapists t ON t.id = tm.therapist_id
+           WHERE tm.order_id = o.id
+             AND (
+               s.type::text IN ('KARAOKE', 'KTV')
+               OR tm.service_id = oi.service_id
+             )
+         ) src
+         WHERE BTRIM(COALESCE(src.name, '')) <> ''
+       ) therapist_names
        LEFT JOIN LATERAL (
          SELECT
            COALESCE(tg.commission_amount, tg.commission_percent, 0) AS commission_amount,
@@ -642,7 +688,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
            ) AS grade_service_base_price
          FROM therapists t
          LEFT JOIN therapist_grades tg ON tg.id = t.grade_id
-         WHERE LOWER(regexp_replace(BTRIM(t.name), '[^a-z0-9]', '', 'gi')) = LOWER(regexp_replace(BTRIM(raw_name), '[^a-z0-9]', '', 'gi'))
+         WHERE LOWER(regexp_replace(BTRIM(t.name), '[^a-z0-9]', '', 'gi')) = LOWER(regexp_replace(BTRIM(therapist_names.therapist_name), '[^a-z0-9]', '', 'gi'))
            AND t.branch_id = $1
          ORDER BY t.active DESC NULLS LAST, t.id DESC
          LIMIT 1
