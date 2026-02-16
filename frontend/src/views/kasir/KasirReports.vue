@@ -23,10 +23,7 @@
         type="date"
         v-model="filters.date_from"
         :disabled="loading"
-        @focus="openDatePicker('from')"
         @click="openDatePicker('from')"
-        @keydown.prevent
-        @paste.prevent
       />
 
       <label>Sampai</label>
@@ -36,10 +33,7 @@
         type="date"
         v-model="filters.date_to"
         :disabled="loading"
-        @focus="openDatePicker('to')"
         @click="openDatePicker('to')"
-        @keydown.prevent
-        @paste.prevent
       />
 
       <button class="apply-btn" @click="loadAnalytics" :disabled="loading">
@@ -179,7 +173,11 @@ const format = (n) => new Intl.NumberFormat('id-ID').format(Number(n || 0))
 const openDatePicker = (field) => {
   const target = field === 'from' ? dateFromEl.value : dateToEl.value
   if (target?.showPicker) {
-    target.showPicker()
+    try {
+      target.showPicker()
+    } catch (_) {
+      // Ignore NotAllowedError when browser requires explicit user gesture.
+    }
   }
 }
 

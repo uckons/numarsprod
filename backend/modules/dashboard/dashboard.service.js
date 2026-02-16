@@ -280,17 +280,81 @@ exports.kasirAnalytics = async (user, query = {}) => {
      therapist_rows AS (
        SELECT
          o.id AS order_id,
-         oi.subtotal,
+         COALESCE(oi.qty, 0) AS qty,
+         CASE
+           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN 'KTV'
+           WHEN s.type::text = 'LOUNGE' THEN 'LC'
+           ELSE s.type::text
+         END AS category,
+         COALESCE(
+           CASE
+             WHEN s.type::text IN ('KARAOKE', 'KTV') THEN false
+             ELSE (
+               LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
+               OR hh_match.active = true
+             )
+           END,
+           false
+         ) AS is_happy,
+         COALESCE(NULLIF(array_length(regexp_split_to_array(regexp_replace(COALESCE(oi.therapist_name, ''), '\s*,\s*', ',', 'g'), ','), 1), 0), 1) AS therapist_count,
+         CASE
+           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN (
+             GREATEST(COALESCE(oi.price, 0) - COALESCE(s.base_price, 0), 0)
+             / COALESCE(NULLIF(array_length(regexp_split_to_array(regexp_replace(COALESCE(oi.therapist_name, ''), '\s*,\s*', ',', 'g'), ','), 1), 0), 1)
+           )
+           WHEN (
+             COALESCE(
+               CASE
+                 WHEN s.type::text IN ('KARAOKE', 'KTV') THEN false
+                 ELSE (
+                   LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
+                   OR hh_match.active = true
+                 )
+               END,
+               false
+             ) = true
+             AND s.happy_hour_enabled = true
+             AND s.happy_hour_price IS NOT NULL
+           ) THEN s.happy_hour_price
+           ELSE COALESCE(s.base_price, oi.price, 0)
+         END AS effective_unit_price,
          BTRIM(raw_name) AS therapist_name
        FROM order_items oi
        JOIN orders_scoped o ON o.id = oi.order_id
+       JOIN services s ON s.id = oi.service_id
+       LEFT JOIN LATERAL (
+         SELECT true AS active
+         FROM happy_hours hh
+         WHERE hh.branch_id = $1
+           AND (
+             (
+               hh.start_time <= hh.end_time
+               AND timezone('Asia/Jakarta', o.created_at)::time BETWEEN hh.start_time AND hh.end_time
+             )
+             OR (
+               hh.start_time > hh.end_time
+               AND (
+                 timezone('Asia/Jakarta', o.created_at)::time >= hh.start_time
+                 OR timezone('Asia/Jakarta', o.created_at)::time <= hh.end_time
+               )
+             )
+           )
+           AND (
+             hh.service_type IS NULL
+             OR hh.service_type = s.type::text
+             OR hh.service_type = 'ALL'
+             OR (hh.service_type = 'LC' AND s.type = 'LOUNGE')
+             OR (hh.service_type = 'LOUNGE' AND s.type = 'LC')
+           )
+         LIMIT 1
+       ) hh_match ON true
        CROSS JOIN LATERAL regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',') AS raw_name
      )
      SELECT
        tr.therapist_name,
        COALESCE(grade_info.grade_name, '-') AS grade_name,
        COUNT(DISTINCT tr.order_id) AS orders,
-       COALESCE(SUM(tr.subtotal), 0) AS revenue
+       COALESCE(SUM(tr.qty * tr.effective_unit_price), 0) AS revenue
      FROM therapist_rows tr
      LEFT JOIN LATERAL (
        SELECT tg.name AS grade_name
@@ -417,8 +481,13 @@ exports.kasirAnalytics = async (user, query = {}) => {
          COALESCE(oi.is_package_snapshot, false) AS is_package,
          LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'non hh', 'happy', 'happy hour', 'non happy hour') AS is_hh_tagged,
          COALESCE(
-           LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
-           OR hh_match.active = true,
+           CASE
+             WHEN s.type::text IN ('KARAOKE', 'KTV') THEN false
+             ELSE (
+               LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
+               OR hh_match.active = true
+             )
+           END,
            false
          ) AS is_happy
        FROM order_items oi
@@ -483,10 +552,37 @@ exports.kasirAnalytics = async (user, query = {}) => {
          COALESCE(oi.is_package_snapshot, false) AS is_package,
          LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'non hh', 'happy', 'happy hour', 'non happy hour') AS is_hh_tagged,
          COALESCE(
-           LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
-           OR hh_match.active = true,
+           CASE
+             WHEN s.type::text IN ('KARAOKE', 'KTV') THEN false
+             ELSE (
+               LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
+               OR hh_match.active = true
+             )
+           END,
            false
          ) AS is_happy,
+         COALESCE(NULLIF(array_length(regexp_split_to_array(regexp_replace(COALESCE(oi.therapist_name, ''), '\s*,\s*', ',', 'g'), ','), 1), 0), 1) AS therapist_count,
+         CASE
+           WHEN s.type::text IN ('KARAOKE', 'KTV') THEN (
+             GREATEST(COALESCE(oi.price, 0) - COALESCE(s.base_price, 0), 0)
+             / COALESCE(NULLIF(array_length(regexp_split_to_array(regexp_replace(COALESCE(oi.therapist_name, ''), '\s*,\s*', ',', 'g'), ','), 1), 0), 1)
+           )
+           WHEN (
+             COALESCE(
+               CASE
+                 WHEN s.type::text IN ('KARAOKE', 'KTV') THEN false
+                 ELSE (
+                   LOWER(COALESCE(oi.price_label, '')) IN ('hh', 'happy', 'happy hour')
+                   OR hh_match.active = true
+                 )
+               END,
+               false
+             ) = true
+             AND s.happy_hour_enabled = true
+             AND s.happy_hour_price IS NOT NULL
+           ) THEN s.happy_hour_price
+           ELSE COALESCE(s.base_price, oi.price, 0)
+         END AS effective_unit_price,
          BTRIM(raw_name) AS therapist_name
        FROM order_items oi
        JOIN orders_scoped o ON o.id = oi.order_id
@@ -525,12 +621,12 @@ exports.kasirAnalytics = async (user, query = {}) => {
        tr.service_name,
        COALESCE(COUNT(DISTINCT tr.order_id), 0) AS orders,
        COALESCE(SUM(tr.qty), 0) AS qty,
-       COALESCE(SUM(CASE WHEN tr.is_happy THEN tr.subtotal END), 0) AS happy_hour_revenue,
-       COALESCE(SUM(CASE WHEN (tr.category <> 'FNB' AND NOT tr.is_happy) OR (tr.category = 'FNB' AND tr.is_hh_tagged AND NOT tr.is_happy) THEN tr.subtotal END), 0) AS non_happy_hour_revenue,
-       COALESCE(SUM(CASE WHEN tr.category = 'FNB' AND NOT tr.is_happy AND tr.is_package THEN tr.subtotal END), 0) AS package_revenue,
-       COALESCE(SUM(CASE WHEN tr.category = 'FNB' AND NOT tr.is_happy AND NOT tr.is_package AND NOT tr.is_hh_tagged THEN tr.subtotal END), 0) AS non_package_revenue,
-       COALESCE(SUM(tr.subtotal), 0) AS total_revenue,
-       COALESCE(SUM(SUM(tr.subtotal)) OVER (PARTITION BY tr.therapist_name), 0) AS therapist_total_kerja,
+       COALESCE(SUM(CASE WHEN tr.is_happy THEN tr.qty * tr.effective_unit_price END), 0) AS happy_hour_revenue,
+       COALESCE(SUM(CASE WHEN (tr.category <> 'FNB' AND NOT tr.is_happy) OR (tr.category = 'FNB' AND tr.is_hh_tagged AND NOT tr.is_happy) THEN tr.qty * tr.effective_unit_price END), 0) AS non_happy_hour_revenue,
+       COALESCE(SUM(CASE WHEN tr.category = 'FNB' AND NOT tr.is_happy AND tr.is_package THEN tr.qty * tr.effective_unit_price END), 0) AS package_revenue,
+       COALESCE(SUM(CASE WHEN tr.category = 'FNB' AND NOT tr.is_happy AND NOT tr.is_package AND NOT tr.is_hh_tagged THEN tr.qty * tr.effective_unit_price END), 0) AS non_package_revenue,
+       COALESCE(SUM(tr.qty * tr.effective_unit_price), 0) AS total_revenue,
+       COALESCE(SUM(SUM(tr.qty * tr.effective_unit_price)) OVER (PARTITION BY tr.therapist_name), 0) AS therapist_total_kerja,
        COALESCE(grade_info.grade_name, '-') AS grade_name
      FROM therapist_rows tr
      LEFT JOIN LATERAL (
@@ -543,7 +639,7 @@ exports.kasirAnalytics = async (user, query = {}) => {
        LIMIT 1
      ) grade_info ON true
      WHERE tr.therapist_name <> ''
-       AND tr.category IN ('SPA', 'LC')
+       AND tr.category IN ('SPA', 'LC', 'KTV')
      GROUP BY tr.therapist_name, tr.category, tr.service_name, grade_info.grade_name
      ORDER BY tr.therapist_name ASC, tr.category ASC, total_revenue DESC`,
     [branchId, from, to]
