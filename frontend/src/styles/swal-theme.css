@@ -57,3 +57,32 @@
 .swal2-success-line-long {
   background-color: var(--gold, #f5c518) !important;
 }
+
+/* Action buttons spacing + proportional size */
+.swal2-actions {
+  gap: 12px !important;
+  margin-top: 18px !important;
+}
+
+.swal-theme-confirm,
+.swal-theme-cancel,
+.swal-theme-deny {
+  min-width: 126px !important;
+  min-height: 44px !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+
+
+/* Variant qty modal sizing */
+.variant-qty-popup {
+  width: min(1040px, 94vw) !important;
+  max-width: 1040px !important;
+  padding: 22px 26px !important;
+}
+
+.variant-qty-popup .var-qty-btn:focus,
+.variant-qty-popup .var-qty-btn:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(201, 162, 77, 0.35) !important;
+}

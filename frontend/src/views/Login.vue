@@ -16,7 +16,6 @@
       <p class="subtitle subtitle-login">System Login</p>
 
       <form class="login-form" @submit.prevent="handleLogin">
-        <!-- USERNAME (GANTI DARI PHONE) -->
         <input
           v-model="username"
           placeholder="Username"
@@ -31,19 +30,11 @@
         />
 
         <div class="captcha-box">
-          <label for="captchaInput">Captcha keamanan</label>
-          <div class="captcha-row">
-            <span class="captcha-question">{{ captchaQuestion }}</span>
-            <button type="button" class="captcha-refresh" @click="generateCaptcha" title="Refresh captcha">↻</button>
-          </div>
-          <input
-            id="captchaInput"
-            v-model="captchaAnswer"
-            type="text"
-            inputmode="numeric"
-            placeholder="Jawaban captcha"
-            autocomplete="off"
-          />
+          <label>Cloudflare Captcha</label>
+          <div v-if="turnstileSiteKey" ref="turnstileEl" class="turnstile-host"></div>
+          <p v-else class="captcha-missing">
+            Turnstile belum dikonfigurasi. Set <code>VITE_TURNSTILE_SITE_KEY</code> di environment frontend.
+          </p>
         </div>
 
         <button type="submit" :disabled="loading">
@@ -57,57 +48,82 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue"
+import { computed, onMounted, ref } from "vue"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "../store/auth.store"
 
 const router = useRouter()
 const auth = useAuthStore()
 
-// ⬇️ GANTI phone → username
 const username = ref("")
 const password = ref("")
 const loading = ref(false)
 const error = ref("")
 
-const captchaAnswer = ref("")
-const captchaA = ref(0)
-const captchaB = ref(0)
-const captchaQuestion = computed(() => `${captchaA.value} + ${captchaB.value} = ?`)
 const logoUrl = computed(() => import.meta.env.VITE_LOGIN_LOGO_URL || "/logo-sky.png")
 const showLogoImage = ref(true)
 
-const generateCaptcha = () => {
-  captchaA.value = Math.floor(Math.random() * 9) + 1
-  captchaB.value = Math.floor(Math.random() * 9) + 1
-  captchaAnswer.value = ""
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ""
+const turnstileEl = ref(null)
+const turnstileToken = ref("")
+let turnstileWidgetId = null
+
+const loadTurnstileScript = () => new Promise((resolve, reject) => {
+  if (window.turnstile?.render) return resolve(window.turnstile)
+
+  const existing = document.querySelector('script[data-turnstile="true"]')
+  if (existing) {
+    existing.addEventListener('load', () => resolve(window.turnstile))
+    existing.addEventListener('error', () => reject(new Error('Gagal memuat Cloudflare Turnstile')))
+    return
+  }
+
+  const script = document.createElement('script')
+  script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+  script.async = true
+  script.defer = true
+  script.dataset.turnstile = 'true'
+  script.onload = () => resolve(window.turnstile)
+  script.onerror = () => reject(new Error('Gagal memuat Cloudflare Turnstile'))
+  document.head.appendChild(script)
+})
+
+const renderTurnstile = async () => {
+  if (!turnstileSiteKey || !turnstileEl.value) return
+  try {
+    const turnstile = await loadTurnstileScript()
+    turnstileEl.value.innerHTML = ''
+    turnstileWidgetId = turnstile.render(turnstileEl.value, {
+      sitekey: turnstileSiteKey,
+      theme: 'dark',
+      callback: (token) => {
+        turnstileToken.value = token
+      },
+      'expired-callback': () => {
+        turnstileToken.value = ''
+      },
+      'error-callback': () => {
+        turnstileToken.value = ''
+      }
+    })
+  } catch (e) {
+    error.value = e.message || 'Captcha Cloudflare gagal dimuat'
+  }
 }
 
-generateCaptcha()
-
-//const handleLogin = async () => {
-//  loading.value = true
-//  error.value = ""
-//
-//  try {
-    // ⬇️ KIRIM USERNAME KE BACKEND
-//    await auth.login(username.value, password.value)
-//    router.push("/")   // redirect by role
-//  } catch (err) {
-//    error.value =
-//      err.response?.data?.message ||
-//      err.message ||
-//      "Login gagal"
-//  } finally {
-//    loading.value = false
-//  }
-//}
+const requestAppFullscreen = async () => {
+  const el = document.documentElement
+  if (!el || document.fullscreenElement) return
+  try {
+    if (el.requestFullscreen) await el.requestFullscreen()
+  } catch (_) {
+    // Browser may block fullscreen without a direct trusted user gesture.
+  }
+}
 
 const handleLogin = async () => {
-  const expected = captchaA.value + captchaB.value
-  if (Number(captchaAnswer.value) !== expected) {
-    error.value = "Captcha tidak valid"
-    generateCaptcha()
+  if (turnstileSiteKey && !turnstileToken.value) {
+    error.value = 'Captcha Cloudflare belum tervalidasi'
     return
   }
 
@@ -115,8 +131,8 @@ const handleLogin = async () => {
   error.value = ""
   try {
     await auth.login(username.value, password.value)
+    await requestAppFullscreen()
     const role = auth.role
-    //if (["SuperAdmin","Owner"].includes(role)) router.push("/owner")
     if (role === "SuperAdmin") router.push("/superadmin")
     else if (role === "Owner") router.push("/owner")
     else if (role === "Manager") router.push("/manager")
@@ -129,9 +145,14 @@ const handleLogin = async () => {
     error.value = e.response?.data?.message || "Login gagal"
   } finally {
     loading.value = false
+    if (turnstileSiteKey && window.turnstile && turnstileWidgetId !== null) {
+      window.turnstile.reset(turnstileWidgetId)
+      turnstileToken.value = ''
+    }
   }
 }
 
+onMounted(renderTurnstile)
 </script>
 
 <style scoped>
@@ -213,26 +234,16 @@ h1 {
   margin-bottom: 6px;
 }
 
-.captcha-row {
+.turnstile-host {
+  min-height: 70px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
 }
 
-.captcha-question {
+.captcha-missing {
   color: #e5c677;
-  font-weight: 700;
-}
-
-.captcha-refresh {
-  width: auto;
-  padding: 4px 8px;
-  background: #1f1f1f;
-  border: 1px solid #373737;
-  color: #c9a24d;
-  border-radius: 8px;
+  font-size: 12px;
+  margin: 0;
 }
 
 input {
@@ -259,7 +270,8 @@ button:disabled {
 }
 
 .error {
-  color: #e74c3c;
+  color: #ff6b6b;
   margin-top: 12px;
+  font-size: 13px;
 }
 </style>
