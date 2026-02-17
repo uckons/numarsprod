@@ -130,7 +130,7 @@ const handleLogin = async () => {
   loading.value = true
   error.value = ""
   try {
-    await auth.login(username.value, password.value)
+    await auth.login(username.value, password.value, turnstileToken.value)
     await requestAppFullscreen()
     const role = auth.role
     if (role === "SuperAdmin") router.push("/superadmin")
