@@ -5,7 +5,10 @@
         <h1>Laporan Pendapatan</h1>
         <p>Analytics harian, mingguan, bulanan + custom range</p>
       </div>
-      <button class="back-btn" @click="router.push('/kasir')">← Kembali</button>
+      <div class="header-actions">
+        <button class="print-btn" @click="printReport" :disabled="loading">🖨️ Cetak Report</button>
+        <button class="back-btn" @click="router.push('/kasir')">← Kembali</button>
+      </div>
     </header>
 
     <section class="filters">
@@ -137,6 +140,66 @@
         </tbody>
       </table>
     </section>
+
+    <section class="table-card">
+      <h3>Recap Pendapatan per Kategori</h3>
+      <table>
+        <thead>
+          <tr><th>Kategori</th><th>Item Terjual</th><th>Total Pendapatan</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in normalizedBreakdown" :key="`recap-${row.category}`">
+            <td>{{ row.category }}</td>
+            <td>{{ row.qty }}</td>
+            <td>Rp {{ format(row.revenue) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="two-col">
+      <article class="table-card">
+        <h3>Recap Pendapatan FNB (Semua Item)</h3>
+        <table>
+          <thead>
+            <tr><th>Item FNB</th><th>Qty</th><th>Pendapatan</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in fnbServiceRows" :key="`fnb-recap-${row.service_id}`">
+              <td>{{ row.service_name }}</td>
+              <td>{{ row.qty }}</td>
+              <td>Rp {{ format(row.revenue) }}</td>
+            </tr>
+            <tr v-if="!fnbServiceRows.length"><td colspan="3" class="muted">Belum ada data FNB</td></tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Total FNB</th>
+              <th>{{ fnbTotalQty }}</th>
+              <th>Rp {{ format(fnbTotalRevenue) }}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </article>
+
+      <article class="table-card">
+        <h3>Recap SPA / LC / KTV (Semua Layanan)</h3>
+        <table>
+          <thead>
+            <tr><th>Layanan</th><th>Kategori</th><th>Qty</th><th>Pendapatan</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in nonFnbServiceRows" :key="`non-fnb-recap-${row.category}-${row.service_id}`">
+              <td>{{ row.service_name }}</td>
+              <td>{{ row.category }}</td>
+              <td>{{ row.qty }}</td>
+              <td>Rp {{ format(row.revenue) }}</td>
+            </tr>
+            <tr v-if="!nonFnbServiceRows.length"><td colspan="4" class="muted">Belum ada data SPA / LC / KTV</td></tr>
+          </tbody>
+        </table>
+      </article>
+    </section>
   </div>
 </template>
 
@@ -232,6 +295,96 @@ const normalizedBreakdown = computed(() => {
     revenue: base[category]
   }))
 })
+
+
+
+const fnbServiceRows = computed(() => {
+  return (analytics.value.service_details || [])
+    .filter((row) => row.category === 'FNB')
+    .sort((a, b) => Number(b.revenue || 0) - Number(a.revenue || 0))
+})
+
+const nonFnbServiceRows = computed(() => {
+  return (analytics.value.service_details || [])
+    .filter((row) => ['SPA', 'LC', 'KTV'].includes(row.category))
+    .sort((a, b) => Number(b.revenue || 0) - Number(a.revenue || 0))
+})
+
+const fnbTotalRevenue = computed(() => {
+  return fnbServiceRows.value.reduce((sum, row) => sum + Number(row.revenue || 0), 0)
+})
+
+const fnbTotalQty = computed(() => {
+  return fnbServiceRows.value.reduce((sum, row) => sum + Number(row.qty || 0), 0)
+})
+
+const printReport = () => {
+  const reportWindow = window.open('', '_blank', 'width=1024,height=768')
+  if (!reportWindow) return
+
+  const rangeLabel = `${analytics.value.range.from} s/d ${analytics.value.range.to}`
+  const categoryRowsHtml = normalizedBreakdown.value
+    .map((row) => `<tr><td>${row.category}</td><td>${row.qty}</td><td>Rp ${format(row.revenue)}</td></tr>`)
+    .join('')
+
+  const fnbRowsHtml = fnbServiceRows.value
+    .map((row) => `<tr><td>${row.service_name}</td><td>${row.qty}</td><td>Rp ${format(row.revenue)}</td></tr>`)
+    .join('')
+
+  const nonFnbRowsHtml = nonFnbServiceRows.value
+    .map((row) => `<tr><td>${row.service_name}</td><td>${row.category}</td><td>${row.qty}</td><td>Rp ${format(row.revenue)}</td></tr>`)
+    .join('')
+
+  reportWindow.document.write(`
+    <html>
+      <head>
+        <title>Report Pendapatan Kasir</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #111; margin: 24px; }
+          h1, h2 { margin: 0 0 8px; }
+          .meta { margin-bottom: 16px; color: #444; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background: #f5f5f5; }
+          .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+          .summary div { border: 1px solid #ddd; padding: 10px; border-radius: 6px; }
+        </style>
+      </head>
+      <body>
+        <h1>Report Pendapatan Kasir</h1>
+        <p class="meta">Periode: ${rangeLabel}</p>
+        <div class="summary">
+          <div><strong>Total Pendapatan:</strong> Rp ${format(analytics.value.summary.revenue)}</div>
+          <div><strong>Total Order PAID:</strong> ${analytics.value.summary.paid_orders}</div>
+          <div><strong>Total Item Terjual:</strong> ${analytics.value.summary.items_sold}</div>
+          <div><strong>Total FNB:</strong> Rp ${format(fnbTotalRevenue.value)}</div>
+        </div>
+
+        <h2>Recap Kategori (SPA / LC / FNB / KTV)</h2>
+        <table>
+          <thead><tr><th>Kategori</th><th>Qty</th><th>Pendapatan</th></tr></thead>
+          <tbody>${categoryRowsHtml || '<tr><td colspan="3">Belum ada data</td></tr>'}</tbody>
+        </table>
+
+        <h2>Recap Pendapatan FNB (Semua Item)</h2>
+        <table>
+          <thead><tr><th>Item FNB</th><th>Qty</th><th>Pendapatan</th></tr></thead>
+          <tbody>${fnbRowsHtml || '<tr><td colspan="3">Belum ada data FNB</td></tr>'}</tbody>
+          <tfoot><tr><th>Total FNB</th><th>${fnbTotalQty.value}</th><th>Rp ${format(fnbTotalRevenue.value)}</th></tr></tfoot>
+        </table>
+
+        <h2>Recap Pendapatan SPA / LC / KTV</h2>
+        <table>
+          <thead><tr><th>Layanan</th><th>Kategori</th><th>Qty</th><th>Pendapatan</th></tr></thead>
+          <tbody>${nonFnbRowsHtml || '<tr><td colspan="4">Belum ada data SPA / LC / KTV</td></tr>'}</tbody>
+        </table>
+      </body>
+    </html>
+  `)
+  reportWindow.document.close()
+  reportWindow.focus()
+  reportWindow.print()
+}
 
 const trendChartOptions = computed(() => ({
   theme: { mode: 'dark' },
@@ -354,8 +507,19 @@ onMounted(loadAnalytics)
 <style scoped>
 .reports-page { padding: 20px; color: #fff; }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.header-actions { display: flex; gap: 8px; }
 .page-header h1 { margin: 0 0 4px; color: #f0c46a; }
 .page-header p { margin: 0; color: #9aa0ae; }
+.print-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 8px;
+  background: #f0c46a;
+  border: 1px solid #333;
+  color: #111;
+  cursor: pointer;
+}
 .back-btn {
   padding: 6px 12px;
   font-size: 12px;
@@ -373,6 +537,7 @@ onMounted(loadAnalytics)
 .apply-btn { background:#c9a24d; border:none; color:#111; font-weight:700; border-radius:8px; padding:9px; cursor:pointer; }
 .ghost-btn { background:transparent; border:1px solid #474747; color:#fff; border-radius:8px; padding:9px; cursor:pointer; }
 .apply-btn:disabled, .ghost-btn:disabled { opacity: .6; cursor: not-allowed; }
+.print-btn:disabled { opacity: .6; cursor: not-allowed; }
 
 .summary-grid { display:grid; gap:12px; grid-template-columns: repeat(4, minmax(0,1fr)); margin-bottom:14px; }
 .summary-card { background:#111; border:1px solid #232323; border-radius:12px; padding:14px; display:flex; flex-direction:column; gap:6px; }
@@ -389,6 +554,7 @@ onMounted(loadAnalytics)
 table { width:100%; border-collapse: collapse; }
 th, td { padding:10px; border-bottom:1px solid #212121; text-align:left; }
 th { color:#f0c46a; font-size:12px; }
+tfoot th { color:#fff; }
 .muted { text-align:center; color:#8a8a8a; }
 
 @media (max-width: 1024px) {
