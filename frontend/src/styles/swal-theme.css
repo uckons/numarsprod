@@ -57,3 +57,18 @@
 .swal2-success-line-long {
   background-color: var(--gold, #f5c518) !important;
 }
+
+/* Action buttons spacing + proportional size */
+.swal2-actions {
+  gap: 12px !important;
+  margin-top: 18px !important;
+}
+
+.swal-theme-confirm,
+.swal-theme-cancel,
+.swal-theme-deny {
+  min-width: 126px !important;
+  min-height: 44px !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
