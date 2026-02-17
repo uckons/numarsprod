@@ -196,18 +196,19 @@ const loadVariantOptions = async (cartItem) => {
 
 const chooseVariantBreakdownInCart = async (cartItem, variants = []) => {
   const targetQty = Number(cartItem.qty || 0)
-  const leftIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c9a24d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>'
-  const rightIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c9a24d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>'
+  const leftIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c9a24d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>'
+  const rightIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c9a24d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>'
 
   const html = `
-    <div style="text-align:left;display:grid;gap:10px;max-height:300px;overflow:auto;padding-right:4px;">
+    <div class="variant-qty-list" style="text-align:left;display:grid;gap:12px;max-height:300px;overflow:auto;padding-right:4px;">
       ${variants.map(opt => `
-        <label style="display:grid;grid-template-columns:1fr 148px;align-items:center;gap:12px;">
+        <label style="display:grid;grid-template-columns:1fr 164px;align-items:center;gap:12px;">
           <span>${opt.name}</span>
-          <div style="display:flex;align-items:center;justify-content:space-between;border:1px solid #4f596e;border-radius:12px;padding:6px 8px;gap:10px;background:rgba(11,14,20,.55);">
-            <button type="button" class="var-qty-btn" data-dir="dec" data-id="${opt.id}" style="width:36px;height:36px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 36px;">${leftIcon}</button>
-            <input class="swal2-input var-qty" data-id="${opt.id}" data-name="${String(opt.name || '').replace(/"/g, '&quot;')}" type="number" min="0" step="1" value="0" style="margin:0;max-width:48px;height:36px;padding:0;border:none;background:transparent;text-align:center;font-weight:800;font-size:19px;color:#f2f2f2;" readonly />
-            <button type="button" class="var-qty-btn" data-dir="inc" data-id="${opt.id}" style="width:36px;height:36px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 36px;">${rightIcon}</button>
+          <div class="variant-stepper" style="display:flex;align-items:center;justify-content:space-between;border:1px solid #4f596e;border-radius:12px;padding:6px 8px;gap:10px;background:rgba(11,14,20,.55);min-height:50px;">
+            <button type="button" class="var-qty-btn" data-dir="dec" data-id="${opt.id}" style="width:38px;height:38px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 38px;">${leftIcon}</button>
+            <span class="var-qty-value" data-id="${opt.id}" style="min-width:24px;text-align:center;font-weight:800;font-size:22px;color:#f2f2f2;line-height:1;">0</span>
+            <input class="var-qty" data-id="${opt.id}" data-name="${String(opt.name || '').replace(/"/g, '&quot;')}" type="hidden" value="0" />
+            <button type="button" class="var-qty-btn" data-dir="inc" data-id="${opt.id}" style="width:38px;height:38px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 38px;">${rightIcon}</button>
           </div>
         </label>
       `).join('')}
@@ -230,9 +231,12 @@ const chooseVariantBreakdownInCart = async (cartItem, variants = []) => {
           const id = btn.getAttribute('data-id')
           const dir = btn.getAttribute('data-dir')
           const input = popup.querySelector(`.var-qty[data-id="${id}"]`)
-          if (!input) return
+          const valueNode = popup.querySelector(`.var-qty-value[data-id="${id}"]`)
+          if (!input || !valueNode) return
           const current = Number(input.value || 0)
-          input.value = String(dir === 'inc' ? current + 1 : Math.max(0, current - 1))
+          const next = dir === 'inc' ? current + 1 : Math.max(0, current - 1)
+          input.value = String(next)
+          valueNode.textContent = String(next)
         })
       })
     },
