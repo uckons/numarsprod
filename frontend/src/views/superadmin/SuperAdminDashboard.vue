@@ -5,20 +5,20 @@
       <h2>SUPER ADMIN</h2>
 
       <nav>
-        <button :class="{active:tab==='users'}" @click="tab='users'"> <UsersIcon size="18" /> Users</button>
-        <button :class="{active:tab==='branches'}" @click="tab='branches'"> <UsersIcon size="18" />Branches</button>
-        <button :class="{active:tab==='orders'}" @click="tab='orders'"> <UsersIcon size="18" />Orders</button>
-        <button :class="{active:tab==='timers'}" @click="tab='timers'"> <UsersIcon size="18" />Timers</button>
-        <button :class="{active:tab==='audit'}" @click="tab='audit'"> <ShieldCheck size="18" /> Audit Logs</button>
-        <button :class="{active:tab==='services'}" @click="tab='services'"> <Store size="18" /> Services</button>
-        <button :class="{active:tab==='therapists'}" @click="tab='therapists'"> <UsersIcon size="18" /> Therapists</button>
-        <button :class="{active:tab==='rooms'}" @click="tab='rooms'"> <Store size="18" /> Rooms</button>
-        <button :class="{active:tab==='stock'}" @click="tab='stock'"> <Package size="18" /> FNB Stock</button>
-        <button :class="{active:tab==='grades'}" @click="tab='grades'"> 🏆 Grades</button>
+        <button class="nav-btn" :class="{active:tab==='users'}" @click="tab='users'"><UsersIcon size="18" /> Users</button>
+        <button class="nav-btn" :class="{active:tab==='branches'}" @click="tab='branches'"><Building2 size="18" /> Branches</button>
+        <button class="nav-btn" :class="{active:tab==='orders'}" @click="tab='orders'"><ReceiptText size="18" /> Orders</button>
+        <button class="nav-btn" :class="{active:tab==='timers'}" @click="tab='timers'"><Timer size="18" /> Timers</button>
+        <button class="nav-btn" :class="{active:tab==='audit'}" @click="tab='audit'"><ShieldCheck size="18" /> Audit Logs</button>
+        <button class="nav-btn" :class="{active:tab==='services'}" @click="tab='services'"><Store size="18" /> Services</button>
+        <button class="nav-btn" :class="{active:tab==='therapists'}" @click="tab='therapists'"><UsersRound size="18" /> Therapists</button>
+        <button class="nav-btn" :class="{active:tab==='rooms'}" @click="tab='rooms'"><DoorOpen size="18" /> Rooms</button>
+        <button class="nav-btn" :class="{active:tab==='stock'}" @click="tab='stock'"><Package size="18" /> FNB Stock</button>
+        <button class="nav-btn" :class="{active:tab==='grades'}" @click="tab='grades'"><Trophy size="18" /> Grades</button>
       </nav>
 
       <!-- LOGOUT -->
-      <button class="logout" @click="logout"> <UsersIcon size="18" />Logout</button>
+      <button class="logout nav-btn" @click="logout"><LogOut size="18" /> Logout</button>
     </aside>
 
     <!-- CONTENT -->
@@ -41,9 +41,8 @@
 import { ref } from "vue"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "@/store/auth.store"
-import { Users as UsersIcon, Store, Package } from "lucide-vue-next"
+import { Users as UsersIcon, Store, Package, ShieldCheck, Building2, ReceiptText, Timer, UsersRound, DoorOpen, Trophy, LogOut } from "lucide-vue-next"
 import AuditLogs from "./AuditLogs.vue"
-import { ShieldCheck } from "lucide-vue-next"
 import StockDashboard from "@/views/stock/StockDashboard.vue"
 import Users from "./Users.vue"
 import Branches from "./Branches.vue"
@@ -87,14 +86,28 @@ const logout = () => {
   margin-bottom: 16px;
 }
 
+nav {
+  display: grid;
+  gap: 8px;
+}
+
 nav button {
   width: 100%;
   background: transparent;
   border: none;
   color: white;
-  padding: 10px;
+  padding: 10px 12px;
   text-align: left;
   cursor: pointer;
+  border-radius: 10px;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-size: 14px;
 }
 
 nav button.active {
@@ -106,7 +119,7 @@ nav button.active {
   margin-top: auto;
   background: #b02a2a;
   border: none;
-  padding: 10px;
+  padding: 10px 12px;
   color: white;
   cursor: pointer;
 }
