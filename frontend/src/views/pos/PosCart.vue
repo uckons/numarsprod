@@ -202,13 +202,13 @@ const chooseVariantBreakdownInCart = async (cartItem, variants = []) => {
   const html = `
     <div class="variant-qty-list" style="text-align:left;display:grid;gap:12px;max-height:300px;overflow:auto;padding-right:4px;">
       ${variants.map(opt => `
-        <label style="display:grid;grid-template-columns:1fr 164px;align-items:center;gap:12px;">
+        <label style="display:grid;grid-template-columns:minmax(260px,1fr) 210px;align-items:center;gap:12px;">
           <span>${opt.name}</span>
-          <div class="variant-stepper" style="display:flex;align-items:center;justify-content:space-between;border:1px solid #4f596e;border-radius:12px;padding:6px 8px;gap:10px;background:rgba(11,14,20,.55);min-height:50px;">
-            <button type="button" class="var-qty-btn" data-dir="dec" data-id="${opt.id}" style="width:38px;height:38px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 38px;">${leftIcon}</button>
-            <span class="var-qty-value" data-id="${opt.id}" style="min-width:24px;text-align:center;font-weight:800;font-size:22px;color:#f2f2f2;line-height:1;">0</span>
+          <div class="variant-stepper" style="display:flex;align-items:center;justify-content:space-between;border:1px solid #4f596e;border-radius:12px;padding:6px 8px;gap:10px;background:rgba(11,14,20,.55);min-height:56px;">
+            <button type="button" class="var-qty-btn" data-dir="dec" data-id="${opt.id}" style="width:40px;height:40px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 40px;outline:none;box-shadow:none;">${leftIcon}</button>
+            <span class="var-qty-value" data-id="${opt.id}" style="min-width:24px;text-align:center;font-weight:800;font-size:24px;color:#f2f2f2;line-height:1;">0</span>
             <input class="var-qty" data-id="${opt.id}" data-name="${String(opt.name || '').replace(/"/g, '&quot;')}" type="hidden" value="0" />
-            <button type="button" class="var-qty-btn" data-dir="inc" data-id="${opt.id}" style="width:38px;height:38px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 38px;">${rightIcon}</button>
+            <button type="button" class="var-qty-btn" data-dir="inc" data-id="${opt.id}" style="width:40px;height:40px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 40px;outline:none;box-shadow:none;">${rightIcon}</button>
           </div>
         </label>
       `).join('')}
@@ -218,6 +218,7 @@ const chooseVariantBreakdownInCart = async (cartItem, variants = []) => {
 
   const res = await SwalTheme.fire({
     title: 'Pilih varian paket + qty',
+    customClass: { popup: 'swal-theme-popup variant-qty-popup' },
     html,
     showCancelButton: true,
     confirmButtonText: 'Pakai varian',
