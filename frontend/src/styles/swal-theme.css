@@ -76,13 +76,21 @@
 
 /* Variant qty modal sizing */
 .variant-qty-popup {
-  width: min(1040px, 94vw) !important;
-  max-width: 1040px !important;
-  padding: 22px 26px !important;
+  width: min(860px, 92vw) !important;
+  max-width: 860px !important;
+  padding: 24px 22px !important;
 }
 
 .variant-qty-popup .var-qty-btn:focus,
 .variant-qty-popup .var-qty-btn:focus-visible {
   outline: none !important;
   box-shadow: 0 0 0 2px rgba(201, 162, 77, 0.35) !important;
+}
+
+.variant-qty-popup .swal2-title {
+  margin-bottom: 8px !important;
+}
+
+.variant-qty-popup .swal2-html-container {
+  margin-top: 6px !important;
 }

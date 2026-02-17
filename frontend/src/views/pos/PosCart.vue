@@ -200,15 +200,15 @@ const chooseVariantBreakdownInCart = async (cartItem, variants = []) => {
   const rightIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c9a24d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>'
 
   const html = `
-    <div class="variant-qty-list" style="text-align:left;display:grid;gap:12px;max-height:300px;overflow:auto;padding-right:4px;">
+    <div class="variant-qty-list" style="text-align:left;display:grid;gap:12px;max-height:380px;overflow:auto;padding-right:2px;">
       ${variants.map(opt => `
-        <label style="display:grid;grid-template-columns:minmax(260px,1fr) 210px;align-items:center;gap:12px;">
+        <label style="display:grid;grid-template-columns:minmax(220px,1fr) 184px;align-items:center;gap:8px;">
           <span>${opt.name}</span>
-          <div class="variant-stepper" style="display:flex;align-items:center;justify-content:space-between;border:1px solid #4f596e;border-radius:12px;padding:6px 8px;gap:10px;background:rgba(11,14,20,.55);min-height:56px;">
-            <button type="button" class="var-qty-btn" data-dir="dec" data-id="${opt.id}" style="width:40px;height:40px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 40px;outline:none;box-shadow:none;">${leftIcon}</button>
-            <span class="var-qty-value" data-id="${opt.id}" style="min-width:24px;text-align:center;font-weight:800;font-size:24px;color:#f2f2f2;line-height:1;">0</span>
+          <div class="variant-stepper" style="display:flex;align-items:center;justify-content:space-between;border:1px solid #4f596e;border-radius:12px;padding:8px 8px;gap:8px;background:rgba(11,14,20,.55);min-height:62px;">
+            <button type="button" class="var-qty-btn" data-dir="dec" data-id="${opt.id}" style="width:42px;height:42px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 42px;outline:none;box-shadow:none;">${leftIcon}</button>
+            <span class="var-qty-value" data-id="${opt.id}" style="min-width:24px;text-align:center;font-weight:800;font-size:26px;color:#f2f2f2;line-height:1;">0</span>
             <input class="var-qty" data-id="${opt.id}" data-name="${String(opt.name || '').replace(/"/g, '&quot;')}" type="hidden" value="0" />
-            <button type="button" class="var-qty-btn" data-dir="inc" data-id="${opt.id}" style="width:40px;height:40px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 40px;outline:none;box-shadow:none;">${rightIcon}</button>
+            <button type="button" class="var-qty-btn" data-dir="inc" data-id="${opt.id}" style="width:42px;height:42px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 42px;outline:none;box-shadow:none;">${rightIcon}</button>
           </div>
         </label>
       `).join('')}
