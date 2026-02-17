@@ -202,7 +202,7 @@ const chooseVariantBreakdownInCart = async (cartItem, variants = []) => {
   const html = `
     <div class="variant-qty-list" style="text-align:left;display:grid;gap:12px;max-height:380px;overflow:auto;padding-right:2px;">
       ${variants.map(opt => `
-        <label style="display:grid;grid-template-columns:minmax(220px,1fr) 184px;align-items:center;gap:8px;">
+        <label style="display:grid;grid-template-columns:minmax(260px,420px) 184px;align-items:center;justify-content:center;column-gap:14px;">
           <span>${opt.name}</span>
           <div class="variant-stepper" style="display:flex;align-items:center;justify-content:space-between;border:1px solid #4f596e;border-radius:12px;padding:8px 8px;gap:8px;background:rgba(11,14,20,.55);min-height:62px;">
             <button type="button" class="var-qty-btn" data-dir="dec" data-id="${opt.id}" style="width:42px;height:42px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 42px;outline:none;box-shadow:none;">${leftIcon}</button>
