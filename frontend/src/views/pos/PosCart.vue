@@ -196,12 +196,20 @@ const loadVariantOptions = async (cartItem) => {
 
 const chooseVariantBreakdownInCart = async (cartItem, variants = []) => {
   const targetQty = Number(cartItem.qty || 0)
+  const leftIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c9a24d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>'
+  const rightIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c9a24d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>'
+
   const html = `
-    <div style="text-align:left;display:grid;gap:8px;max-height:280px;overflow:auto;padding-right:4px;">
+    <div class="variant-qty-list" style="text-align:left;display:grid;gap:12px;max-height:380px;overflow:auto;padding-right:2px;">
       ${variants.map(opt => `
-        <label style="display:grid;grid-template-columns:1fr 90px;align-items:center;gap:8px;">
-          <span>${opt.name}</span>
-          <input class="swal2-input var-qty" data-id="${opt.id}" data-name="${String(opt.name || '').replace(/"/g, '&quot;')}" type="number" min="0" step="1" value="0" style="margin:0;height:36px;" />
+        <label style="display:flex;align-items:center;justify-content:center;gap:10px;">
+          <span style="width:260px;max-width:260px;text-align:left;">${opt.name}</span>
+          <div class="variant-stepper" style="display:flex;align-items:center;justify-content:space-between;border:1px solid #4f596e;border-radius:12px;padding:8px 8px;gap:8px;background:rgba(11,14,20,.55);min-height:62px;">
+            <button type="button" class="var-qty-btn" data-dir="dec" data-id="${opt.id}" style="width:42px;height:42px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 42px;outline:none;box-shadow:none;">${leftIcon}</button>
+            <span class="var-qty-value" data-id="${opt.id}" style="min-width:24px;text-align:center;font-weight:800;font-size:26px;color:#f2f2f2;line-height:1;">0</span>
+            <input class="var-qty" data-id="${opt.id}" data-name="${String(opt.name || '').replace(/"/g, '&quot;')}" type="hidden" value="0" />
+            <button type="button" class="var-qty-btn" data-dir="inc" data-id="${opt.id}" style="width:42px;height:42px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 42px;outline:none;box-shadow:none;">${rightIcon}</button>
+          </div>
         </label>
       `).join('')}
     </div>
@@ -210,13 +218,32 @@ const chooseVariantBreakdownInCart = async (cartItem, variants = []) => {
 
   const res = await SwalTheme.fire({
     title: 'Pilih varian paket + qty',
+    customClass: { popup: 'swal-theme-popup variant-qty-popup' },
     html,
     showCancelButton: true,
     confirmButtonText: 'Pakai varian',
     cancelButtonText: 'Batal',
     focusConfirm: false,
+    didOpen: () => {
+      const popup = Swal.getPopup()
+      if (!popup) return
+      popup.querySelectorAll('.var-qty-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id')
+          const dir = btn.getAttribute('data-dir')
+          const input = popup.querySelector(`.var-qty[data-id="${id}"]`)
+          const valueNode = popup.querySelector(`.var-qty-value[data-id="${id}"]`)
+          if (!input || !valueNode) return
+          const current = Number(input.value || 0)
+          const next = dir === 'inc' ? current + 1 : Math.max(0, current - 1)
+          input.value = String(next)
+          valueNode.textContent = String(next)
+        })
+      })
+    },
     preConfirm: () => {
-      const inputs = Array.from(document.querySelectorAll('.var-qty'))
+      const popup = Swal.getPopup()
+      const inputs = Array.from(popup?.querySelectorAll('.var-qty') || [])
       const rows = inputs.map(el => ({
         variant_service_id: Number(el.getAttribute('data-id') || 0),
         variant_name: el.getAttribute('data-name') || '',
@@ -235,6 +262,7 @@ const chooseVariantBreakdownInCart = async (cartItem, variants = []) => {
   if (!res.isConfirmed) return undefined
   return Array.isArray(res.value) ? res.value : []
 }
+
 
 const maybeOfferPackage = async (cartItem) => {
   if (!cartItem || cartItem.is_package) return
