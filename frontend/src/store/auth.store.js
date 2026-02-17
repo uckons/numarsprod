@@ -11,8 +11,12 @@ export const useAuthStore = defineStore("auth", {
     role: (s) => s.user?.role || null,
   },
   actions: {
-    async login(username, password) {
-      const res = await axios.post("/api/auth/login", { username, password })
+    async login(username, password, turnstileToken = "") {
+      const res = await axios.post("/api/auth/login", {
+        username,
+        password,
+        turnstile_token: turnstileToken || undefined
+      })
       this.token = res.data.token
       this.user = res.data.user
       localStorage.setItem("token", this.token)
