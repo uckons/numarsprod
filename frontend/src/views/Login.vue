@@ -85,23 +85,15 @@ const generateCaptcha = () => {
 
 generateCaptcha()
 
-//const handleLogin = async () => {
-//  loading.value = true
-//  error.value = ""
-//
-//  try {
-    // ⬇️ KIRIM USERNAME KE BACKEND
-//    await auth.login(username.value, password.value)
-//    router.push("/")   // redirect by role
-//  } catch (err) {
-//    error.value =
-//      err.response?.data?.message ||
-//      err.message ||
-//      "Login gagal"
-//  } finally {
-//    loading.value = false
-//  }
-//}
+const requestAppFullscreen = async () => {
+  const el = document.documentElement
+  if (!el || document.fullscreenElement) return
+  try {
+    if (el.requestFullscreen) await el.requestFullscreen()
+  } catch (_) {
+    // Browser may block fullscreen without a direct trusted user gesture.
+  }
+}
 
 const handleLogin = async () => {
   const expected = captchaA.value + captchaB.value
@@ -115,8 +107,8 @@ const handleLogin = async () => {
   error.value = ""
   try {
     await auth.login(username.value, password.value)
+    await requestAppFullscreen()
     const role = auth.role
-    //if (["SuperAdmin","Owner"].includes(role)) router.push("/owner")
     if (role === "SuperAdmin") router.push("/superadmin")
     else if (role === "Owner") router.push("/owner")
     else if (role === "Manager") router.push("/manager")
@@ -131,6 +123,7 @@ const handleLogin = async () => {
     loading.value = false
   }
 }
+
 
 </script>
 
