@@ -6,8 +6,9 @@
         <p>Analytics harian, mingguan, bulanan + custom range</p>
       </div>
       <div class="header-actions">
-        <button class="print-btn" @click="printReport" :disabled="loading">🖨️ Cetak Report</button>
-        <button class="back-btn" @click="router.push('/kasir')">← Kembali</button>
+        <button class="print-btn" @click="printPosReport" :disabled="loading">Cetak POS</button>
+        <button class="print-btn" @click="printReport" :disabled="loading">Cetak A4</button>
+        <button class="back-btn floating-back" @click="router.push('/kasir')">Kembali</button>
       </div>
     </header>
 
@@ -183,19 +184,32 @@
       </article>
 
       <article class="table-card">
-        <h3>Recap SPA / LC / KTV (Semua Layanan)</h3>
+        <h3>Recap SPA</h3>
         <table>
-          <thead>
-            <tr><th>Layanan</th><th>Kategori</th><th>Qty</th><th>Pendapatan</th></tr>
-          </thead>
+          <thead><tr><th>Layanan</th><th>Qty</th><th>Pendapatan</th></tr></thead>
           <tbody>
-            <tr v-for="row in nonFnbServiceRows" :key="`non-fnb-recap-${row.category}-${row.service_id}`">
-              <td>{{ row.service_name }}</td>
-              <td>{{ row.category }}</td>
-              <td>{{ row.qty }}</td>
-              <td>Rp {{ format(row.revenue) }}</td>
-            </tr>
-            <tr v-if="!nonFnbServiceRows.length"><td colspan="4" class="muted">Belum ada data SPA / LC / KTV</td></tr>
+            <tr v-for="row in spaServiceRows" :key="`spa-${row.service_id}`"><td>{{ row.service_name }}</td><td>{{ row.qty }}</td><td>Rp {{ format(row.revenue) }}</td></tr>
+            <tr v-if="!spaServiceRows.length"><td colspan="3" class="muted">Belum ada data SPA</td></tr>
+          </tbody>
+        </table>
+      </article>
+      <article class="table-card">
+        <h3>Recap LC</h3>
+        <table>
+          <thead><tr><th>Layanan</th><th>Qty</th><th>Pendapatan</th></tr></thead>
+          <tbody>
+            <tr v-for="row in lcServiceRows" :key="`lc-${row.service_id}`"><td>{{ row.service_name }}</td><td>{{ row.qty }}</td><td>Rp {{ format(row.revenue) }}</td></tr>
+            <tr v-if="!lcServiceRows.length"><td colspan="3" class="muted">Belum ada data LC</td></tr>
+          </tbody>
+        </table>
+      </article>
+      <article class="table-card">
+        <h3>Recap KTV</h3>
+        <table>
+          <thead><tr><th>Layanan</th><th>Qty</th><th>Pendapatan</th></tr></thead>
+          <tbody>
+            <tr v-for="row in ktvServiceRows" :key="`ktv-${row.service_id}`"><td>{{ row.service_name }}</td><td>{{ row.qty }}</td><td>Rp {{ format(row.revenue) }}</td></tr>
+            <tr v-if="!ktvServiceRows.length"><td colspan="3" class="muted">Belum ada data KTV</td></tr>
           </tbody>
         </table>
       </article>
@@ -304,6 +318,25 @@ const fnbServiceRows = computed(() => {
     .sort((a, b) => Number(b.revenue || 0) - Number(a.revenue || 0))
 })
 
+
+const spaServiceRows = computed(() => {
+  return (analytics.value.service_details || [])
+    .filter((row) => row.category === 'SPA')
+    .sort((a, b) => Number(b.revenue || 0) - Number(a.revenue || 0))
+})
+
+const lcServiceRows = computed(() => {
+  return (analytics.value.service_details || [])
+    .filter((row) => row.category === 'LC')
+    .sort((a, b) => Number(b.revenue || 0) - Number(a.revenue || 0))
+})
+
+const ktvServiceRows = computed(() => {
+  return (analytics.value.service_details || [])
+    .filter((row) => row.category === 'KTV')
+    .sort((a, b) => Number(b.revenue || 0) - Number(a.revenue || 0))
+})
+
 const nonFnbServiceRows = computed(() => {
   return (analytics.value.service_details || [])
     .filter((row) => ['SPA', 'LC', 'KTV'].includes(row.category))
@@ -318,6 +351,49 @@ const fnbTotalQty = computed(() => {
   return fnbServiceRows.value.reduce((sum, row) => sum + Number(row.qty || 0), 0)
 })
 
+
+const printPosReport = () => {
+  const reportWindow = window.open('', '_blank', 'width=380,height=760')
+  if (!reportWindow) return
+
+  const line = '--------------------------------'
+  const textRows = [
+    'NUMARS POS - RECAP PENDAPATAN',
+    `Periode: ${analytics.value.range.from} s/d ${analytics.value.range.to}`,
+    line,
+    `TOTAL   : Rp ${format(analytics.value.summary.revenue)}`,
+    `ORDER   : ${analytics.value.summary.paid_orders}`,
+    `ITEM    : ${analytics.value.summary.items_sold}`,
+    line,
+    'FNB',
+    ...fnbServiceRows.value.map((r) => `${r.service_name} x${r.qty} = ${format(r.revenue)}`),
+    `TOTAL FNB: ${format(fnbTotalRevenue.value)}`,
+    line,
+    'SPA',
+    ...spaServiceRows.value.map((r) => `${r.service_name} x${r.qty} = ${format(r.revenue)}`),
+    line,
+    'LC',
+    ...lcServiceRows.value.map((r) => `${r.service_name} x${r.qty} = ${format(r.revenue)}`),
+    line,
+    'KTV',
+    ...ktvServiceRows.value.map((r) => `${r.service_name} x${r.qty} = ${format(r.revenue)}`),
+    line
+  ]
+
+  reportWindow.document.write(`
+    <html><head><title>POS Report</title>
+    <style>
+      @media print { @page { size: 80mm auto; margin: 2mm; } }
+      body { font-family: 'Courier New', monospace; width: 72mm; font-size: 11px; margin: 0 auto; }
+      pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
+    </style>
+    </head><body><pre>${textRows.join('\n')}</pre></body></html>
+  `)
+  reportWindow.document.close()
+  reportWindow.focus()
+  reportWindow.print()
+}
+
 const printReport = () => {
   const reportWindow = window.open('', '_blank', 'width=1024,height=768')
   if (!reportWindow) return
@@ -331,8 +407,16 @@ const printReport = () => {
     .map((row) => `<tr><td>${row.service_name}</td><td>${row.qty}</td><td>Rp ${format(row.revenue)}</td></tr>`)
     .join('')
 
-  const nonFnbRowsHtml = nonFnbServiceRows.value
-    .map((row) => `<tr><td>${row.service_name}</td><td>${row.category}</td><td>${row.qty}</td><td>Rp ${format(row.revenue)}</td></tr>`)
+  const spaRowsHtml = spaServiceRows.value
+    .map((row) => `<tr><td>${row.service_name}</td><td>${row.qty}</td><td>Rp ${format(row.revenue)}</td></tr>`)
+    .join('')
+
+  const lcRowsHtml = lcServiceRows.value
+    .map((row) => `<tr><td>${row.service_name}</td><td>${row.qty}</td><td>Rp ${format(row.revenue)}</td></tr>`)
+    .join('')
+
+  const ktvRowsHtml = ktvServiceRows.value
+    .map((row) => `<tr><td>${row.service_name}</td><td>${row.qty}</td><td>Rp ${format(row.revenue)}</td></tr>`)
     .join('')
 
   reportWindow.document.write(`
@@ -373,11 +457,9 @@ const printReport = () => {
           <tfoot><tr><th>Total FNB</th><th>${fnbTotalQty.value}</th><th>Rp ${format(fnbTotalRevenue.value)}</th></tr></tfoot>
         </table>
 
-        <h2>Recap Pendapatan SPA / LC / KTV</h2>
-        <table>
-          <thead><tr><th>Layanan</th><th>Kategori</th><th>Qty</th><th>Pendapatan</th></tr></thead>
-          <tbody>${nonFnbRowsHtml || '<tr><td colspan="4">Belum ada data SPA / LC / KTV</td></tr>'}</tbody>
-        </table>
+        <h2>Recap SPA</h2><table><thead><tr><th>Layanan</th><th>Qty</th><th>Pendapatan</th></tr></thead><tbody>${spaRowsHtml || '<tr><td colspan="3">Belum ada data SPA</td></tr>'}</tbody></table>
+        <h2>Recap LC</h2><table><thead><tr><th>Layanan</th><th>Qty</th><th>Pendapatan</th></tr></thead><tbody>${lcRowsHtml || '<tr><td colspan="3">Belum ada data LC</td></tr>'}</tbody></table>
+        <h2>Recap KTV</h2><table><thead><tr><th>Layanan</th><th>Qty</th><th>Pendapatan</th></tr></thead><tbody>${ktvRowsHtml || '<tr><td colspan="3">Belum ada data KTV</td></tr>'}</tbody></table>
       </body>
     </html>
   `)
@@ -507,10 +589,12 @@ onMounted(loadAnalytics)
 <style scoped>
 .reports-page { padding: 20px; color: #fff; }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.header-actions { display: flex; gap: 8px; }
+.header-actions { display: flex; gap: 10px; align-items: center; }
 .page-header h1 { margin: 0 0 4px; color: #f0c46a; }
 .page-header p { margin: 0; color: #9aa0ae; }
 .print-btn {
+  min-width: 110px;
+  min-height: 36px;
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 700;
@@ -521,6 +605,8 @@ onMounted(loadAnalytics)
   cursor: pointer;
 }
 .back-btn {
+  min-width: 110px;
+  min-height: 36px;
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 600;
@@ -550,13 +636,15 @@ onMounted(loadAnalytics)
 .chart-wrap.small { height: 220px; }
 :deep(canvas) { max-height: 240px !important; }
 
-.two-col { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
+.two-col { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
+.floating-back { position: fixed; right: 16px; bottom: 16px; z-index: 30; box-shadow: 0 8px 18px rgba(0,0,0,.35); }
 table { width:100%; border-collapse: collapse; }
 th, td { padding:10px; border-bottom:1px solid #212121; text-align:left; }
 th { color:#f0c46a; font-size:12px; }
 tfoot th { color:#fff; }
 .muted { text-align:center; color:#8a8a8a; }
 
+@media (max-width: 1200px) { .two-col { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 1024px) {
   .filters { grid-template-columns: 1fr 1fr; }
   .summary-grid { grid-template-columns: 1fr 1fr; }
