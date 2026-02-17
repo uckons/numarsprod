@@ -202,8 +202,8 @@ const chooseVariantBreakdownInCart = async (cartItem, variants = []) => {
   const html = `
     <div class="variant-qty-list" style="text-align:left;display:grid;gap:12px;max-height:380px;overflow:auto;padding-right:2px;">
       ${variants.map(opt => `
-        <label style="display:flex;align-items:center;justify-content:center;gap:10px;">
-          <span style="width:260px;max-width:260px;text-align:left;">${opt.name}</span>
+        <label style="display:flex;align-items:center;justify-content:center;gap:8px;">
+          <span style="width:240px;max-width:240px;text-align:left;">${opt.name}</span>
           <div class="variant-stepper" style="display:flex;align-items:center;justify-content:space-between;border:1px solid #4f596e;border-radius:12px;padding:8px 8px;gap:8px;background:rgba(11,14,20,.55);min-height:62px;">
             <button type="button" class="var-qty-btn" data-dir="dec" data-id="${opt.id}" style="width:42px;height:42px;border:1px solid #3e4658;border-radius:10px;background:#151a22;color:#c9a24d;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 42px;outline:none;box-shadow:none;">${leftIcon}</button>
             <span class="var-qty-value" data-id="${opt.id}" style="min-width:24px;text-align:center;font-weight:800;font-size:26px;color:#f2f2f2;line-height:1;">0</span>

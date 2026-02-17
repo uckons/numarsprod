@@ -76,9 +76,9 @@
 
 /* Variant qty modal sizing */
 .variant-qty-popup {
-  width: min(860px, 92vw) !important;
-  max-width: 860px !important;
-  padding: 24px 22px !important;
+  width: min(760px, 88vw) !important;
+  max-width: 760px !important;
+  padding: 20px 18px !important;
 }
 
 .variant-qty-popup .var-qty-btn:focus,
