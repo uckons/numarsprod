@@ -915,10 +915,23 @@ onMounted(() => {
   line-height: 1.3;
 }
 .ktv-checkbox {
-  width: 16px;
-  height: 16px;
-  accent-color: #c9a24d;
+  width: 18px;
+  height: 18px;
+  appearance: none;
+  border: 1px solid #596072;
+  border-radius: 6px;
+  background: #10141d;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ktv-checkbox:checked {
+  border-color: #c9a24d;
+  background-color: #c9a24d;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23111' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
 }
 .ktv-qty-input {
   width: 88px !important;
