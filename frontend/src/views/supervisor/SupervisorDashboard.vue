@@ -263,6 +263,7 @@ import api from "../../services/api"
 import socket from "../../services/socket"
 import { useAuthStore } from "../../store/auth.store"
 import UserBar from "../../components/UserBar.vue"
+import ProfilePasswordCard from "../../components/ProfilePasswordCard.vue"
 
 const auth = useAuthStore()
 const activeInboxTab = ref('bar')
