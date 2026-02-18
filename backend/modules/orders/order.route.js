@@ -141,6 +141,18 @@ router.post(
 )
 
 router.post(
+  "/pay-bulk",
+  auth,
+  (req, res, next) => {
+    if (req.user.role !== "Kasir") {
+      return res.status(403).json({ message: "Only cashier can pay multiple orders" })
+    }
+    next()
+  },
+  controller.payBulk
+)
+
+router.post(
   "/bar/messages/:messageId/read",
   auth,
   (req, res, next) => {

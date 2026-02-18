@@ -787,6 +787,84 @@ exports.createFromPos = async (req, res) => {
     res.status(500).json({ message: err.message })
   }
 }
+
+exports.payBulk = async (req, res) => {
+  const db = req.app.get("db")
+  const orderIds = Array.isArray(req.body?.order_ids)
+    ? [...new Set(req.body.order_ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))]
+    : []
+  const paymentMethod = String(req.body?.payment_method || "CASH").toUpperCase()
+
+  if (!orderIds.length) {
+    return res.status(400).json({ message: "order_ids wajib diisi" })
+  }
+
+  const client = await db.connect()
+  try {
+    await client.query("BEGIN")
+
+    const { rows } = await client.query(
+      `SELECT id, status, total
+       FROM orders
+       WHERE id = ANY($1::int[])
+         AND branch_id = $2
+       FOR UPDATE`,
+      [orderIds, req.user.branch_id]
+    )
+
+    if (rows.length !== orderIds.length) {
+      throw new Error("Sebagian order tidak ditemukan atau bukan milik branch ini")
+    }
+
+    const notDraft = rows.filter((row) => row.status !== "DRAFT")
+    if (notDraft.length) {
+      const invalidIds = notDraft.map((row) => row.id).join(", ")
+      throw new Error(`Hanya order DRAFT yang bisa dibayar gabungan. Invalid: #${invalidIds}`)
+    }
+
+    await client.query(
+      `UPDATE orders
+       SET status = 'PAID', payment_method = $2
+       WHERE id = ANY($1::int[])`,
+      [orderIds, paymentMethod]
+    )
+
+    const grandTotal = rows.reduce((sum, row) => sum + Number(row.total || 0), 0)
+
+    await client.query(
+      `INSERT INTO payments (order_id, method, amount)
+       SELECT id, $2, total
+       FROM orders
+       WHERE id = ANY($1::int[])`,
+      [orderIds, paymentMethod]
+    )
+
+    for (const order of rows) {
+      await writeAuditEntry(client, req.user?.id, "ORDER_PAID", {
+        order_id: order.id,
+        total: Number(order.total || 0),
+        payment_method: paymentMethod,
+        item_count: null,
+        paid_via: "BULK"
+      })
+    }
+
+    await client.query("COMMIT")
+    res.json({
+      success: true,
+      paid_order_ids: orderIds,
+      paid_count: orderIds.length,
+      payment_method: paymentMethod,
+      total: grandTotal
+    })
+  } catch (err) {
+    await client.query("ROLLBACK")
+    console.error("PAY BULK ERROR:", err)
+    res.status(400).json({ message: err.message || "Gagal bayar gabungan" })
+  } finally {
+    client.release()
+  }
+}
 //order draft
 exports.createDraftFromPos = async (req, res) => {
   try {

@@ -96,12 +96,31 @@
     Menampilkan {{ orders.length }} dari {{ pagination.totalRecords }} transaksi
   (Halaman {{ pagination.page }} dari {{ pagination.totalPages }})
   </div>
+
+  <div class="bulk-actions">
+    <span>{{ selectedOrderIds.length }} order dipilih</span>
+    <button
+      class="btn-bulk-pay"
+      :disabled="selectedOrderIds.length === 0 || loading"
+      @click="paySelectedOrders"
+    >
+      Bayar Gabungan
+    </button>
+  </div>
 </div>
 
     <div class="table-wrapper">
       <table class="orders-table">
 <thead>
   <tr>
+    <th class="select-col">
+      <input
+        type="checkbox"
+        :checked="isAllDraftOnPageSelected"
+        :disabled="draftOrderIdsOnPage.length === 0"
+        @change="toggleSelectAllDraft($event.target.checked)"
+      />
+    </th>
     <th>#</th>
     <th>Tanggal</th>
     <th>Service</th>
@@ -116,6 +135,14 @@
 
 <tbody>
   <tr v-for="o in orders" :key="o.id">
+    <td class="select-col">
+      <input
+        v-if="o.status === 'DRAFT'"
+        type="checkbox"
+        :checked="selectedOrderIds.includes(o.id)"
+        @change="toggleOrderSelection(o.id, $event.target.checked)"
+      />
+    </td>
     <td>#{{ o.id }}</td>
 
     <td>{{ formatDate(o.created_at) }}</td>
@@ -411,7 +438,7 @@
 
 </template>
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from "vue"
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue"
 import { useRouter } from "vue-router"
 import Swal from "sweetalert2"
 import api from "@/services/api"
@@ -419,6 +446,14 @@ import api from "@/services/api"
 const router = useRouter()
 const orders = ref([])
 const loading = ref(false)
+const selectedOrderIds = ref([])
+const draftOrderIdsOnPage = computed(() =>
+  orders.value.filter((order) => order.status === "DRAFT").map((order) => Number(order.id))
+)
+const isAllDraftOnPageSelected = computed(() =>
+  draftOrderIdsOnPage.value.length > 0
+  && draftOrderIdsOnPage.value.every((id) => selectedOrderIds.value.includes(id))
+)
 
 // 🔍 FILTER STATE
 const filters = ref({
@@ -501,6 +536,9 @@ const loadOrders = async () => {
     
     // 📄 UPDATE DATA & PAGINATION
     orders.value = res.data.data
+    selectedOrderIds.value = selectedOrderIds.value.filter((id) =>
+      orders.value.some((order) => Number(order.id) === Number(id) && order.status === "DRAFT")
+    )
     pagination.value = {
       page: res.data.pagination.page,
       limit: res.data.pagination.limit,
@@ -563,6 +601,122 @@ const confirmPay = async (order) => {
     path: "/kasir/pos",
     query: { order_id: order.id }
   })
+}
+
+const toggleSelectAllDraft = (checked) => {
+  if (checked) {
+    selectedOrderIds.value = [...new Set([...selectedOrderIds.value, ...draftOrderIdsOnPage.value])]
+    return
+  }
+  selectedOrderIds.value = selectedOrderIds.value.filter((id) => !draftOrderIdsOnPage.value.includes(id))
+}
+
+const toggleOrderSelection = (orderId, checked) => {
+  const id = Number(orderId)
+  if (checked) {
+    if (!selectedOrderIds.value.includes(id)) {
+      selectedOrderIds.value.push(id)
+    }
+    return
+  }
+  selectedOrderIds.value = selectedOrderIds.value.filter((selectedId) => selectedId !== id)
+}
+
+const askPrintAfterBulkPayment = async (paidOrderIds, totalAmount) => {
+  if (!paidOrderIds.length) return
+
+  const decision = await Swal.fire({
+    icon: 'success',
+    title: 'Pembayaran gabungan berhasil',
+    html: `${paidOrderIds.length} order dibayar. Total Rp <b>${format(totalAmount || 0)}</b><br/>Cetak struk sekarang?`,
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: 'Pilih & Print',
+    denyButtonText: 'Print Semua',
+    cancelButtonText: 'Nanti',
+    confirmButtonColor: '#c9a24d',
+    denyButtonColor: '#2dd46e',
+    background: '#111',
+    color: '#fff'
+  })
+
+  if (decision.isDenied) {
+    queueBulkPrint(paidOrderIds)
+    return
+  }
+
+  if (!decision.isConfirmed) return
+
+  const inputOptions = paidOrderIds.reduce((acc, id) => {
+    acc[id] = `Order #${id}`
+    return acc
+  }, {})
+
+  const pick = await Swal.fire({
+    title: 'Pilih order untuk dicetak',
+    input: 'select',
+    inputOptions,
+    inputPlaceholder: 'Pilih order',
+    showCancelButton: true,
+    confirmButtonText: 'Print',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#c9a24d',
+    background: '#111',
+    color: '#fff',
+    inputValidator: (value) => {
+      if (!value) return 'Pilih salah satu order'
+      return null
+    }
+  })
+
+  if (pick.isConfirmed && pick.value) {
+    await reprintReceipt(Number(pick.value))
+  }
+}
+
+const paySelectedOrders = async () => {
+  if (selectedOrderIds.value.length === 0) return
+
+  const confirm = await Swal.fire({
+    title: 'Bayar gabungan?',
+    html: `Akan membayar <b>${selectedOrderIds.value.length}</b> order DRAFT sekaligus.`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Ya, Bayar Semua',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#c9a24d',
+    background: '#111',
+    color: '#fff'
+  })
+
+  if (!confirm.isConfirmed) return
+
+  try {
+    loading.value = true
+    const requestedIds = [...selectedOrderIds.value]
+    const { data } = await api.post('/orders/pay-bulk', {
+      order_ids: requestedIds,
+      payment_method: 'CASH'
+    })
+
+    const paidOrderIds = Array.isArray(data?.paid_order_ids) && data.paid_order_ids.length
+      ? data.paid_order_ids.map((id) => Number(id))
+      : requestedIds
+
+    selectedOrderIds.value = []
+    await loadOrders()
+    await askPrintAfterBulkPayment(paidOrderIds, Number(data?.total || 0))
+  } catch (err) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Gagal bayar gabungan',
+      text: err.response?.data?.message || 'Terjadi kesalahan',
+      background: '#111',
+      color: '#fff'
+    })
+  } finally {
+    loading.value = false
+  }
 }
 const addItemToDraft = (order) => {
   router.push({
@@ -731,6 +885,29 @@ const getPageRange = () => {
 const showPrintModal = ref(false)
 const printOrder = ref(null)
 const printLoading = ref(false)
+const bulkPrintQueue = ref([])
+
+const queueBulkPrint = async (orderIds) => {
+  const queue = Array.isArray(orderIds)
+    ? orderIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
+    : []
+
+  if (!queue.length) return
+
+  bulkPrintQueue.value = queue
+  await openNextQueuedPrint()
+}
+
+const openNextQueuedPrint = async () => {
+  if (showPrintModal.value || printLoading.value) return
+  if (bulkPrintQueue.value.length === 0) return
+
+  const nextOrderId = bulkPrintQueue.value.shift()
+  if (!nextOrderId) return
+
+  await reprintReceipt(nextOrderId)
+}
+
 // 🖨️ REPRINT RECEIPT
 const reprintReceipt = async (orderId) => {
   try {
@@ -741,14 +918,16 @@ const reprintReceipt = async (orderId) => {
   } catch (err) {
     console.error("Failed to load order detail:", err)
     alert("Gagal memuat detail order")
+    await openNextQueuedPrint()
   } finally {
     printLoading.value = false
   }
 }
 
-const closePrintModal = () => {
+const closePrintModal = async () => {
   showPrintModal.value = false
   printOrder.value = null
+  await openNextQueuedPrint()
 }
 
 const printReceipt = () => {
@@ -856,6 +1035,18 @@ th {
   background: #0e0e0e;
   color: #c9a24d;
   font-weight: 700;
+}
+
+.select-col {
+  width: 42px;
+  text-align: center;
+}
+
+.select-col input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #c9a24d;
+  cursor: pointer;
 }
 /* 🎨 TABLE ROW HOVER EFFECT */
 .orders-table tbody tr {
@@ -1104,6 +1295,29 @@ th {
   font-weight: 600;
 }
 
+.bulk-actions {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.btn-bulk-pay {
+  background: linear-gradient(90deg, #c9a24d, #e3c670);
+  color: #111;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-bulk-pay:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* MOBILE RESPONSIVE */
 @media (max-width: 768px) {
   .filter-row {
@@ -1117,6 +1331,11 @@ th {
   
   .btn-reset {
     width: 100%;
+  }
+
+  .bulk-actions {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 /* 📄 PAGINATION SECTION */
@@ -1716,4 +1935,3 @@ th {
 .service-meta { display:block; font-size:11px; color:#b9b9b9; }
 .item-meta { display:block; font-size:10px; color:#666; }
 </style>
-
