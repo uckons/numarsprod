@@ -75,7 +75,7 @@ const captchaProvider = computed(() => {
 })
 
 const showCaptchaHost = computed(() => Boolean(captchaProvider.value))
-const shouldUseRecaptchaExecute = computed(() => ['v3', 'execute', 'enterprise'].includes(recaptchaMode))
+const shouldUseRecaptchaExecute = computed(() => ['v3', 'execute'].includes(recaptchaMode))
 
 const captchaLabel = computed(() => {
   if (captchaProvider.value === "recaptcha") return "Google reCAPTCHA"
@@ -248,7 +248,7 @@ const renderRecaptcha = async () => {
         return
       } catch (renderErr) {
         const message = String(renderErr?.message || renderErr || '')
-        if (message.toLowerCase().includes('invalid key type') && typeof recaptchaEnterprise.execute === 'function') {
+        if ((message.toLowerCase().includes('invalid key type') || message.toLowerCase().includes('invalid site key')) && typeof recaptchaEnterprise.execute === 'function') {
           recaptchaUsesExecute.value = true
           showRecaptchaExecuteInfo()
           return
@@ -302,9 +302,17 @@ const ensureRecaptchaToken = async () => {
     await new Promise((resolve) => recaptchaEnterpriseApi.ready(resolve))
   }
 
-  const token = await recaptchaEnterpriseApi.execute(recaptchaSiteKey, { action: 'login' })
-  recaptchaToken.value = token || ''
-  return recaptchaToken.value
+  try {
+    const token = await recaptchaEnterpriseApi.execute(recaptchaSiteKey, { action: 'login' })
+    recaptchaToken.value = token || ''
+    return recaptchaToken.value
+  } catch (err) {
+    const msg = String(err?.message || err || '')
+    if (msg.toLowerCase().includes('invalid site key')) {
+      throw new Error(`Invalid site key reCAPTCHA Enterprise: ${recaptchaSiteKey}`)
+    }
+    throw err
+  }
 }
 
 const handleLogin = async () => {
