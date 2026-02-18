@@ -66,6 +66,7 @@ const showLogoImage = ref(true)
 
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ""
 const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || ""
+const recaptchaMode = String(import.meta.env.VITE_RECAPTCHA_MODE || 'auto').toLowerCase()
 
 const captchaProvider = computed(() => {
   if (recaptchaSiteKey) return "recaptcha"
@@ -74,6 +75,7 @@ const captchaProvider = computed(() => {
 })
 
 const showCaptchaHost = computed(() => Boolean(captchaProvider.value))
+const shouldUseRecaptchaExecute = computed(() => ['v3', 'execute'].includes(recaptchaMode))
 
 const captchaLabel = computed(() => {
   if (captchaProvider.value === "recaptcha") return "Google reCAPTCHA"
@@ -197,33 +199,54 @@ const renderTurnstile = async () => {
   }
 }
 
+const showRecaptchaExecuteInfo = () => {
+  if (!captchaEl.value) return
+  captchaEl.value.innerHTML = '<small class="captcha-missing">Google reCAPTCHA v3 aktif. Token dibuat saat Login.</small>'
+}
+
 const renderRecaptcha = async () => {
   if (!recaptchaSiteKey || !captchaEl.value) return
   try {
     const grecaptcha = await loadRecaptchaScript()
     captchaEl.value.innerHTML = ''
 
+    if (shouldUseRecaptchaExecute.value && typeof grecaptcha.execute === 'function') {
+      recaptchaUsesExecute.value = true
+      showRecaptchaExecuteInfo()
+      return
+    }
+
     if (typeof grecaptcha.render === 'function') {
       recaptchaUsesExecute.value = false
-      recaptchaWidgetId = grecaptcha.render(captchaEl.value, {
-        sitekey: recaptchaSiteKey,
-        theme: 'dark',
-        callback: (token) => {
-          recaptchaToken.value = token
-        },
-        'expired-callback': () => {
-          recaptchaToken.value = ''
-        },
-        'error-callback': () => {
-          recaptchaToken.value = ''
+      try {
+        recaptchaWidgetId = grecaptcha.render(captchaEl.value, {
+          sitekey: recaptchaSiteKey,
+          theme: 'dark',
+          callback: (token) => {
+            recaptchaToken.value = token
+          },
+          'expired-callback': () => {
+            recaptchaToken.value = ''
+          },
+          'error-callback': () => {
+            recaptchaToken.value = ''
+          }
+        })
+        return
+      } catch (renderErr) {
+        const message = String(renderErr?.message || renderErr || '')
+        if (message.toLowerCase().includes('invalid key type') && typeof grecaptcha.execute === 'function') {
+          recaptchaUsesExecute.value = true
+          showRecaptchaExecuteInfo()
+          return
         }
-      })
-      return
+        throw renderErr
+      }
     }
 
     if (typeof grecaptcha.execute === 'function') {
       recaptchaUsesExecute.value = true
-      captchaEl.value.innerHTML = '<small class="captcha-missing">Google reCAPTCHA v3 aktif. Token dibuat saat Login.</small>'
+      showRecaptchaExecuteInfo()
       return
     }
 
@@ -262,6 +285,10 @@ const ensureRecaptchaToken = async () => {
 
   if (!grecaptchaApi || typeof grecaptchaApi.execute !== 'function') {
     throw new Error('Google reCAPTCHA execute tidak tersedia')
+  }
+
+  if (typeof grecaptchaApi.ready === 'function') {
+    await new Promise((resolve) => grecaptchaApi.ready(resolve))
   }
 
   const token = await grecaptchaApi.execute(recaptchaSiteKey, { action: 'login' })
