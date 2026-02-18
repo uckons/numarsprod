@@ -89,14 +89,14 @@ exports.update = async (id, data, actor) => {
  * RESET PASSWORD
  */
 exports.resetPassword = async (id, actor) => {
-  const hash = await bcrypt.hash("123456", 10)
+  const hash = await bcrypt.hash("Numars!212#", 10)
   await db.query(
     `UPDATE users SET password = $1 WHERE id = $2`,
     [hash, id]
   )
 
   await audit(actor.id, "RESET_PASSWORD", id)
-  return { success: true, password: "123456" }
+  return { success: true, password: "Numars!212#" }
 }
 
 /**
@@ -212,4 +212,34 @@ exports.stats = async (actor) => {
   `, params)
 
   return rows[0]
+}
+
+const passwordPolicyRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
+
+exports.changePassword = async (actor, payload = {}) => {
+  const currentPassword = String(payload.current_password || '')
+  const newPassword = String(payload.new_password || '')
+
+  if (!currentPassword || !newPassword) {
+    throw new Error('Password lama dan password baru wajib diisi')
+  }
+
+  if (!passwordPolicyRegex.test(newPassword)) {
+    throw new Error('Password baru minimal 8 karakter dan wajib mengandung huruf besar, huruf kecil, angka, serta karakter khusus')
+  }
+
+  const { rows } = await db.query('SELECT id, password FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1', [actor.id])
+  if (!rows.length) throw new Error('User tidak ditemukan')
+
+  const validCurrent = await bcrypt.compare(currentPassword, rows[0].password)
+  if (!validCurrent) throw new Error('Password lama salah')
+
+  const isSame = await bcrypt.compare(newPassword, rows[0].password)
+  if (isSame) throw new Error('Password baru tidak boleh sama dengan password lama')
+
+  const hash = await bcrypt.hash(newPassword, 10)
+  await db.query('UPDATE users SET password = $1 WHERE id = $2', [hash, actor.id])
+  await audit(actor.id, 'CHANGE_PASSWORD', actor.id)
+
+  return { success: true }
 }

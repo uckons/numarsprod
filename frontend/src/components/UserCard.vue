@@ -94,7 +94,7 @@ const edit = u => alert("Edit " + u.username)
 const reset = async u => {
   if (!confirm(`Reset password ${u.username}?`)) return
   await api.put(`/users/${u.id}/reset-password`)
-  alert("Password reset to 123456")
+  alert("Password reset to Numars!212#")
 }
 
 const toggle = async u => {

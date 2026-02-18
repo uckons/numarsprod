@@ -152,6 +152,15 @@
               </option>
             </select>
           </div>
+          <div class="form-group">
+            <label>Cabang *</label>
+            <select v-model="form.branch_id" required>
+              <option value="">Pilih Cabang</option>
+              <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+                {{ branch.name }}
+              </option>
+            </select>
+          </div>
 
           <div class="form-group" v-if="isEdit">
             <label>Status</label>
@@ -184,6 +193,7 @@ import 'sweetalert2/dist/sweetalert2.min.css'
 // State
 const therapists = ref([])
 const grades = ref([])
+const branches = ref([])
 const loading = ref(false)
 const submitting = ref(false)
 
@@ -207,6 +217,7 @@ const isEdit = ref(false)
 const form = ref({
   name: '',
   grade_id: '',
+  branch_id: '',
   active: true
 })
 
@@ -273,6 +284,17 @@ const fetchGrades = async () => {
   }
 }
 
+
+const fetchBranches = async () => {
+  try {
+    const res = await api.get('/superadmin/branches')
+    branches.value = Array.isArray(res.data) ? res.data : []
+  } catch (err) {
+    console.error('Fetch branches error:', err)
+    branches.value = []
+  }
+}
+
 // Debounce Search
 const debounceSearch = () => {
   clearTimeout(searchTimeout)
@@ -306,6 +328,7 @@ const openAddModal = () => {
   form.value = {
     name: '',
     grade_id: '',
+    branch_id: '',
     active: true
   }
   showModal.value = true
@@ -318,6 +341,7 @@ const openEditModal = (therapist) => {
     id: therapist.id,
     name: therapist.name,
     grade_id: therapist.grade_id,
+    branch_id: therapist.branch_id,
     active: therapist.active
   }
   showModal.value = true
@@ -329,6 +353,7 @@ const closeModal = () => {
   form.value = {
     name: '',
     grade_id: '',
+    branch_id: '',
     active: true
   }
 }
@@ -414,6 +439,7 @@ const deleteTherapist = async (therapist) => {
 // Lifecycle
 onMounted(() => {
   fetchGrades()
+  fetchBranches()
   fetchTherapists()
 })
 </script>

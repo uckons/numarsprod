@@ -7,6 +7,7 @@ const rbac = require("../../middlewares/rbac.middleware")
 router.get("/stats", auth, c.stats)
 router.get("/", auth, c.list)
 router.get("/search", auth, c.search)
+router.put("/change-password", auth, c.changePassword)
 
 // 🔒 HANYA SUPERADMIN
 router.post("/", auth, rbac(["SuperAdmin"]), c.create)

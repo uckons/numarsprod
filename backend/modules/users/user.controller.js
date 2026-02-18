@@ -90,3 +90,14 @@ exports.stats = async (req, res) => {
     res.status(500).json({ message: "Failed load user stats" })
   }
 }
+
+
+exports.changePassword = async (req, res) => {
+  try {
+    const result = await service.changePassword(req.user, req.body)
+    res.json(result)
+  } catch (err) {
+    console.error(err)
+    res.status(400).json({ message: err.message })
+  }
+}
