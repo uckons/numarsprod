@@ -335,7 +335,7 @@
 
       <!-- Print Preview -->
       <div class="receipt-preview" id="receipt-print">
-        <div class="receipt">
+        <div v-if="!bulkReceipt" class="receipt">
           <!-- Header -->
           <div class="receipt-header">
             <h2>{{ printOrder?.branch_name || 'NUMARS SPA' }}</h2>
@@ -420,6 +420,81 @@
             <p>Terima kasih atas kunjungan Anda</p>
             <p>Semoga sehat selalu!</p>
             <p class="reprint-note">*** REPRINT ***</p>
+          </div>
+        </div>
+
+        <div v-else class="receipt">
+          <div class="receipt-header">
+            <h2>{{ bulkReceipt.branch_name || 'NUMARS SPA' }}</h2>
+            <p>{{ bulkReceipt.branch_address }}</p>
+            <p>Tel: {{ bulkReceipt.branch_phone }}</p>
+          </div>
+
+          <div class="receipt-divider">================================</div>
+
+          <div class="receipt-info">
+            <div class="info-row">
+              <span>Tipe:</span>
+              <span>PEMBAYARAN GABUNGAN</span>
+            </div>
+            <div class="info-row">
+              <span>Order:</span>
+              <span>{{ bulkReceipt.order_ids.map((id) => `#${id}`).join(', ') }}</span>
+            </div>
+            <div class="info-row">
+              <span>Tanggal:</span>
+              <span>{{ formatDateTime(bulkReceipt.paid_at) }}</span>
+            </div>
+            <div class="info-row">
+              <span>Kasir:</span>
+              <span>{{ bulkReceipt.cashier_name }}</span>
+            </div>
+          </div>
+
+          <div class="receipt-divider">================================</div>
+
+          <div class="receipt-items">
+            <div class="item-header">
+              <span>Item</span>
+              <span>Qty</span>
+              <span>Subtotal</span>
+            </div>
+            <div v-for="item in bulkReceipt.items" :key="item._key" class="item-row">
+              <div class="item-name">
+                <div>[#{{ item.order_id }}] {{ item.service_name }}</div>
+                <small v-if="item.therapist_name" class="item-meta">Terapis: {{ item.therapist_name }}</small>
+              </div>
+              <div class="item-detail">
+                <span>{{ item.qty }}x</span>
+                <span>{{ formatRupiah(item.price) }}</span>
+                <span class="item-subtotal">{{ formatRupiah(item.subtotal) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="receipt-divider">================================</div>
+
+          <div class="receipt-total">
+            <div class="total-row">
+              <span>TOTAL GABUNGAN:</span>
+              <span class="total-amount">{{ formatRupiah(bulkReceipt.total) }}</span>
+            </div>
+            <div class="total-row">
+              <span>HARUS DIBAYAR:</span>
+              <span>{{ formatRupiah(bulkReceipt.payment_amount) }}</span>
+            </div>
+            <div class="total-row payment-method">
+              <span>Metode:</span>
+              <span>{{ bulkReceipt.payment_method || 'CASH' }}</span>
+            </div>
+          </div>
+
+          <div class="receipt-divider">================================</div>
+
+          <div class="receipt-footer">
+            <p>Terima kasih atas kunjungan Anda</p>
+            <p>Semoga sehat selalu!</p>
+            <p class="reprint-note">*** BULK PAYMENT ***</p>
           </div>
         </div>
       </div>
@@ -622,56 +697,24 @@ const toggleOrderSelection = (orderId, checked) => {
   selectedOrderIds.value = selectedOrderIds.value.filter((selectedId) => selectedId !== id)
 }
 
-const askPrintAfterBulkPayment = async (paidOrderIds, totalAmount) => {
+const askPrintAfterBulkPayment = async (paidOrderIds, totalAmount, paymentMethod = 'CASH') => {
   if (!paidOrderIds.length) return
 
   const decision = await Swal.fire({
     icon: 'success',
     title: 'Pembayaran gabungan berhasil',
-    html: `${paidOrderIds.length} order dibayar. Total Rp <b>${format(totalAmount || 0)}</b><br/>Cetak struk sekarang?`,
+    html: `${paidOrderIds.length} order dibayar. Total tagihan Rp <b>${format(totalAmount || 0)}</b><br/>Cetak 1 struk gabungan sekarang?`,
     showCancelButton: true,
-    showDenyButton: true,
-    confirmButtonText: 'Pilih & Print',
-    denyButtonText: 'Print Semua',
+    confirmButtonText: 'Ya, Cetak 1 Struk',
     cancelButtonText: 'Nanti',
     confirmButtonColor: '#c9a24d',
-    denyButtonColor: '#2dd46e',
     background: '#111',
     color: '#fff'
   })
 
-  if (decision.isDenied) {
-    queueBulkPrint(paidOrderIds)
-    return
-  }
-
   if (!decision.isConfirmed) return
 
-  const inputOptions = paidOrderIds.reduce((acc, id) => {
-    acc[id] = `Order #${id}`
-    return acc
-  }, {})
-
-  const pick = await Swal.fire({
-    title: 'Pilih order untuk dicetak',
-    input: 'select',
-    inputOptions,
-    inputPlaceholder: 'Pilih order',
-    showCancelButton: true,
-    confirmButtonText: 'Print',
-    cancelButtonText: 'Batal',
-    confirmButtonColor: '#c9a24d',
-    background: '#111',
-    color: '#fff',
-    inputValidator: (value) => {
-      if (!value) return 'Pilih salah satu order'
-      return null
-    }
-  })
-
-  if (pick.isConfirmed && pick.value) {
-    await reprintReceipt(Number(pick.value))
-  }
+  await openBulkReceipt(paidOrderIds, totalAmount, paymentMethod)
 }
 
 const paySelectedOrders = async () => {
@@ -705,7 +748,7 @@ const paySelectedOrders = async () => {
 
     selectedOrderIds.value = []
     await loadOrders()
-    await askPrintAfterBulkPayment(paidOrderIds, Number(data?.total || 0))
+    await askPrintAfterBulkPayment(paidOrderIds, Number(data?.total || 0), String(data?.payment_method || 'CASH'))
   } catch (err) {
     await Swal.fire({
       icon: 'error',
@@ -884,28 +927,60 @@ const getPageRange = () => {
 // 🖨️ PRINT RECEIPT STATE
 const showPrintModal = ref(false)
 const printOrder = ref(null)
+const bulkReceipt = ref(null)
 const printLoading = ref(false)
-const bulkPrintQueue = ref([])
 
-const queueBulkPrint = async (orderIds) => {
-  const queue = Array.isArray(orderIds)
+const openBulkReceipt = async (orderIds, totalAmount, paymentMethod = 'CASH') => {
+  const ids = Array.isArray(orderIds)
     ? orderIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
     : []
 
-  if (!queue.length) return
+  if (!ids.length) return
 
-  bulkPrintQueue.value = queue
-  await openNextQueuedPrint()
-}
+  try {
+    printLoading.value = true
+    const responses = await Promise.all(ids.map((id) => api.get(`/orders/${id}/detail`)))
+    const details = responses.map((res) => res.data)
+    const firstOrder = details[0] || {}
 
-const openNextQueuedPrint = async () => {
-  if (showPrintModal.value || printLoading.value) return
-  if (bulkPrintQueue.value.length === 0) return
+    const mergedItems = details.flatMap((order) =>
+      (order.items || []).map((item, idx) => ({
+        ...item,
+        order_id: order.id,
+        _key: `${order.id}-${item.service_id || item.id || idx}`
+      }))
+    )
 
-  const nextOrderId = bulkPrintQueue.value.shift()
-  if (!nextOrderId) return
+    const computedTotal = details.reduce((sum, order) => sum + Number(order.total || 0), 0)
 
-  await reprintReceipt(nextOrderId)
+    bulkReceipt.value = {
+      branch_name: firstOrder.branch_name || 'NUMARS SPA',
+      branch_address: firstOrder.branch_address || '-',
+      branch_phone: firstOrder.branch_phone || '-',
+      cashier_name: firstOrder.cashier_name || '-',
+      order_ids: ids,
+      paid_at: new Date().toISOString(),
+      items: mergedItems,
+      total: Number(totalAmount || computedTotal || 0),
+      payment_amount: Number(totalAmount || computedTotal || 0),
+      change_amount: 0,
+      payment_method: paymentMethod || 'CASH'
+    }
+
+    printOrder.value = null
+    showPrintModal.value = true
+  } catch (err) {
+    console.error('Failed to load bulk receipt detail:', err)
+    await Swal.fire({
+      icon: 'error',
+      title: 'Gagal memuat struk gabungan',
+      text: err.response?.data?.message || 'Terjadi kesalahan',
+      background: '#111',
+      color: '#fff'
+    })
+  } finally {
+    printLoading.value = false
+  }
 }
 
 // 🖨️ REPRINT RECEIPT
@@ -913,6 +988,7 @@ const reprintReceipt = async (orderId) => {
   try {
     printLoading.value = true
     const res = await api.get(`/orders/${orderId}/detail`)
+    bulkReceipt.value = null
     printOrder.value = res.data
     showPrintModal.value = true
   } catch (err) {
@@ -927,7 +1003,7 @@ const reprintReceipt = async (orderId) => {
 const closePrintModal = async () => {
   showPrintModal.value = false
   printOrder.value = null
-  await openNextQueuedPrint()
+  bulkReceipt.value = null
 }
 
 const printReceipt = () => {

@@ -366,17 +366,17 @@ const printPosReport = () => {
     `ITEM    : ${analytics.value.summary.items_sold}`,
     line,
     'FNB',
-    ...fnbServiceRows.value.map((r) => `${r.service_name} x${r.qty} = ${format(r.revenue)}`),
-    `TOTAL FNB: ${format(fnbTotalRevenue.value)}`,
+    ...fnbServiceRows.value.map((r) => `${r.service_name} x${r.qty}`),
+    `TOTAL QTY FNB: ${fnbTotalQty.value}`,
     line,
     'SPA',
-    ...spaServiceRows.value.map((r) => `${r.service_name} x${r.qty} = ${format(r.revenue)}`),
+    ...spaServiceRows.value.map((r) => `${r.service_name} x${r.qty}`),
     line,
     'LC',
-    ...lcServiceRows.value.map((r) => `${r.service_name} x${r.qty} = ${format(r.revenue)}`),
+    ...lcServiceRows.value.map((r) => `${r.service_name} x${r.qty}`),
     line,
     'KTV',
-    ...ktvServiceRows.value.map((r) => `${r.service_name} x${r.qty} = ${format(r.revenue)}`),
+    ...ktvServiceRows.value.map((r) => `${r.service_name} x${r.qty}`),
     line
   ]
 
