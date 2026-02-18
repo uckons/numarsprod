@@ -30,10 +30,11 @@
         />
 
         <div class="captcha-box">
-          <label>Cloudflare Captcha</label>
-          <div v-if="turnstileSiteKey" ref="turnstileEl" class="turnstile-host"></div>
+          <label>{{ captchaLabel }}</label>
+          <div v-if="showCaptchaHost" ref="captchaEl" class="captcha-host"></div>
           <p v-else class="captcha-missing">
-            Turnstile belum dikonfigurasi. Set <code>VITE_TURNSTILE_SITE_KEY</code> di environment frontend.
+            Captcha belum dikonfigurasi. Set salah satu environment: <code>VITE_RECAPTCHA_SITE_KEY</code> atau
+            <code>VITE_TURNSTILE_SITE_KEY</code>.
           </p>
         </div>
 
@@ -64,17 +65,56 @@ const logoUrl = computed(() => import.meta.env.VITE_LOGIN_LOGO_URL || "/logo-sky
 const showLogoImage = ref(true)
 
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ""
-const turnstileEl = ref(null)
+const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || ""
+const recaptchaMode = String(import.meta.env.VITE_RECAPTCHA_MODE || 'auto').toLowerCase()
+
+const captchaProvider = computed(() => {
+  if (recaptchaSiteKey) return "recaptcha"
+  if (turnstileSiteKey) return "turnstile"
+  return ""
+})
+
+const showCaptchaHost = computed(() => Boolean(captchaProvider.value))
+const shouldUseRecaptchaExecute = computed(() => ['v3', 'execute', 'enterprise'].includes(recaptchaMode))
+
+const captchaLabel = computed(() => {
+  if (captchaProvider.value === "recaptcha") return "Google reCAPTCHA"
+  if (captchaProvider.value === "turnstile") return "Cloudflare Captcha"
+  return "Captcha"
+})
+
+const captchaEl = ref(null)
 const turnstileToken = ref("")
+const recaptchaToken = ref("")
 let turnstileWidgetId = null
+let recaptchaWidgetId = null
+const recaptchaUsesExecute = ref(false)
+
+const waitFor = async (checkFn, timeoutMs = 7000) => {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const value = checkFn()
+    if (value) return value
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  return null
+}
 
 const loadTurnstileScript = () => new Promise((resolve, reject) => {
-  if (window.turnstile?.render) return resolve(window.turnstile)
+  const existingApi = window.turnstile
+  if (existingApi && typeof existingApi.render === 'function') {
+    resolve(existingApi)
+    return
+  }
 
-  const existing = document.querySelector('script[data-turnstile="true"]')
-  if (existing) {
-    existing.addEventListener('load', () => resolve(window.turnstile))
-    existing.addEventListener('error', () => reject(new Error('Gagal memuat Cloudflare Turnstile')))
+  const existingScript = document.querySelector('script[data-turnstile="true"]')
+  if (existingScript) {
+    existingScript.addEventListener('load', async () => {
+      const api = await waitFor(() => (window.turnstile && typeof window.turnstile.render === 'function' ? window.turnstile : null))
+      if (api) resolve(api)
+      else reject(new Error('Cloudflare Turnstile API tidak siap (render tidak tersedia)'))
+    })
+    existingScript.addEventListener('error', () => reject(new Error('Gagal memuat Cloudflare Turnstile')))
     return
   }
 
@@ -83,17 +123,67 @@ const loadTurnstileScript = () => new Promise((resolve, reject) => {
   script.async = true
   script.defer = true
   script.dataset.turnstile = 'true'
-  script.onload = () => resolve(window.turnstile)
+  script.onload = async () => {
+    const api = await waitFor(() => (window.turnstile && typeof window.turnstile.render === 'function' ? window.turnstile : null))
+    if (api) resolve(api)
+    else reject(new Error('Cloudflare Turnstile API tidak siap (render tidak tersedia)'))
+  }
   script.onerror = () => reject(new Error('Gagal memuat Cloudflare Turnstile'))
   document.head.appendChild(script)
 })
 
+const loadRecaptchaScript = () => new Promise((resolve, reject) => {
+  const existingApi = window.grecaptcha
+  if (existingApi && (typeof existingApi.render === 'function' || typeof existingApi.execute === 'function')) {
+    resolve(existingApi)
+    return
+  }
+
+  const existingScript = document.querySelector('script[data-recaptcha="true"]')
+  if (existingScript) {
+    existingScript.addEventListener('load', async () => {
+      const api = await waitFor(() => {
+        const recaptcha = window.grecaptcha
+        if (!recaptcha) return null
+        if (typeof recaptcha.render === 'function' || typeof recaptcha.execute === 'function') return recaptcha
+        if (recaptcha.enterprise && (typeof recaptcha.enterprise.render === 'function' || typeof recaptcha.enterprise.execute === 'function')) return recaptcha.enterprise
+        return null
+      })
+      if (api) resolve(api)
+      else reject(new Error('Google reCAPTCHA API tidak siap'))
+    })
+    existingScript.addEventListener('error', () => reject(new Error('Gagal memuat Google reCAPTCHA')))
+    return
+  }
+
+  const script = document.createElement('script')
+  script.src = recaptchaMode === 'enterprise'
+    ? `https://www.google.com/recaptcha/enterprise.js?render=${encodeURIComponent(recaptchaSiteKey || 'explicit')}`
+    : 'https://www.google.com/recaptcha/api.js?render=explicit'
+  script.async = true
+  script.defer = true
+  script.dataset.recaptcha = 'true'
+  script.onload = async () => {
+    const api = await waitFor(() => {
+      const recaptcha = window.grecaptcha
+      if (!recaptcha) return null
+      if (typeof recaptcha.render === 'function' || typeof recaptcha.execute === 'function') return recaptcha
+      if (recaptcha.enterprise && (typeof recaptcha.enterprise.render === 'function' || typeof recaptcha.enterprise.execute === 'function')) return recaptcha.enterprise
+      return null
+    })
+    if (api) resolve(api)
+    else reject(new Error('Google reCAPTCHA API tidak siap'))
+  }
+  script.onerror = () => reject(new Error('Gagal memuat Google reCAPTCHA'))
+  document.head.appendChild(script)
+})
+
 const renderTurnstile = async () => {
-  if (!turnstileSiteKey || !turnstileEl.value) return
+  if (!turnstileSiteKey || !captchaEl.value) return
   try {
     const turnstile = await loadTurnstileScript()
-    turnstileEl.value.innerHTML = ''
-    turnstileWidgetId = turnstile.render(turnstileEl.value, {
+    captchaEl.value.innerHTML = ''
+    turnstileWidgetId = turnstile.render(captchaEl.value, {
       sitekey: turnstileSiteKey,
       theme: 'dark',
       callback: (token) => {
@@ -111,6 +201,73 @@ const renderTurnstile = async () => {
   }
 }
 
+const showRecaptchaExecuteInfo = () => {
+  if (!captchaEl.value) return
+  captchaEl.value.innerHTML = '<small class="captcha-missing">Google reCAPTCHA execute/enterprise aktif. Token dibuat saat Login.</small>'
+}
+
+const renderRecaptcha = async () => {
+  if (!recaptchaSiteKey || !captchaEl.value) return
+  try {
+    const grecaptcha = await loadRecaptchaScript()
+    captchaEl.value.innerHTML = ''
+
+    if (shouldUseRecaptchaExecute.value && typeof grecaptcha.execute === 'function') {
+      recaptchaUsesExecute.value = true
+      showRecaptchaExecuteInfo()
+      return
+    }
+
+    if (typeof grecaptcha.render === 'function') {
+      recaptchaUsesExecute.value = false
+      try {
+        recaptchaWidgetId = grecaptcha.render(captchaEl.value, {
+          sitekey: recaptchaSiteKey,
+          theme: 'dark',
+          callback: (token) => {
+            recaptchaToken.value = token
+          },
+          'expired-callback': () => {
+            recaptchaToken.value = ''
+          },
+          'error-callback': () => {
+            recaptchaToken.value = ''
+          }
+        })
+        return
+      } catch (renderErr) {
+        const message = String(renderErr?.message || renderErr || '')
+        if (message.toLowerCase().includes('invalid key type') && typeof grecaptcha.execute === 'function') {
+          recaptchaUsesExecute.value = true
+          showRecaptchaExecuteInfo()
+          return
+        }
+        throw renderErr
+      }
+    }
+
+    if (typeof grecaptcha.execute === 'function') {
+      recaptchaUsesExecute.value = true
+      showRecaptchaExecuteInfo()
+      return
+    }
+
+    throw new Error('Google reCAPTCHA API tidak mendukung render/execute')
+  } catch (e) {
+    error.value = e.message || 'Google reCAPTCHA gagal dimuat'
+  }
+}
+
+const renderCaptcha = async () => {
+  if (captchaProvider.value === 'recaptcha') {
+    await renderRecaptcha()
+    return
+  }
+  if (captchaProvider.value === 'turnstile') {
+    await renderTurnstile()
+  }
+}
+
 const requestAppFullscreen = async () => {
   const el = document.documentElement
   if (!el || document.fullscreenElement) return
@@ -121,8 +278,28 @@ const requestAppFullscreen = async () => {
   }
 }
 
+const ensureRecaptchaToken = async () => {
+  if (!recaptchaUsesExecute.value) return recaptchaToken.value
+
+  const grecaptchaApi = window.grecaptcha?.enterprise?.execute
+    ? window.grecaptcha.enterprise
+    : (window.grecaptcha?.execute ? window.grecaptcha : null)
+
+  if (!grecaptchaApi || typeof grecaptchaApi.execute !== 'function') {
+    throw new Error('Google reCAPTCHA execute tidak tersedia')
+  }
+
+  if (typeof grecaptchaApi.ready === 'function') {
+    await new Promise((resolve) => grecaptchaApi.ready(resolve))
+  }
+
+  const token = await grecaptchaApi.execute(recaptchaSiteKey, { action: 'login' })
+  recaptchaToken.value = token || ''
+  return recaptchaToken.value
+}
+
 const handleLogin = async () => {
-  if (turnstileSiteKey && !turnstileToken.value) {
+  if (captchaProvider.value === 'turnstile' && !turnstileToken.value) {
     error.value = 'Captcha Cloudflare belum tervalidasi'
     return
   }
@@ -130,7 +307,19 @@ const handleLogin = async () => {
   loading.value = true
   error.value = ""
   try {
-    await auth.login(username.value, password.value, turnstileToken.value)
+    if (captchaProvider.value === 'recaptcha') {
+      await ensureRecaptchaToken()
+      if (!recaptchaToken.value) {
+        error.value = 'Google reCAPTCHA belum tervalidasi'
+        loading.value = false
+        return
+      }
+    }
+
+    await auth.login(username.value, password.value, {
+      turnstileToken: turnstileToken.value,
+      recaptchaToken: recaptchaToken.value
+    })
     await requestAppFullscreen()
     const role = auth.role
     if (role === "SuperAdmin") router.push("/superadmin")
@@ -142,17 +331,23 @@ const handleLogin = async () => {
     else if (role === "Terapis") router.push("/terapis")
     else router.push("/login")
   } catch (e) {
-    error.value = e.response?.data?.message || "Login gagal"
+    const baseMessage = e.response?.data?.message || e.message || "Login gagal"
+    const details = Array.isArray(e.response?.data?.errors) ? e.response.data.errors.filter(Boolean) : []
+    error.value = details.length ? `${baseMessage} (${details.join(", ")})` : baseMessage
   } finally {
     loading.value = false
-    if (turnstileSiteKey && window.turnstile && turnstileWidgetId !== null) {
+    if (captchaProvider.value === 'turnstile' && window.turnstile && turnstileWidgetId !== null) {
       window.turnstile.reset(turnstileWidgetId)
       turnstileToken.value = ''
+    }
+    if (captchaProvider.value === 'recaptcha' && !recaptchaUsesExecute.value && window.grecaptcha && recaptchaWidgetId !== null) {
+      window.grecaptcha.reset(recaptchaWidgetId)
+      recaptchaToken.value = ''
     }
   }
 }
 
-onMounted(renderTurnstile)
+onMounted(renderCaptcha)
 </script>
 
 <style scoped>
@@ -234,7 +429,7 @@ h1 {
   margin-bottom: 6px;
 }
 
-.turnstile-host {
+.captcha-host {
   min-height: 70px;
   display: flex;
   align-items: center;
