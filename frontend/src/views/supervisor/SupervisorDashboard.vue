@@ -11,7 +11,6 @@
       </div>
     </section>
 
-    <ProfilePasswordCard />
 
     <section class="card">
       <div class="section-head">
