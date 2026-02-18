@@ -12,6 +12,7 @@
 
       <div class="user">
         <span class="name">{{ auth.user?.name || auth.user?.username || "User"  }}</span>
+        <button class="change-pass" @click="changePassword">Ganti Password</button>
         <button class="logout" @click="logout">Logout</button>
       </div>
     </header>
@@ -144,6 +145,42 @@ const format = n =>
 //  window.__auth = auth
 //  console.log("Auth store (kasir):", auth.user)
 //}
+
+const changePassword = async () => {
+  const { value: formValues } = await Swal.fire({
+    title: 'Ganti Password',
+    html:
+      '<input id="swal-current-password" class="swal2-input" type="password" placeholder="Password lama">' +
+      '<input id="swal-new-password" class="swal2-input" type="password" placeholder="Password baru">',
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Simpan',
+    cancelButtonText: 'Batal',
+    preConfirm: () => {
+      const current_password = document.getElementById('swal-current-password')?.value || ''
+      const new_password = document.getElementById('swal-new-password')?.value || ''
+      const policy = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
+      if (!current_password || !new_password) {
+        Swal.showValidationMessage('Password lama dan password baru wajib diisi')
+        return false
+      }
+      if (!policy.test(new_password)) {
+        Swal.showValidationMessage('Password baru minimal 8 karakter dan wajib huruf besar, huruf kecil, angka, dan karakter khusus')
+        return false
+      }
+      return { current_password, new_password }
+    }
+  })
+  if (!formValues) return
+
+  try {
+    await api.put('/users/change-password', formValues)
+    await Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Password berhasil diubah' })
+  } catch (err) {
+    await Swal.fire({ icon: 'error', title: 'Gagal', text: err.response?.data?.message || 'Gagal mengubah password' })
+  }
+}
+
 const logout = () => {
   auth.logout()
   router.push("/login")
@@ -427,6 +464,16 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: bold;
   color: #ffffff;
+}
+
+.change-pass {
+  background: transparent;
+  border: 1px solid #c9a24d;
+  color: #c9a24d;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 700;
+  margin-right: 8px;
 }
 
 .logout {

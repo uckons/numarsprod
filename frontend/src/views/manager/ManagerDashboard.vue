@@ -3,18 +3,18 @@
     <aside class="sidebar">
       <h2>MANAGER</h2>
       <nav>
-        <button :class="{active:tab==='report'}" @click="tab='report'">📊 Finance Report</button>
-        <button :class="{active:tab==='payroll'}" @click="openPayrollTab">💸 Payroll Terapis</button>
-        <button :class="{active:tab==='orders'}" @click="tab='orders'">🧾 Orders</button>
-        <button :class="{active:tab==='timers'}" @click="tab='timers'">⏱ Timers</button>
-        <button :class="{active:tab==='branches'}" @click="tab='branches'">🏢 Branches</button>
-        <button :class="{active:tab==='services'}" @click="tab='services'">🛎 Services</button>
-        <button :class="{active:tab==='therapists'}" @click="tab='therapists'">💆 Therapists</button>
-        <button :class="{active:tab==='rooms'}" @click="tab='rooms'">🚪 Rooms</button>
-        <button :class="{active:tab==='stock'}" @click="tab='stock'">📦 FNB Stock</button>
-        <button :class="{active:tab==='grades'}" @click="tab='grades'">🏆 Grades</button>
+        <button class="nav-btn" :class="{active:tab==='report'}" @click="tab='report'"><ChartNoAxesColumn size="18" /> Finance Report</button>
+        <button class="nav-btn" :class="{active:tab==='payroll'}" @click="openPayrollTab"><Wallet size="18" /> Payroll Terapis</button>
+        <button class="nav-btn" :class="{active:tab==='orders'}" @click="tab='orders'"><ReceiptText size="18" /> Orders</button>
+        <button class="nav-btn" :class="{active:tab==='timers'}" @click="tab='timers'"><Timer size="18" /> Timers</button>
+        <button class="nav-btn" :class="{active:tab==='branches'}" @click="tab='branches'"><Building2 size="18" /> Branches</button>
+        <button class="nav-btn" :class="{active:tab==='services'}" @click="tab='services'"><BellRing size="18" /> Services</button>
+        <button class="nav-btn" :class="{active:tab==='therapists'}" @click="tab='therapists'"><Users size="18" /> Therapists</button>
+        <button class="nav-btn" :class="{active:tab==='rooms'}" @click="tab='rooms'"><DoorOpen size="18" /> Rooms</button>
+        <button class="nav-btn" :class="{active:tab==='stock'}" @click="tab='stock'"><Package size="18" /> FNB Stock</button>
+        <button class="nav-btn" :class="{active:tab==='grades'}" @click="tab='grades'"><Trophy size="18" /> Grades</button>
       </nav>
-      <button class="logout" @click="logout">Logout</button>
+      <button class="logout nav-btn" @click="logout"><LogOut size="18" /> Logout</button>
     </aside>
 
     <main class="content">
@@ -197,6 +197,7 @@ import Rooms from "../superadmin/Rooms.vue"
 import Grades from "../superadmin/Grades.vue"
 import StockDashboard from "../stock/StockDashboard.vue"
 import { useAuthStore } from "../../store/auth.store"
+import { ChartNoAxesColumn, Wallet, ReceiptText, Timer, Building2, BellRing, Users, DoorOpen, Package, Trophy, LogOut } from "lucide-vue-next"
 
 const tab = ref("report")
 const branches = ref([])
@@ -527,9 +528,10 @@ const formatDate = (v) => v ? new Date(v).toLocaleString("id-ID", { weekday: "lo
 .sidebar { width:240px; background:#111; border-right:1px solid #c9a24d; padding:16px; display:flex; flex-direction:column; }
 .sidebar h2 { color:#c9a24d; margin-bottom:12px; }
 nav { display:grid; gap:8px; }
-nav button { text-align:left; background:transparent; border:none; color:#fff; padding:10px; border-radius:10px; cursor:pointer; }
+nav button { text-align:left; background:transparent; border:none; color:#fff; padding:10px 12px; border-radius:10px; cursor:pointer; }
+.nav-btn { display:flex; align-items:center; gap:10px; min-height:40px; width:100%; font-size:14px; }
 nav button.active { background:#c9a24d; color:#000; }
-.logout { margin-top:auto; background:#c9a24d; color:#000; border:none; border-radius:10px; padding:10px; cursor:pointer; font-weight:700; }
+.logout { margin-top:auto; background:#c9a24d; color:#000; border:none; border-radius:10px; padding:10px 12px; cursor:pointer; font-weight:700; }
 .content { flex:1; padding:20px; }
 .page { display:grid; gap:14px; }
 .card { background:linear-gradient(120deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); border:1px solid rgba(255,255,255,.09); border-radius:14px; padding:14px; }

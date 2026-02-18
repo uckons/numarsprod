@@ -247,7 +247,7 @@ const reset = async u => {
   const ask = await Swal.fire({
     icon: "question",
     title: `Reset password ${u.username}?`,
-    text: "Password akan diubah ke default 123456",
+    text: "Password akan diubah ke default Numars!212#",
     showCancelButton: true,
     confirmButtonText: "Reset",
     cancelButtonText: "Batal"
@@ -255,7 +255,7 @@ const reset = async u => {
   if (!ask.isConfirmed) return
 
   await api.put(`/users/${u.id}/reset-password`)
-  await Swal.fire({ icon: "success", title: "Password reset", text: "Default password: 123456" })
+  await Swal.fire({ icon: "success", title: "Password reset", text: "Default password: Numars!212#" })
 }
 
 const toggle = async u => {

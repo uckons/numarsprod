@@ -37,7 +37,7 @@ exports.toggleUser = async (id) => {
 }
 
 exports.resetPassword = async (id) => {
-  const hash = await bcrypt.hash("123456", 10)
+  const hash = await bcrypt.hash("Numars!212#", 10)
   return db.query("UPDATE users SET password=$1 WHERE id=$2", [hash, id])
 }
 
