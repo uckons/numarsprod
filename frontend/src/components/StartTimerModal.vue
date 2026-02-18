@@ -663,10 +663,14 @@ const popupTherapistDisabled = (therapistId, currentIndex) => {
 }
 
 const emitStartTimer = (therapistIdsPayload, karaokeFnbPayload = []) => {
+  const normalizedServiceIds = selectedServiceIds.value
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id) && id > 0)
+
   isSubmitting.value = true
   emit("start", {
-    service_id: Number(selectedServiceIds.value[0]),
-    service_ids: [Number(selectedServiceIds.value[0])],
+    service_id: normalizedServiceIds[0],
+    service_ids: normalizedServiceIds,
     service_type: serviceType.value,
     therapist_id: therapistIdsPayload[0] || null,
     therapist_ids: therapistIdsPayload,
