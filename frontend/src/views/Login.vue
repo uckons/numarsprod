@@ -31,7 +31,7 @@
 
         <div class="captcha-box">
           <label>{{ captchaLabel }}</label>
-          <div v-if="captchaProvider" ref="captchaEl" class="captcha-host"></div>
+          <div v-if="showCaptchaHost" ref="captchaEl" class="captcha-host"></div>
           <p v-else class="captcha-missing">
             Captcha belum dikonfigurasi. Set salah satu environment: <code>VITE_RECAPTCHA_SITE_KEY</code> atau
             <code>VITE_TURNSTILE_SITE_KEY</code>.
@@ -72,6 +72,9 @@ const captchaProvider = computed(() => {
   if (turnstileSiteKey) return "turnstile"
   return ""
 })
+
+const showCaptchaHost = computed(() => Boolean(captchaProvider.value))
+
 const captchaLabel = computed(() => {
   if (captchaProvider.value === "recaptcha") return "Google reCAPTCHA"
   if (captchaProvider.value === "turnstile") return "Cloudflare Captcha"
@@ -83,14 +86,33 @@ const turnstileToken = ref("")
 const recaptchaToken = ref("")
 let turnstileWidgetId = null
 let recaptchaWidgetId = null
+const recaptchaUsesExecute = ref(false)
+
+const waitFor = async (checkFn, timeoutMs = 7000) => {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    const value = checkFn()
+    if (value) return value
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  return null
+}
 
 const loadTurnstileScript = () => new Promise((resolve, reject) => {
-  if (window.turnstile?.render) return resolve(window.turnstile)
+  const existingApi = window.turnstile
+  if (existingApi && typeof existingApi.render === 'function') {
+    resolve(existingApi)
+    return
+  }
 
-  const existing = document.querySelector('script[data-turnstile="true"]')
-  if (existing) {
-    existing.addEventListener('load', () => resolve(window.turnstile))
-    existing.addEventListener('error', () => reject(new Error('Gagal memuat Cloudflare Turnstile')))
+  const existingScript = document.querySelector('script[data-turnstile="true"]')
+  if (existingScript) {
+    existingScript.addEventListener('load', async () => {
+      const api = await waitFor(() => (window.turnstile && typeof window.turnstile.render === 'function' ? window.turnstile : null))
+      if (api) resolve(api)
+      else reject(new Error('Cloudflare Turnstile API tidak siap (render tidak tersedia)'))
+    })
+    existingScript.addEventListener('error', () => reject(new Error('Gagal memuat Cloudflare Turnstile')))
     return
   }
 
@@ -99,18 +121,36 @@ const loadTurnstileScript = () => new Promise((resolve, reject) => {
   script.async = true
   script.defer = true
   script.dataset.turnstile = 'true'
-  script.onload = () => resolve(window.turnstile)
+  script.onload = async () => {
+    const api = await waitFor(() => (window.turnstile && typeof window.turnstile.render === 'function' ? window.turnstile : null))
+    if (api) resolve(api)
+    else reject(new Error('Cloudflare Turnstile API tidak siap (render tidak tersedia)'))
+  }
   script.onerror = () => reject(new Error('Gagal memuat Cloudflare Turnstile'))
   document.head.appendChild(script)
 })
 
 const loadRecaptchaScript = () => new Promise((resolve, reject) => {
-  if (window.grecaptcha?.render) return resolve(window.grecaptcha)
+  const existingApi = window.grecaptcha
+  if (existingApi && (typeof existingApi.render === 'function' || typeof existingApi.execute === 'function')) {
+    resolve(existingApi)
+    return
+  }
 
-  const existing = document.querySelector('script[data-recaptcha="true"]')
-  if (existing) {
-    existing.addEventListener('load', () => resolve(window.grecaptcha))
-    existing.addEventListener('error', () => reject(new Error('Gagal memuat Google reCAPTCHA')))
+  const existingScript = document.querySelector('script[data-recaptcha="true"]')
+  if (existingScript) {
+    existingScript.addEventListener('load', async () => {
+      const api = await waitFor(() => {
+        const recaptcha = window.grecaptcha
+        if (!recaptcha) return null
+        if (typeof recaptcha.render === 'function' || typeof recaptcha.execute === 'function') return recaptcha
+        if (recaptcha.enterprise && (typeof recaptcha.enterprise.render === 'function' || typeof recaptcha.enterprise.execute === 'function')) return recaptcha.enterprise
+        return null
+      })
+      if (api) resolve(api)
+      else reject(new Error('Google reCAPTCHA API tidak siap'))
+    })
+    existingScript.addEventListener('error', () => reject(new Error('Gagal memuat Google reCAPTCHA')))
     return
   }
 
@@ -119,7 +159,17 @@ const loadRecaptchaScript = () => new Promise((resolve, reject) => {
   script.async = true
   script.defer = true
   script.dataset.recaptcha = 'true'
-  script.onload = () => resolve(window.grecaptcha)
+  script.onload = async () => {
+    const api = await waitFor(() => {
+      const recaptcha = window.grecaptcha
+      if (!recaptcha) return null
+      if (typeof recaptcha.render === 'function' || typeof recaptcha.execute === 'function') return recaptcha
+      if (recaptcha.enterprise && (typeof recaptcha.enterprise.render === 'function' || typeof recaptcha.enterprise.execute === 'function')) return recaptcha.enterprise
+      return null
+    })
+    if (api) resolve(api)
+    else reject(new Error('Google reCAPTCHA API tidak siap'))
+  }
   script.onerror = () => reject(new Error('Gagal memuat Google reCAPTCHA'))
   document.head.appendChild(script)
 })
@@ -152,19 +202,32 @@ const renderRecaptcha = async () => {
   try {
     const grecaptcha = await loadRecaptchaScript()
     captchaEl.value.innerHTML = ''
-    recaptchaWidgetId = grecaptcha.render(captchaEl.value, {
-      sitekey: recaptchaSiteKey,
-      theme: 'dark',
-      callback: (token) => {
-        recaptchaToken.value = token
-      },
-      'expired-callback': () => {
-        recaptchaToken.value = ''
-      },
-      'error-callback': () => {
-        recaptchaToken.value = ''
-      }
-    })
+
+    if (typeof grecaptcha.render === 'function') {
+      recaptchaUsesExecute.value = false
+      recaptchaWidgetId = grecaptcha.render(captchaEl.value, {
+        sitekey: recaptchaSiteKey,
+        theme: 'dark',
+        callback: (token) => {
+          recaptchaToken.value = token
+        },
+        'expired-callback': () => {
+          recaptchaToken.value = ''
+        },
+        'error-callback': () => {
+          recaptchaToken.value = ''
+        }
+      })
+      return
+    }
+
+    if (typeof grecaptcha.execute === 'function') {
+      recaptchaUsesExecute.value = true
+      captchaEl.value.innerHTML = '<small class="captcha-missing">Google reCAPTCHA v3 aktif. Token dibuat saat Login.</small>'
+      return
+    }
+
+    throw new Error('Google reCAPTCHA API tidak mendukung render/execute')
   } catch (e) {
     error.value = e.message || 'Google reCAPTCHA gagal dimuat'
   }
@@ -190,12 +253,23 @@ const requestAppFullscreen = async () => {
   }
 }
 
-const handleLogin = async () => {
-  if (captchaProvider.value === 'recaptcha' && !recaptchaToken.value) {
-    error.value = 'Google reCAPTCHA belum tervalidasi'
-    return
+const ensureRecaptchaToken = async () => {
+  if (!recaptchaUsesExecute.value) return recaptchaToken.value
+
+  const grecaptchaApi = window.grecaptcha?.execute
+    ? window.grecaptcha
+    : window.grecaptcha?.enterprise
+
+  if (!grecaptchaApi || typeof grecaptchaApi.execute !== 'function') {
+    throw new Error('Google reCAPTCHA execute tidak tersedia')
   }
 
+  const token = await grecaptchaApi.execute(recaptchaSiteKey, { action: 'login' })
+  recaptchaToken.value = token || ''
+  return recaptchaToken.value
+}
+
+const handleLogin = async () => {
   if (captchaProvider.value === 'turnstile' && !turnstileToken.value) {
     error.value = 'Captcha Cloudflare belum tervalidasi'
     return
@@ -204,6 +278,15 @@ const handleLogin = async () => {
   loading.value = true
   error.value = ""
   try {
+    if (captchaProvider.value === 'recaptcha') {
+      await ensureRecaptchaToken()
+      if (!recaptchaToken.value) {
+        error.value = 'Google reCAPTCHA belum tervalidasi'
+        loading.value = false
+        return
+      }
+    }
+
     await auth.login(username.value, password.value, {
       turnstileToken: turnstileToken.value,
       recaptchaToken: recaptchaToken.value
@@ -219,14 +302,14 @@ const handleLogin = async () => {
     else if (role === "Terapis") router.push("/terapis")
     else router.push("/login")
   } catch (e) {
-    error.value = e.response?.data?.message || "Login gagal"
+    error.value = e.response?.data?.message || e.message || "Login gagal"
   } finally {
     loading.value = false
     if (captchaProvider.value === 'turnstile' && window.turnstile && turnstileWidgetId !== null) {
       window.turnstile.reset(turnstileWidgetId)
       turnstileToken.value = ''
     }
-    if (captchaProvider.value === 'recaptcha' && window.grecaptcha && recaptchaWidgetId !== null) {
+    if (captchaProvider.value === 'recaptcha' && !recaptchaUsesExecute.value && window.grecaptcha && recaptchaWidgetId !== null) {
       window.grecaptcha.reset(recaptchaWidgetId)
       recaptchaToken.value = ''
     }
