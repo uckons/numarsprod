@@ -3,10 +3,9 @@ const bcrypt = require("bcrypt")
 const jwt = require("jsonwebtoken")
 const db = require("../../config/db")
 
-
 const verifyTurnstileToken = async ({ token, remoteip }) => {
   const secret = process.env.TURNSTILE_SECRET_KEY
-  if (!secret) return { enabled: false, success: true }
+  if (!secret) return { enabled: false, success: false }
 
   if (!token) {
     return { enabled: true, success: false, message: "Captcha Cloudflare wajib diisi" }
@@ -39,19 +38,152 @@ const verifyTurnstileToken = async ({ token, remoteip }) => {
   }
 }
 
+const verifyRecaptchaStandard = async ({ token, remoteip, secret }) => {
+  const params = new URLSearchParams()
+  params.append("secret", secret)
+  params.append("response", token)
+  if (remoteip) params.append("remoteip", remoteip)
+
+  const { data } = await axios.post(
+    "https://www.google.com/recaptcha/api/siteverify",
+    params,
+    { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 10000 }
+  )
+
+  if (!data?.success) {
+    return {
+      enabled: true,
+      success: false,
+      message: "Validasi Google reCAPTCHA gagal",
+      errors: Array.isArray(data?.["error-codes"]) ? data["error-codes"] : []
+    }
+  }
+
+  return { enabled: true, success: true }
+}
+
+const verifyRecaptchaEnterprise = async ({ token, remoteip, expectedAction }) => {
+  const projectId = process.env.RECAPTCHA_ENTERPRISE_PROJECT_ID
+  const apiKey = process.env.RECAPTCHA_ENTERPRISE_API_KEY
+
+  if (!projectId || !apiKey) {
+    return { enabled: false, success: false }
+  }
+
+  const payload = {
+    event: {
+      token,
+      siteKey: process.env.VITE_RECAPTCHA_SITE_KEY || process.env.RECAPTCHA_SITE_KEY,
+      userIpAddress: remoteip || undefined,
+      expectedAction: expectedAction || undefined
+    }
+  }
+
+  try {
+    const { data } = await axios.post(
+      `https://recaptchaenterprise.googleapis.com/v1/projects/${projectId}/assessments?key=${apiKey}`,
+      payload,
+      { timeout: 10000 }
+    )
+
+    const valid = Boolean(data?.tokenProperties?.valid)
+    const invalidReason = data?.tokenProperties?.invalidReason
+
+    if (!valid) {
+      return {
+        enabled: true,
+        success: false,
+        message: "Validasi Google reCAPTCHA Enterprise gagal",
+        errors: invalidReason ? [String(invalidReason)] : []
+      }
+    }
+
+    const action = data?.tokenProperties?.action || ""
+    if (expectedAction && action && action !== expectedAction) {
+      return {
+        enabled: true,
+        success: false,
+        message: "Aksi reCAPTCHA tidak sesuai",
+        errors: [`expected:${expectedAction}`, `actual:${action}`]
+      }
+    }
+
+    const minScore = Number(process.env.RECAPTCHA_MIN_SCORE || 0)
+    const score = Number(data?.riskAnalysis?.score || 0)
+    if (Number.isFinite(minScore) && minScore > 0 && score < minScore) {
+      return {
+        enabled: true,
+        success: false,
+        message: "Skor reCAPTCHA terlalu rendah",
+        errors: [`score:${score}`, `min:${minScore}`]
+      }
+    }
+
+    return { enabled: true, success: true }
+  } catch (error) {
+    return { enabled: true, success: false, message: "Google reCAPTCHA Enterprise tidak dapat diverifikasi" }
+  }
+}
+
+const verifyRecaptchaToken = async ({ token, remoteip, expectedAction }) => {
+  const secret = process.env.RECAPTCHA_SECRET_KEY
+  const enterpriseEnabled = Boolean(process.env.RECAPTCHA_ENTERPRISE_PROJECT_ID && process.env.RECAPTCHA_ENTERPRISE_API_KEY)
+
+  if (!secret && !enterpriseEnabled) return { enabled: false, success: false }
+
+  if (!token) {
+    return { enabled: true, success: false, message: "Google reCAPTCHA wajib diisi" }
+  }
+
+  if (enterpriseEnabled) {
+    const enterpriseResult = await verifyRecaptchaEnterprise({ token, remoteip, expectedAction })
+    if (enterpriseResult.enabled) return enterpriseResult
+  }
+
+  if (secret) {
+    try {
+      return await verifyRecaptchaStandard({ token, remoteip, secret })
+    } catch (error) {
+      return { enabled: true, success: false, message: "Google reCAPTCHA tidak dapat diverifikasi" }
+    }
+  }
+
+  return { enabled: true, success: false, message: "Konfigurasi reCAPTCHA belum lengkap" }
+}
+
+const verifyCaptchaToken = async ({ turnstileToken, recaptchaToken, remoteip, expectedAction }) => {
+  const recaptchaEnabled = Boolean(
+    process.env.RECAPTCHA_SECRET_KEY ||
+    (process.env.RECAPTCHA_ENTERPRISE_PROJECT_ID && process.env.RECAPTCHA_ENTERPRISE_API_KEY)
+  )
+  const turnstileEnabled = Boolean(process.env.TURNSTILE_SECRET_KEY)
+
+  if (recaptchaEnabled) {
+    return verifyRecaptchaToken({ token: recaptchaToken, remoteip, expectedAction })
+  }
+
+  if (turnstileEnabled) {
+    return verifyTurnstileToken({ token: turnstileToken, remoteip })
+  }
+
+  return { enabled: false, success: true }
+}
 
 exports.login = async (req, res) => {
   try {
-    const { username, password, turnstile_token } = req.body
+    const { username, password, turnstile_token, recaptcha_token } = req.body
 
     if (!username || !password) {
       return res.status(400).json({ message: "Username & password required" })
     }
 
-    const captchaCheck = await verifyTurnstileToken({
-      token: turnstile_token,
-      remoteip: req.ip
+    const captchaCheck = await verifyCaptchaToken({
+      turnstileToken: turnstile_token,
+      recaptchaToken: recaptcha_token,
+      remoteip: req.ip,
+      expectedAction: "login"
     })
+
     if (!captchaCheck.success) {
       return res.status(400).json({
         message: captchaCheck.message,

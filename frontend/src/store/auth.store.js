@@ -11,11 +11,14 @@ export const useAuthStore = defineStore("auth", {
     role: (s) => s.user?.role || null,
   },
   actions: {
-    async login(username, password, turnstileToken = "") {
+    async login(username, password, captcha = {}) {
+      const turnstileToken = captcha.turnstileToken || ""
+      const recaptchaToken = captcha.recaptchaToken || ""
       const res = await axios.post("/api/auth/login", {
         username,
         password,
-        turnstile_token: turnstileToken || undefined
+        turnstile_token: turnstileToken || undefined,
+        recaptcha_token: recaptchaToken || undefined
       })
       this.token = res.data.token
       this.user = res.data.user
