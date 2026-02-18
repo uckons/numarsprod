@@ -66,7 +66,7 @@ const verifyRecaptchaStandard = async ({ token, remoteip, secret }) => {
 }
 
 const verifyRecaptchaEnterprise = async ({ token, remoteip, expectedAction }) => {
-  const projectId = process.env.RECAPTCHA_ENTERPRISE_PROJECT_ID
+  const projectId = process.env.RECAPTCHA_ENTERPRISE_PROJECT_ID || "numarsproject"
   const apiKey = process.env.RECAPTCHA_ENTERPRISE_API_KEY
   const siteKey = process.env.RECAPTCHA_SITE_KEY || process.env.VITE_RECAPTCHA_SITE_KEY
 
@@ -161,7 +161,7 @@ const verifyRecaptchaEnterprise = async ({ token, remoteip, expectedAction }) =>
 
 const verifyRecaptchaToken = async ({ token, remoteip, expectedAction }) => {
   const secret = process.env.RECAPTCHA_SECRET_KEY
-  const enterpriseConfigured = Boolean(process.env.RECAPTCHA_ENTERPRISE_PROJECT_ID && process.env.RECAPTCHA_ENTERPRISE_API_KEY)
+  const enterpriseConfigured = Boolean((process.env.RECAPTCHA_ENTERPRISE_PROJECT_ID || "numarsproject") && process.env.RECAPTCHA_ENTERPRISE_API_KEY)
   const enterpriseEnabled = enterpriseConfigured && !isEnvFalse(process.env.RECAPTCHA_ENTERPRISE_ENABLED)
 
   if (!secret && !enterpriseEnabled) return { enabled: false, success: false }
@@ -171,21 +171,8 @@ const verifyRecaptchaToken = async ({ token, remoteip, expectedAction }) => {
   }
 
   if (enterpriseEnabled) {
-    const enterpriseResult = await verifyRecaptchaEnterprise({ token, remoteip, expectedAction })
-    if (enterpriseResult.success || !secret) return enterpriseResult
-    // fallback ke reCAPTCHA standard jika enterprise gagal tetapi secret standard tersedia
-    try {
-      const standardResult = await verifyRecaptchaStandard({ token, remoteip, secret })
-      if (standardResult.success) return standardResult
-      return {
-        enabled: true,
-        success: false,
-        message: enterpriseResult.message,
-        errors: [...(enterpriseResult.errors || []), ...(standardResult.errors || [])]
-      }
-    } catch (error) {
-      return enterpriseResult
-    }
+    // Prinsip: mode Enterprise harus diverifikasi lewat endpoint Enterprise, bukan /siteverify klasik.
+    return verifyRecaptchaEnterprise({ token, remoteip, expectedAction })
   }
 
   if (secret) {
@@ -202,7 +189,7 @@ const verifyRecaptchaToken = async ({ token, remoteip, expectedAction }) => {
 const verifyCaptchaToken = async ({ turnstileToken, recaptchaToken, remoteip, expectedAction }) => {
   const recaptchaEnabled = Boolean(
     process.env.RECAPTCHA_SECRET_KEY ||
-    (process.env.RECAPTCHA_ENTERPRISE_PROJECT_ID && process.env.RECAPTCHA_ENTERPRISE_API_KEY)
+    ((process.env.RECAPTCHA_ENTERPRISE_PROJECT_ID || "numarsproject") && process.env.RECAPTCHA_ENTERPRISE_API_KEY)
   )
   const turnstileEnabled = Boolean(process.env.TURNSTILE_SECRET_KEY)
 

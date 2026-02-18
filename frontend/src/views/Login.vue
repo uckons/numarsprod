@@ -132,28 +132,27 @@ const loadTurnstileScript = () => new Promise((resolve, reject) => {
   document.head.appendChild(script)
 })
 
-const getRecaptchaApi = () => {
-  const recaptcha = window.grecaptcha
-  if (!recaptcha) return null
-  if (typeof recaptcha.render === 'function' || typeof recaptcha.execute === 'function') return recaptcha
-  if (recaptcha.enterprise && (typeof recaptcha.enterprise.render === 'function' || typeof recaptcha.enterprise.execute === 'function')) return recaptcha.enterprise
+const getRecaptchaEnterpriseApi = () => {
+  const enterprise = window.grecaptcha?.enterprise
+  if (!enterprise) return null
+  if (typeof enterprise.render === 'function' || typeof enterprise.execute === 'function') return enterprise
   return null
 }
 
 const loadRecaptchaScript = () => new Promise(async (resolve, reject) => {
-  const existingApi = getRecaptchaApi()
+  const existingApi = getRecaptchaEnterpriseApi()
   if (existingApi) {
     resolve(existingApi)
     return
   }
 
-  const waitApi = async () => waitFor(getRecaptchaApi)
+  const waitApi = async () => waitFor(getRecaptchaEnterpriseApi)
 
   const tryInject = (src, tag) => new Promise((res, rej) => {
     const prev = document.querySelector(`script[data-recaptcha="${tag}"]`)
     if (prev) {
       prev.addEventListener('load', () => res(true), { once: true })
-      prev.addEventListener('error', () => rej(new Error(`Gagal memuat Google reCAPTCHA (${tag})`)), { once: true })
+      prev.addEventListener('error', () => rej(new Error(`Gagal memuat Google reCAPTCHA Enterprise (${tag})`)), { once: true })
       return
     }
 
@@ -163,19 +162,14 @@ const loadRecaptchaScript = () => new Promise(async (resolve, reject) => {
     script.defer = true
     script.dataset.recaptcha = tag
     script.onload = () => res(true)
-    script.onerror = () => rej(new Error(`Gagal memuat Google reCAPTCHA (${tag})`))
+    script.onerror = () => rej(new Error(`Gagal memuat Google reCAPTCHA Enterprise (${tag})`))
     document.head.appendChild(script)
   })
 
-  const candidates = recaptchaMode === 'enterprise'
-    ? [
-        { tag: 'enterprise-keyed', src: `https://www.google.com/recaptcha/enterprise.js?render=${encodeURIComponent(recaptchaSiteKey || '')}` },
-        { tag: 'enterprise-explicit', src: 'https://www.google.com/recaptcha/enterprise.js?render=explicit' },
-        { tag: 'standard-explicit', src: 'https://www.google.com/recaptcha/api.js?render=explicit' }
-      ]
-    : [
-        { tag: 'standard-explicit', src: 'https://www.google.com/recaptcha/api.js?render=explicit' }
-      ]
+  const candidates = [
+    { tag: 'enterprise-keyed', src: `https://www.google.com/recaptcha/enterprise.js?render=${encodeURIComponent(recaptchaSiteKey || '')}` },
+    { tag: 'enterprise-explicit', src: 'https://www.google.com/recaptcha/enterprise.js?render=explicit' }
+  ]
 
   const errors = []
   for (const candidate of candidates) {
@@ -186,13 +180,13 @@ const loadRecaptchaScript = () => new Promise(async (resolve, reject) => {
         resolve(api)
         return
       }
-      errors.push(`API tidak siap (${candidate.tag})`)
+      errors.push(`API enterprise tidak siap (${candidate.tag})`)
     } catch (err) {
       errors.push(err?.message || String(err))
     }
   }
 
-  reject(new Error(`Google reCAPTCHA gagal dimuat. Cek site key/domain/restriction. Detail: ${errors.join(' | ')}`))
+  reject(new Error(`Google reCAPTCHA Enterprise gagal dimuat. Cek Enterprise site key/domain/restriction. Detail: ${errors.join(' | ')}`))
 })
 
 const renderTurnstile = async () => {
@@ -226,19 +220,19 @@ const showRecaptchaExecuteInfo = () => {
 const renderRecaptcha = async () => {
   if (!recaptchaSiteKey || !captchaEl.value) return
   try {
-    const grecaptcha = await loadRecaptchaScript()
+    const recaptchaEnterprise = await loadRecaptchaScript()
     captchaEl.value.innerHTML = ''
 
-    if (shouldUseRecaptchaExecute.value && typeof grecaptcha.execute === 'function') {
+    if (shouldUseRecaptchaExecute.value && typeof recaptchaEnterprise.execute === 'function') {
       recaptchaUsesExecute.value = true
       showRecaptchaExecuteInfo()
       return
     }
 
-    if (typeof grecaptcha.render === 'function') {
+    if (typeof recaptchaEnterprise.render === 'function') {
       recaptchaUsesExecute.value = false
       try {
-        recaptchaWidgetId = grecaptcha.render(captchaEl.value, {
+        recaptchaWidgetId = recaptchaEnterprise.render(captchaEl.value, {
           sitekey: recaptchaSiteKey,
           theme: 'dark',
           callback: (token) => {
@@ -254,7 +248,7 @@ const renderRecaptcha = async () => {
         return
       } catch (renderErr) {
         const message = String(renderErr?.message || renderErr || '')
-        if (message.toLowerCase().includes('invalid key type') && typeof grecaptcha.execute === 'function') {
+        if (message.toLowerCase().includes('invalid key type') && typeof recaptchaEnterprise.execute === 'function') {
           recaptchaUsesExecute.value = true
           showRecaptchaExecuteInfo()
           return
@@ -263,7 +257,7 @@ const renderRecaptcha = async () => {
       }
     }
 
-    if (typeof grecaptcha.execute === 'function') {
+    if (typeof recaptchaEnterprise.execute === 'function') {
       recaptchaUsesExecute.value = true
       showRecaptchaExecuteInfo()
       return
@@ -298,19 +292,17 @@ const requestAppFullscreen = async () => {
 const ensureRecaptchaToken = async () => {
   if (!recaptchaUsesExecute.value) return recaptchaToken.value
 
-  const grecaptchaApi = window.grecaptcha?.enterprise?.execute
-    ? window.grecaptcha.enterprise
-    : (window.grecaptcha?.execute ? window.grecaptcha : null)
+  const recaptchaEnterpriseApi = window.grecaptcha?.enterprise
 
-  if (!grecaptchaApi || typeof grecaptchaApi.execute !== 'function') {
-    throw new Error('Google reCAPTCHA execute tidak tersedia')
+  if (!recaptchaEnterpriseApi || typeof recaptchaEnterpriseApi.execute !== 'function') {
+    throw new Error('Google reCAPTCHA Enterprise execute tidak tersedia')
   }
 
-  if (typeof grecaptchaApi.ready === 'function') {
-    await new Promise((resolve) => grecaptchaApi.ready(resolve))
+  if (typeof recaptchaEnterpriseApi.ready === 'function') {
+    await new Promise((resolve) => recaptchaEnterpriseApi.ready(resolve))
   }
 
-  const token = await grecaptchaApi.execute(recaptchaSiteKey, { action: 'login' })
+  const token = await recaptchaEnterpriseApi.execute(recaptchaSiteKey, { action: 'login' })
   recaptchaToken.value = token || ''
   return recaptchaToken.value
 }
@@ -357,8 +349,8 @@ const handleLogin = async () => {
       window.turnstile.reset(turnstileWidgetId)
       turnstileToken.value = ''
     }
-    if (captchaProvider.value === 'recaptcha' && !recaptchaUsesExecute.value && window.grecaptcha && recaptchaWidgetId !== null) {
-      window.grecaptcha.reset(recaptchaWidgetId)
+    if (captchaProvider.value === 'recaptcha' && !recaptchaUsesExecute.value && window.grecaptcha?.enterprise && recaptchaWidgetId !== null) {
+      window.grecaptcha.enterprise.reset(recaptchaWidgetId)
       recaptchaToken.value = ''
     }
   }
