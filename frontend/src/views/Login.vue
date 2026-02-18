@@ -75,7 +75,7 @@ const captchaProvider = computed(() => {
 })
 
 const showCaptchaHost = computed(() => Boolean(captchaProvider.value))
-const shouldUseRecaptchaExecute = computed(() => ['v3', 'execute'].includes(recaptchaMode))
+const shouldUseRecaptchaExecute = computed(() => ['v3', 'execute', 'enterprise'].includes(recaptchaMode))
 
 const captchaLabel = computed(() => {
   if (captchaProvider.value === "recaptcha") return "Google reCAPTCHA"
@@ -157,7 +157,9 @@ const loadRecaptchaScript = () => new Promise((resolve, reject) => {
   }
 
   const script = document.createElement('script')
-  script.src = 'https://www.google.com/recaptcha/api.js?render=explicit'
+  script.src = recaptchaMode === 'enterprise'
+    ? `https://www.google.com/recaptcha/enterprise.js?render=${encodeURIComponent(recaptchaSiteKey || 'explicit')}`
+    : 'https://www.google.com/recaptcha/api.js?render=explicit'
   script.async = true
   script.defer = true
   script.dataset.recaptcha = 'true'
@@ -201,7 +203,7 @@ const renderTurnstile = async () => {
 
 const showRecaptchaExecuteInfo = () => {
   if (!captchaEl.value) return
-  captchaEl.value.innerHTML = '<small class="captcha-missing">Google reCAPTCHA v3 aktif. Token dibuat saat Login.</small>'
+  captchaEl.value.innerHTML = '<small class="captcha-missing">Google reCAPTCHA execute/enterprise aktif. Token dibuat saat Login.</small>'
 }
 
 const renderRecaptcha = async () => {
@@ -279,9 +281,9 @@ const requestAppFullscreen = async () => {
 const ensureRecaptchaToken = async () => {
   if (!recaptchaUsesExecute.value) return recaptchaToken.value
 
-  const grecaptchaApi = window.grecaptcha?.execute
-    ? window.grecaptcha
-    : window.grecaptcha?.enterprise
+  const grecaptchaApi = window.grecaptcha?.enterprise?.execute
+    ? window.grecaptcha.enterprise
+    : (window.grecaptcha?.execute ? window.grecaptcha : null)
 
   if (!grecaptchaApi || typeof grecaptchaApi.execute !== 'function') {
     throw new Error('Google reCAPTCHA execute tidak tersedia')
