@@ -622,6 +622,58 @@ const toggleOrderSelection = (orderId, checked) => {
   selectedOrderIds.value = selectedOrderIds.value.filter((selectedId) => selectedId !== id)
 }
 
+const askPrintAfterBulkPayment = async (paidOrderIds, totalAmount) => {
+  if (!paidOrderIds.length) return
+
+  const decision = await Swal.fire({
+    icon: 'success',
+    title: 'Pembayaran gabungan berhasil',
+    html: `${paidOrderIds.length} order dibayar. Total Rp <b>${format(totalAmount || 0)}</b><br/>Cetak struk sekarang?`,
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: 'Pilih & Print',
+    denyButtonText: 'Print Semua',
+    cancelButtonText: 'Nanti',
+    confirmButtonColor: '#c9a24d',
+    denyButtonColor: '#2dd46e',
+    background: '#111',
+    color: '#fff'
+  })
+
+  if (decision.isDenied) {
+    queueBulkPrint(paidOrderIds)
+    return
+  }
+
+  if (!decision.isConfirmed) return
+
+  const inputOptions = paidOrderIds.reduce((acc, id) => {
+    acc[id] = `Order #${id}`
+    return acc
+  }, {})
+
+  const pick = await Swal.fire({
+    title: 'Pilih order untuk dicetak',
+    input: 'select',
+    inputOptions,
+    inputPlaceholder: 'Pilih order',
+    showCancelButton: true,
+    confirmButtonText: 'Print',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#c9a24d',
+    background: '#111',
+    color: '#fff',
+    inputValidator: (value) => {
+      if (!value) return 'Pilih salah satu order'
+      return null
+    }
+  })
+
+  if (pick.isConfirmed && pick.value) {
+    await reprintReceipt(Number(pick.value))
+  }
+}
+
 const paySelectedOrders = async () => {
   if (selectedOrderIds.value.length === 0) return
 
@@ -641,21 +693,19 @@ const paySelectedOrders = async () => {
 
   try {
     loading.value = true
+    const requestedIds = [...selectedOrderIds.value]
     const { data } = await api.post('/orders/pay-bulk', {
-      order_ids: selectedOrderIds.value,
+      order_ids: requestedIds,
       payment_method: 'CASH'
     })
 
-    await Swal.fire({
-      icon: 'success',
-      title: 'Pembayaran gabungan berhasil',
-      text: `${data.paid_count || selectedOrderIds.value.length} order dibayar. Total Rp ${format(data.total || 0)}`,
-      background: '#111',
-      color: '#fff'
-    })
+    const paidOrderIds = Array.isArray(data?.paid_order_ids) && data.paid_order_ids.length
+      ? data.paid_order_ids.map((id) => Number(id))
+      : requestedIds
 
     selectedOrderIds.value = []
     await loadOrders()
+    await askPrintAfterBulkPayment(paidOrderIds, Number(data?.total || 0))
   } catch (err) {
     await Swal.fire({
       icon: 'error',
@@ -835,6 +885,29 @@ const getPageRange = () => {
 const showPrintModal = ref(false)
 const printOrder = ref(null)
 const printLoading = ref(false)
+const bulkPrintQueue = ref([])
+
+const queueBulkPrint = async (orderIds) => {
+  const queue = Array.isArray(orderIds)
+    ? orderIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
+    : []
+
+  if (!queue.length) return
+
+  bulkPrintQueue.value = queue
+  await openNextQueuedPrint()
+}
+
+const openNextQueuedPrint = async () => {
+  if (showPrintModal.value || printLoading.value) return
+  if (bulkPrintQueue.value.length === 0) return
+
+  const nextOrderId = bulkPrintQueue.value.shift()
+  if (!nextOrderId) return
+
+  await reprintReceipt(nextOrderId)
+}
+
 // 🖨️ REPRINT RECEIPT
 const reprintReceipt = async (orderId) => {
   try {
@@ -845,14 +918,16 @@ const reprintReceipt = async (orderId) => {
   } catch (err) {
     console.error("Failed to load order detail:", err)
     alert("Gagal memuat detail order")
+    await openNextQueuedPrint()
   } finally {
     printLoading.value = false
   }
 }
 
-const closePrintModal = () => {
+const closePrintModal = async () => {
   showPrintModal.value = false
   printOrder.value = null
+  await openNextQueuedPrint()
 }
 
 const printReceipt = () => {
