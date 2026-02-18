@@ -4,6 +4,7 @@
       <h2>MANAGER</h2>
       <nav>
         <button class="nav-btn" :class="{active:tab==='report'}" @click="tab='report'"><ChartNoAxesColumn size="18" /> Finance Report</button>
+        <button class="nav-btn" :class="{active:tab==='profile'}" @click="tab='profile'"><User size="18" /> Profile</button>
         <button class="nav-btn" :class="{active:tab==='payroll'}" @click="openPayrollTab"><Wallet size="18" /> Payroll Terapis</button>
         <button class="nav-btn" :class="{active:tab==='orders'}" @click="tab='orders'"><ReceiptText size="18" /> Orders</button>
         <button class="nav-btn" :class="{active:tab==='timers'}" @click="tab='timers'"><Timer size="18" /> Timers</button>
@@ -18,7 +19,11 @@
     </aside>
 
     <main class="content">
-      <section v-if="tab==='report'" class="page">
+      <section v-if="tab==='profile'" class="page">
+        <ProfilePasswordCard />
+      </section>
+
+      <section v-else-if="tab==='report'" class="page">
         <section class="card hero">
           <div>
             <h2>Manager Financial Dashboard</h2>
@@ -196,8 +201,9 @@ import Therapists from "../superadmin/Therapists.vue"
 import Rooms from "../superadmin/Rooms.vue"
 import Grades from "../superadmin/Grades.vue"
 import StockDashboard from "../stock/StockDashboard.vue"
+import ProfilePasswordCard from "../../components/ProfilePasswordCard.vue"
 import { useAuthStore } from "../../store/auth.store"
-import { ChartNoAxesColumn, Wallet, ReceiptText, Timer, Building2, BellRing, Users, DoorOpen, Package, Trophy, LogOut } from "lucide-vue-next"
+import { ChartNoAxesColumn, Wallet, ReceiptText, Timer, Building2, BellRing, Users, DoorOpen, Package, Trophy, LogOut, User } from "lucide-vue-next"
 
 const tab = ref("report")
 const branches = ref([])
