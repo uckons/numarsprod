@@ -994,12 +994,13 @@ const reprintReceipt = async (orderId) => {
   } catch (err) {
     console.error("Failed to load order detail:", err)
     alert("Gagal memuat detail order")
+    await openNextQueuedPrint()
   } finally {
     printLoading.value = false
   }
 }
 
-const closePrintModal = () => {
+const closePrintModal = async () => {
   showPrintModal.value = false
   printOrder.value = null
   bulkReceipt.value = null
