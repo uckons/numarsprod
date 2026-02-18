@@ -165,7 +165,7 @@ const changePassword = async () => {
         return false
       }
       if (!policy.test(new_password)) {
-        Swal.showValidationMessage('Password baru minimal 8 karakter dan wajib huruf besar, huruf kecil, angka, dan karakter khusus')
+        Swal.showValidationMessage('Password baru minimal 8 karakter dan wajib huruf besar, huruf kecil, angka, dan karakter khusus dan jangan gunakan tanda @')
         return false
       }
       return { current_password, new_password }

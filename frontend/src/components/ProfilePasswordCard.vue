@@ -63,7 +63,7 @@ const submitChangePassword = async () => {
     await Swal.fire({
       icon: 'warning',
       title: 'Password Tidak Valid',
-      text: 'Password baru minimal 8 karakter dan wajib huruf besar, huruf kecil, angka, dan karakter khusus.'
+      text: 'Password baru minimal 8 karakter dan wajib huruf besar, huruf kecil, angka, dan karakter khusus dan jangan gunakan tanda @'
     })
     return
   }
