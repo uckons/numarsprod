@@ -132,50 +132,67 @@ const loadTurnstileScript = () => new Promise((resolve, reject) => {
   document.head.appendChild(script)
 })
 
-const loadRecaptchaScript = () => new Promise((resolve, reject) => {
-  const existingApi = window.grecaptcha
-  if (existingApi && (typeof existingApi.render === 'function' || typeof existingApi.execute === 'function')) {
+const getRecaptchaApi = () => {
+  const recaptcha = window.grecaptcha
+  if (!recaptcha) return null
+  if (typeof recaptcha.render === 'function' || typeof recaptcha.execute === 'function') return recaptcha
+  if (recaptcha.enterprise && (typeof recaptcha.enterprise.render === 'function' || typeof recaptcha.enterprise.execute === 'function')) return recaptcha.enterprise
+  return null
+}
+
+const loadRecaptchaScript = () => new Promise(async (resolve, reject) => {
+  const existingApi = getRecaptchaApi()
+  if (existingApi) {
     resolve(existingApi)
     return
   }
 
-  const existingScript = document.querySelector('script[data-recaptcha="true"]')
-  if (existingScript) {
-    existingScript.addEventListener('load', async () => {
-      const api = await waitFor(() => {
-        const recaptcha = window.grecaptcha
-        if (!recaptcha) return null
-        if (typeof recaptcha.render === 'function' || typeof recaptcha.execute === 'function') return recaptcha
-        if (recaptcha.enterprise && (typeof recaptcha.enterprise.render === 'function' || typeof recaptcha.enterprise.execute === 'function')) return recaptcha.enterprise
-        return null
-      })
-      if (api) resolve(api)
-      else reject(new Error('Google reCAPTCHA API tidak siap'))
-    })
-    existingScript.addEventListener('error', () => reject(new Error('Gagal memuat Google reCAPTCHA')))
-    return
+  const waitApi = async () => waitFor(getRecaptchaApi)
+
+  const tryInject = (src, tag) => new Promise((res, rej) => {
+    const prev = document.querySelector(`script[data-recaptcha="${tag}"]`)
+    if (prev) {
+      prev.addEventListener('load', () => res(true), { once: true })
+      prev.addEventListener('error', () => rej(new Error(`Gagal memuat Google reCAPTCHA (${tag})`)), { once: true })
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = src
+    script.async = true
+    script.defer = true
+    script.dataset.recaptcha = tag
+    script.onload = () => res(true)
+    script.onerror = () => rej(new Error(`Gagal memuat Google reCAPTCHA (${tag})`))
+    document.head.appendChild(script)
+  })
+
+  const candidates = recaptchaMode === 'enterprise'
+    ? [
+        { tag: 'enterprise-keyed', src: `https://www.google.com/recaptcha/enterprise.js?render=${encodeURIComponent(recaptchaSiteKey || '')}` },
+        { tag: 'enterprise-explicit', src: 'https://www.google.com/recaptcha/enterprise.js?render=explicit' },
+        { tag: 'standard-explicit', src: 'https://www.google.com/recaptcha/api.js?render=explicit' }
+      ]
+    : [
+        { tag: 'standard-explicit', src: 'https://www.google.com/recaptcha/api.js?render=explicit' }
+      ]
+
+  const errors = []
+  for (const candidate of candidates) {
+    try {
+      await tryInject(candidate.src, candidate.tag)
+      const api = await waitApi()
+      if (api) {
+        resolve(api)
+        return
+      }
+      errors.push(`API tidak siap (${candidate.tag})`)
+    } catch (err) {
+      errors.push(err?.message || String(err))
+    }
   }
 
-  const script = document.createElement('script')
-  script.src = recaptchaMode === 'enterprise'
-    ? `https://www.google.com/recaptcha/enterprise.js?render=${encodeURIComponent(recaptchaSiteKey || 'explicit')}`
-    : 'https://www.google.com/recaptcha/api.js?render=explicit'
-  script.async = true
-  script.defer = true
-  script.dataset.recaptcha = 'true'
-  script.onload = async () => {
-    const api = await waitFor(() => {
-      const recaptcha = window.grecaptcha
-      if (!recaptcha) return null
-      if (typeof recaptcha.render === 'function' || typeof recaptcha.execute === 'function') return recaptcha
-      if (recaptcha.enterprise && (typeof recaptcha.enterprise.render === 'function' || typeof recaptcha.enterprise.execute === 'function')) return recaptcha.enterprise
-      return null
-    })
-    if (api) resolve(api)
-    else reject(new Error('Google reCAPTCHA API tidak siap'))
-  }
-  script.onerror = () => reject(new Error('Gagal memuat Google reCAPTCHA'))
-  document.head.appendChild(script)
+  reject(new Error(`Google reCAPTCHA gagal dimuat. Cek site key/domain/restriction. Detail: ${errors.join(' | ')}`))
 })
 
 const renderTurnstile = async () => {

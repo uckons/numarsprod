@@ -3,6 +3,9 @@ const bcrypt = require("bcrypt")
 const jwt = require("jsonwebtoken")
 const db = require("../../config/db")
 
+
+const isEnvFalse = (value) => ['0', 'false', 'no', 'off'].includes(String(value || '').toLowerCase())
+
 const verifyTurnstileToken = async ({ token, remoteip }) => {
   const secret = process.env.TURNSTILE_SECRET_KEY
   if (!secret) return { enabled: false, success: false }
@@ -134,6 +137,19 @@ const verifyRecaptchaEnterprise = async ({ token, remoteip, expectedAction }) =>
     const googleMessage = error?.response?.data?.error?.message || ""
     const googleStatus = error?.response?.data?.error?.status || ""
 
+    if (googleStatus === "PERMISSION_DENIED" && /referer/i.test(googleMessage)) {
+      return {
+        enabled: true,
+        success: false,
+        message: "Google reCAPTCHA Enterprise ditolak: API key diblokir oleh restriction referer",
+        errors: [
+          googleStatus,
+          googleMessage,
+          "Gunakan API key backend (IP/server restricted, bukan HTTP referer) atau nonaktifkan enterprise via RECAPTCHA_ENTERPRISE_ENABLED=false"
+        ].filter(Boolean)
+      }
+    }
+
     return {
       enabled: true,
       success: false,
@@ -145,7 +161,8 @@ const verifyRecaptchaEnterprise = async ({ token, remoteip, expectedAction }) =>
 
 const verifyRecaptchaToken = async ({ token, remoteip, expectedAction }) => {
   const secret = process.env.RECAPTCHA_SECRET_KEY
-  const enterpriseEnabled = Boolean(process.env.RECAPTCHA_ENTERPRISE_PROJECT_ID && process.env.RECAPTCHA_ENTERPRISE_API_KEY)
+  const enterpriseConfigured = Boolean(process.env.RECAPTCHA_ENTERPRISE_PROJECT_ID && process.env.RECAPTCHA_ENTERPRISE_API_KEY)
+  const enterpriseEnabled = enterpriseConfigured && !isEnvFalse(process.env.RECAPTCHA_ENTERPRISE_ENABLED)
 
   if (!secret && !enterpriseEnabled) return { enabled: false, success: false }
 
@@ -190,7 +207,15 @@ const verifyCaptchaToken = async ({ turnstileToken, recaptchaToken, remoteip, ex
   const turnstileEnabled = Boolean(process.env.TURNSTILE_SECRET_KEY)
 
   if (recaptchaEnabled) {
-    return verifyRecaptchaToken({ token: recaptchaToken, remoteip, expectedAction })
+    const recaptchaResult = await verifyRecaptchaToken({ token: recaptchaToken, remoteip, expectedAction })
+    if (recaptchaResult.success) return recaptchaResult
+
+    const recaptchaBlockedByPermission = (recaptchaResult.errors || []).some((err) => String(err).includes("PERMISSION_DENIED"))
+    if (turnstileEnabled && turnstileToken && recaptchaBlockedByPermission) {
+      return verifyTurnstileToken({ token: turnstileToken, remoteip })
+    }
+
+    return recaptchaResult
   }
 
   if (turnstileEnabled) {
