@@ -3,10 +3,9 @@ const bcrypt = require("bcrypt")
 const jwt = require("jsonwebtoken")
 const db = require("../../config/db")
 
-
 const verifyTurnstileToken = async ({ token, remoteip }) => {
   const secret = process.env.TURNSTILE_SECRET_KEY
-  if (!secret) return { enabled: false, success: true }
+  if (!secret) return { enabled: false, success: false }
 
   if (!token) {
     return { enabled: true, success: false, message: "Captcha Cloudflare wajib diisi" }
@@ -39,19 +38,70 @@ const verifyTurnstileToken = async ({ token, remoteip }) => {
   }
 }
 
+const verifyRecaptchaToken = async ({ token, remoteip }) => {
+  const secret = process.env.RECAPTCHA_SECRET_KEY
+  if (!secret) return { enabled: false, success: false }
+
+  if (!token) {
+    return { enabled: true, success: false, message: "Google reCAPTCHA wajib diisi" }
+  }
+
+  try {
+    const params = new URLSearchParams()
+    params.append("secret", secret)
+    params.append("response", token)
+    if (remoteip) params.append("remoteip", remoteip)
+
+    const { data } = await axios.post(
+      "https://www.google.com/recaptcha/api/siteverify",
+      params,
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 10000 }
+    )
+
+    if (!data?.success) {
+      return {
+        enabled: true,
+        success: false,
+        message: "Validasi Google reCAPTCHA gagal",
+        errors: Array.isArray(data?.["error-codes"]) ? data["error-codes"] : []
+      }
+    }
+
+    return { enabled: true, success: true }
+  } catch (error) {
+    return { enabled: true, success: false, message: "Google reCAPTCHA tidak dapat diverifikasi" }
+  }
+}
+
+const verifyCaptchaToken = async ({ turnstileToken, recaptchaToken, remoteip }) => {
+  const recaptchaEnabled = Boolean(process.env.RECAPTCHA_SECRET_KEY)
+  const turnstileEnabled = Boolean(process.env.TURNSTILE_SECRET_KEY)
+
+  if (recaptchaEnabled) {
+    return verifyRecaptchaToken({ token: recaptchaToken, remoteip })
+  }
+
+  if (turnstileEnabled) {
+    return verifyTurnstileToken({ token: turnstileToken, remoteip })
+  }
+
+  return { enabled: false, success: true }
+}
 
 exports.login = async (req, res) => {
   try {
-    const { username, password, turnstile_token } = req.body
+    const { username, password, turnstile_token, recaptcha_token } = req.body
 
     if (!username || !password) {
       return res.status(400).json({ message: "Username & password required" })
     }
 
-    const captchaCheck = await verifyTurnstileToken({
-      token: turnstile_token,
+    const captchaCheck = await verifyCaptchaToken({
+      turnstileToken: turnstile_token,
+      recaptchaToken: recaptcha_token,
       remoteip: req.ip
     })
+
     if (!captchaCheck.success) {
       return res.status(400).json({
         message: captchaCheck.message,
