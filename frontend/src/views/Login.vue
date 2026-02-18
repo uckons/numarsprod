@@ -331,7 +331,9 @@ const handleLogin = async () => {
     else if (role === "Terapis") router.push("/terapis")
     else router.push("/login")
   } catch (e) {
-    error.value = e.response?.data?.message || e.message || "Login gagal"
+    const baseMessage = e.response?.data?.message || e.message || "Login gagal"
+    const details = Array.isArray(e.response?.data?.errors) ? e.response.data.errors.filter(Boolean) : []
+    error.value = details.length ? `${baseMessage} (${details.join(", ")})` : baseMessage
   } finally {
     loading.value = false
     if (captchaProvider.value === 'turnstile' && window.turnstile && turnstileWidgetId !== null) {

@@ -65,15 +65,25 @@ const verifyRecaptchaStandard = async ({ token, remoteip, secret }) => {
 const verifyRecaptchaEnterprise = async ({ token, remoteip, expectedAction }) => {
   const projectId = process.env.RECAPTCHA_ENTERPRISE_PROJECT_ID
   const apiKey = process.env.RECAPTCHA_ENTERPRISE_API_KEY
+  const siteKey = process.env.RECAPTCHA_SITE_KEY || process.env.VITE_RECAPTCHA_SITE_KEY
 
   if (!projectId || !apiKey) {
     return { enabled: false, success: false }
   }
 
+  if (!siteKey) {
+    return {
+      enabled: true,
+      success: false,
+      message: "RECAPTCHA_SITE_KEY belum dikonfigurasi di backend",
+      errors: ["missing_site_key"]
+    }
+  }
+
   const payload = {
     event: {
       token,
-      siteKey: process.env.VITE_RECAPTCHA_SITE_KEY || process.env.RECAPTCHA_SITE_KEY,
+      siteKey,
       userIpAddress: remoteip || undefined,
       expectedAction: expectedAction || undefined
     }
@@ -121,7 +131,15 @@ const verifyRecaptchaEnterprise = async ({ token, remoteip, expectedAction }) =>
 
     return { enabled: true, success: true }
   } catch (error) {
-    return { enabled: true, success: false, message: "Google reCAPTCHA Enterprise tidak dapat diverifikasi" }
+    const googleMessage = error?.response?.data?.error?.message || ""
+    const googleStatus = error?.response?.data?.error?.status || ""
+
+    return {
+      enabled: true,
+      success: false,
+      message: "Google reCAPTCHA Enterprise tidak dapat diverifikasi",
+      errors: [googleStatus, googleMessage].filter(Boolean)
+    }
   }
 }
 
@@ -137,7 +155,20 @@ const verifyRecaptchaToken = async ({ token, remoteip, expectedAction }) => {
 
   if (enterpriseEnabled) {
     const enterpriseResult = await verifyRecaptchaEnterprise({ token, remoteip, expectedAction })
-    if (enterpriseResult.enabled) return enterpriseResult
+    if (enterpriseResult.success || !secret) return enterpriseResult
+    // fallback ke reCAPTCHA standard jika enterprise gagal tetapi secret standard tersedia
+    try {
+      const standardResult = await verifyRecaptchaStandard({ token, remoteip, secret })
+      if (standardResult.success) return standardResult
+      return {
+        enabled: true,
+        success: false,
+        message: enterpriseResult.message,
+        errors: [...(enterpriseResult.errors || []), ...(standardResult.errors || [])]
+      }
+    } catch (error) {
+      return enterpriseResult
+    }
   }
 
   if (secret) {
@@ -191,7 +222,6 @@ exports.login = async (req, res) => {
       })
     }
 
-    // Ambil juga nama user dan nama branch (jika ada)
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.password, u.name, u.branch_id, r.name AS role, b.name AS branch_name
        FROM users u
@@ -224,7 +254,6 @@ exports.login = async (req, res) => {
       { expiresIn: "24h" }
     )
 
-    // Kembalikan user object lengkap agar frontend punya name & branch_name
     res.json({
       token,
       user: {
