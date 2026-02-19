@@ -1973,61 +1973,49 @@ th {
     margin: 0;
   }
 
-  html,
-  body,
-  #app {
-    width: 58mm !important;
-    height: auto !important;
+  :global(html),
+  :global(body) {
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
   }
 
-  body * {
+  :global(body *) {
     visibility: hidden !important;
   }
 
-  .modal-overlay,
-  .modal-overlay * {
+  :global(#receipt-print),
+  :global(#receipt-print *) {
     visibility: visible !important;
   }
 
-  .modal-overlay {
-    position: static !important;
-    inset: auto !important;
-    display: block !important;
-    background: transparent !important;
-    animation: none !important;
+  :global(#receipt-print) {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 58mm !important;
     margin: 0 !important;
     padding: 0 !important;
-  }
-
-  .modal-content.print-modal {
+    background: #fff !important;
     border: none !important;
     border-radius: 0 !important;
-    padding: 0 !important;
-    max-width: none !important;
-    width: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-    background: transparent !important;
-    animation: none !important;
     box-shadow: none !important;
   }
 
-  .receipt-preview {
-    width: 58mm !important;
-    background: white;
-    padding: 0 !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-  }
-
-  .receipt {
+  :global(#receipt-print .receipt) {
     max-width: 58mm !important;
     margin: 0 !important;
     padding: 1mm 2mm 2mm !important;
+  }
+
+  :global(.modal-overlay),
+  :global(.modal-content.print-modal),
+  :global(.receipt-preview) {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    animation: none !important;
   }
 
   .modal-actions,
@@ -2035,6 +2023,7 @@ th {
     display: none !important;
   }
 }
+
 
 .receipt--compact .receipt-divider {
   margin: 6px 0;
