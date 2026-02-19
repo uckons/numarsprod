@@ -29,6 +29,16 @@
       </div>
 
       <div class="filter-group">
+        <label>Cabang:</label>
+        <select v-model="filters.branch_id" @change="fetchTherapists">
+          <option value="">Semua Cabang</option>
+          <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+            {{ branch.name }}
+          </option>
+        </select>
+      </div>
+
+      <div class="filter-group">
         <label>Cari:</label>
         <input 
           type="text" 
@@ -200,6 +210,7 @@ const submitting = ref(false)
 const filters = ref({
   grade_id: '',
   active: '',
+  branch_id: '',
   search: '',
   page: 1,
   limit: 25
@@ -256,6 +267,7 @@ const fetchTherapists = async () => {
 
     if (filters.value.grade_id) params.grade_id = filters.value.grade_id
     if (filters.value.active !== '') params.active = filters.value.active
+    if (filters.value.branch_id) params.branch_id = filters.value.branch_id
     if (filters.value.search) params.search = filters.value.search
 
     const res = await api.get('/therapists', { params })
@@ -309,6 +321,7 @@ const resetFilters = () => {
   filters.value = {
     grade_id: '',
     active: '',
+    branch_id: '',
     search: '',
     page: 1,
     limit: 25

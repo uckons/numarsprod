@@ -1,4 +1,7 @@
 
+const canAccessAllBranches = (role = '') => ['SuperAdmin', 'Manager', 'Owner'].includes(String(role))
+
+
 const ensureGradeCommissionStorage = async (db) => {
   await db.query(`
     ALTER TABLE therapist_grades
@@ -60,14 +63,15 @@ exports.getTherapists = async (req, res) => {
     let params = []
     let paramIndex = 1
 
-    // Filter by branch (if not super admin)
-    if (branch_id) {
+    // Filter by branch (strict for non-privileged roles)
+    const requestedBranchId = branch_id
+    const effectiveBranchId = canAccessAllBranches(req.user?.role)
+      ? requestedBranchId
+      : req.user?.branch_id
+
+    if (effectiveBranchId) {
       whereConditions.push(`t.branch_id = $${paramIndex}`)
-      params.push(branch_id)
-      paramIndex++
-    } else if (req.user.branch_id) {
-      whereConditions.push(`t.branch_id = $${paramIndex}`)
-      params.push(req.user.branch_id)
+      params.push(effectiveBranchId)
       paramIndex++
     }
 
