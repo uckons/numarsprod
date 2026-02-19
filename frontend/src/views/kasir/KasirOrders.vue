@@ -1974,42 +1974,62 @@ th {
   }
 
   html,
-  body {
-    width: 58mm;
+  body,
+  #app {
+    width: 58mm !important;
     height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
-    overflow: hidden;
-    background: #fff;
+    background: #fff !important;
   }
 
   body * {
-    visibility: hidden;
+    visibility: hidden !important;
   }
-  
-  .receipt-preview,
-  .receipt-preview * {
-    visibility: visible;
+
+  .modal-overlay,
+  .modal-overlay * {
+    visibility: visible !important;
   }
-  
+
+  .modal-overlay {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    background: transparent !important;
+    animation: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .modal-content.print-modal {
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: transparent !important;
+    animation: none !important;
+    box-shadow: none !important;
+  }
+
   .receipt-preview {
-    position: static;
-    left: auto;
-    top: auto;
-    width: 58mm;
+    width: 58mm !important;
     background: white;
-    padding: 0;
-    margin: 0;
-    border-radius: 0;
-    box-shadow: none;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
   }
 
   .receipt {
-    max-width: 58mm;
-    margin: 0;
-    padding: 1mm 2mm 2mm;
+    max-width: 58mm !important;
+    margin: 0 !important;
+    padding: 1mm 2mm 2mm !important;
   }
-  
+
   .modal-actions,
   .modal-close {
     display: none !important;
