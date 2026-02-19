@@ -335,7 +335,7 @@
 
       <!-- Print Preview -->
       <div class="receipt-preview" id="receipt-print">
-        <div v-if="!bulkReceipt" class="receipt">
+        <div v-if="!bulkReceipt" class="receipt" :class="{ 'receipt--compact': isCompactReceipt }">
           <!-- Header -->
           <div class="receipt-header">
             <h2>{{ printOrder?.branch_name || 'NUMARS SPA' }}</h2>
@@ -423,7 +423,7 @@
           </div>
         </div>
 
-        <div v-else class="receipt">
+        <div v-else class="receipt" :class="{ 'receipt--compact': isCompactReceipt }">
           <div class="receipt-header">
             <h2>{{ bulkReceipt.branch_name || 'NUMARS SPA' }}</h2>
             <p>{{ bulkReceipt.branch_address }}</p>
@@ -929,6 +929,10 @@ const showPrintModal = ref(false)
 const printOrder = ref(null)
 const bulkReceipt = ref(null)
 const printLoading = ref(false)
+const isCompactReceipt = computed(() => {
+  const itemCount = bulkReceipt.value?.items?.length ?? printOrder.value?.items?.length ?? 0
+  return itemCount > 0 && itemCount <= 3
+})
 
 const openBulkReceipt = async (orderIds, totalAmount, paymentMethod = 'CASH') => {
   const ids = Array.isArray(orderIds)
@@ -1964,28 +1968,86 @@ th {
 
 /* 🖨️ PRINT MEDIA QUERY */
 @media print {
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
+
+  html,
+  body,
+  #app {
+    width: 58mm !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
   body * {
-    visibility: hidden;
+    visibility: hidden !important;
   }
-  
-  .receipt-preview,
-  .receipt-preview * {
-    visibility: visible;
+
+  .modal-overlay,
+  .modal-overlay * {
+    visibility: visible !important;
   }
-  
+
+  .modal-overlay {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    background: transparent !important;
+    animation: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .modal-content.print-modal {
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    width: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: transparent !important;
+    animation: none !important;
+    box-shadow: none !important;
+  }
+
   .receipt-preview {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 58mm;
+    width: 58mm !important;
     background: white;
-    padding: 0;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
   }
-  
+
+  .receipt {
+    max-width: 58mm !important;
+    margin: 0 !important;
+    padding: 1mm 2mm 2mm !important;
+  }
+
   .modal-actions,
   .modal-close {
     display: none !important;
   }
+}
+
+.receipt--compact .receipt-divider {
+  margin: 6px 0;
+}
+
+.receipt--compact .item-row,
+.receipt--compact .info-row,
+.receipt--compact .total-row {
+  margin: 3px 0;
+}
+
+.receipt--compact .receipt-footer {
+  margin-top: 10px;
 }
 
 /* MOBILE RESPONSIVE PRINT MODAL */
