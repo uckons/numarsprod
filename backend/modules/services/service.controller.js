@@ -5,7 +5,12 @@ const canAccessAllBranches = (role = "") => ["SuperAdmin", "Manager", "Owner"].i
 exports.list = async (req, res) => {
   try {
     const role = req.user?.role
-    const branch_id = canAccessAllBranches(role) ? req.query.branch_id : req.user?.branch_id
+    const privileged = canAccessAllBranches(role)
+    const userBranch = req.user?.branch_id
+    if (!privileged && !userBranch) {
+      return res.status(403).json({ message: "Branch access denied" })
+    }
+    const branch_id = privileged && req.query.branch_id ? req.query.branch_id : userBranch
     const data = await service.list({
       ...req.query,
       branch_id
