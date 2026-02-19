@@ -1,8 +1,20 @@
 const service = require("./service.service")
 
+const canAccessAllBranches = (role = "") => ["SuperAdmin", "Manager", "Owner"].includes(String(role))
+
 exports.list = async (req, res) => {
   try {
-    const data = await service.list(req.query)
+    const role = req.user?.role
+    const privileged = canAccessAllBranches(role)
+    const userBranch = req.user?.branch_id
+    if (!privileged && !userBranch) {
+      return res.status(403).json({ message: "Branch access denied" })
+    }
+    const branch_id = privileged && req.query.branch_id ? req.query.branch_id : userBranch
+    const data = await service.list({
+      ...req.query,
+      branch_id
+    })
     res.json(data)
   } catch (err) {
     console.error(err)
@@ -88,7 +100,10 @@ exports.toggleStatus = async (req, res) => {
  */
 exports.getByType = async (req, res) => {
   try {
-    const branch_id = req.query.branch_id || req.user.branch_id
+    const role = req.user?.role
+    const branch_id = canAccessAllBranches(role)
+      ? (req.query.branch_id || req.user.branch_id)
+      : req.user.branch_id
     const type = req.query.type
 
     if (!type) {
