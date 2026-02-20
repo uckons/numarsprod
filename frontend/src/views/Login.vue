@@ -12,7 +12,7 @@
         <div v-else class="logo-circle">S</div>
       </div>
       <h1>SKY ePOS</h1>
-      <p class="subtitle">NUMARS POS SYSTEMS</p>
+      <p class="subtitle">SKY ePOS SYSTEMS</p>
       <p class="subtitle subtitle-login">System Login</p>
 
       <form class="login-form" @submit.prevent="handleLogin">

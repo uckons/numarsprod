@@ -3,7 +3,7 @@
     <!-- HEADER -->
     <header class="topbar">
       <div>
-        <h1>NUMARS POS</h1>
+        <h1>SKY ePOS</h1>
         <p>Owner Dashboard</p>
       </div>
       <button class="logout" @click="logout">Logout</button>

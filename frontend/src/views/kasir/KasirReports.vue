@@ -221,10 +221,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api'
+import { useAuthStore } from '@/store/auth.store'
 import Swal from 'sweetalert2'
 import ApexChart from '@/components/ApexChart.vue'
 
 const router = useRouter()
+const auth = useAuthStore()
 const loading = ref(false)
 const dateFromEl = ref(null)
 const dateToEl = ref(null)
@@ -356,6 +358,11 @@ const printPosReport = () => {
   const reportWindow = window.open('', '_blank', 'width=380,height=760')
   if (!reportWindow) return
 
+  const outletName = auth.user?.branch_name
+    || auth.user?.branch
+    || auth.user?.branch?.name
+    || 'Outlet'
+
   const esc = (value) => String(value || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -390,8 +397,9 @@ const printPosReport = () => {
     </style>
     </head><body>
       <div class="wrap">
-        <div class="center"><strong>NUMARS POS</strong></div>
+        <div class="center"><strong>SKY ePOS</strong></div>
         <div class="center">REKAP PENDAPATAN</div>
+        <div class="center">${esc(outletName)}</div>
         <div class="line"></div>
         <div class="row"><span>Periode</span><span>${esc(analytics.value.range.from)} - ${esc(analytics.value.range.to)}</span></div>
         <div class="line"></div>
