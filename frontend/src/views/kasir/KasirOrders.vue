@@ -1020,7 +1020,11 @@ const receiptPrintStyles = `
     padding: 0;
     width: 58mm;
     background: #fff;
-    font-family: 'Roboto Mono', 'Courier New', monospace;
+    font-family: 'Courier New', 'Liberation Mono', monospace;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: none;
     -webkit-text-size-adjust: 100%;
     print-color-adjust: exact;
   }
@@ -1034,8 +1038,8 @@ const receiptPrintStyles = `
     line-height: 1.25;
   }
   .receipt {
-    width: 48mm;
-    max-width: 48mm;
+    width: 47mm;
+    max-width: 47mm;
     margin: 0;
     padding: 1.2mm 0 2mm;
   }
@@ -1076,9 +1080,9 @@ const receiptPrintStyles = `
     font-size: 10px;
     color: #333;
   }
-  .item-subtotal { font-weight: 700; text-align: right; }
-  .total-row:first-child { font-size: 12px; font-weight: 700; margin-top: 8px; }
-  .total-amount { font-weight: 700; font-size: 12px; }
+  .item-subtotal { font-weight: 600; text-align: right; }
+  .total-row:first-child { font-size: 11px; font-weight: 700; margin-top: 8px; }
+  .total-amount { font-weight: 700; font-size: 11px; }
   .payment-method { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #666; font-style: italic; }
   .receipt-footer { text-align: center; margin-top: 12px; font-size: 10px; }
   .receipt-footer p { margin: 3px 0; }
@@ -1089,6 +1093,10 @@ const receiptPrintStyles = `
   .receipt--compact .info-row,
   .receipt--compact .total-row { margin: 3px 0; }
   .receipt--compact .receipt-footer { margin-top: 10px; }
+  .info-row span,
+  .total-row span,
+  .item-name,
+  .item-detail span { page-break-inside: avoid; }
 `
 
 const printReceipt = () => {
@@ -1116,11 +1124,17 @@ const printReceipt = () => {
     </html>
   `)
   printWindow.document.close()
-  printWindow.focus()
-  setTimeout(() => {
+
+  const triggerPrint = () => {
+    printWindow.focus()
     printWindow.print()
+  }
+
+  printWindow.onafterprint = () => {
     printWindow.close()
-  }, 250)
+  }
+
+  setTimeout(triggerPrint, 450)
 }
 
 // 🖨️ FORMAT CURRENCY

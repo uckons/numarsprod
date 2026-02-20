@@ -384,14 +384,18 @@ const printPosReport = () => {
       @page { size: 58mm auto; margin: 0; }
       html, body { margin: 0; padding: 0; width: 58mm; background: #fff; }
       body {
-        font-family: 'Roboto Mono', 'Courier New', monospace;
-        font-size: 9px;
+        font-family: 'Courier New', 'Liberation Mono', monospace;
+        font-weight: 400;
+        letter-spacing: 0;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: none;
+        font-size: 8.5px;
         line-height: 1.2;
         -webkit-text-size-adjust: 100%;
         print-color-adjust: exact;
       }
       * { box-sizing: border-box; }
-      .wrap { width: 48mm; margin: 0 auto; padding: 1.5mm 0 2mm; }
+      .wrap { width: 47mm; margin: 0 auto; padding: 1.5mm 0 2mm; }
       .center { text-align: center; }
       .line { border-top: 1px dashed #111; margin: 1.25mm 0; }
       .row { display: flex; justify-content: space-between; gap: 2mm; }
@@ -399,8 +403,8 @@ const printPosReport = () => {
       .item-row { margin: 0.75mm 0; }
       .item-name { font-weight: 700; overflow-wrap: anywhere; }
       .item-sub { color: #222; }
-      .item-subtotal { text-align: right; font-weight: 700; }
-      .total { font-size: 10px; font-weight: 800; }
+      .item-subtotal { text-align: right; font-weight: 600; }
+      .total { font-size: 9.5px; font-weight: 700; }
     </style>
     </head><body>
       <div class="wrap">
