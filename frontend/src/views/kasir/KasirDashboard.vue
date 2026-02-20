@@ -3,7 +3,7 @@
     <!-- TOP BAR -->
         <header class="topbar">
       <div class="brand">
-        <h1>NUMARS POS</h1>
+        <h1>SKY ePOS</h1>
         <span class="branch">{{auth.user?.branch_name
         || auth.user?.branch
         || auth.user?.branch?.name

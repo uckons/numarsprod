@@ -131,7 +131,8 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
-  if (to.meta.auth && !auth.isLoggedIn) return "/login"
+  const needsAuth = Boolean(to.meta.auth || to.meta.requiresAuth)
+  if (needsAuth && !auth.isLoggedIn) return "/login"
   if (to.meta.roles && !to.meta.roles.includes(auth.role)) return "/login"
 })
 

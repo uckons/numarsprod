@@ -35,7 +35,16 @@ module.exports = async (req, res, next) => {
 
     next()
   } catch (err) {
-    console.error("AUTH ERROR", err)
-    res.status(401).json({ message: "Invalid token" })
+    if (err?.name === "TokenExpiredError") {
+      console.warn(`AUTH WARN token expired: ${req.method} ${req.originalUrl}`)
+      return res.status(401).json({
+        message: "Token expired",
+        code: "TOKEN_EXPIRED",
+        expired_at: err.expiredAt
+      })
+    }
+
+    console.error("AUTH ERROR", err?.message || err)
+    res.status(401).json({ message: "Invalid token", code: "INVALID_TOKEN" })
   }
 }
