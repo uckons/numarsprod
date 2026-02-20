@@ -2,7 +2,7 @@
   <div class="pos-layout">
     <!-- HEADER -->
     <header class="pos-header">
-      <h2>NUMARS POS</h2>
+      <h2>SKY ePOS</h2>
 
       <div class="right">
         <!-- <span>{{ user.name }}</span> -->

@@ -14,4 +14,32 @@ api.interceptors.request.use(config => {
   return config
 })
 
+let isHandlingExpiredToken = false
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status
+    const code = error?.response?.data?.code
+
+    if (status === 401 && (code === "TOKEN_EXPIRED" || code === "INVALID_TOKEN")) {
+      const auth = useAuthStore()
+      auth.logout()
+
+      if (!isHandlingExpiredToken) {
+        isHandlingExpiredToken = true
+        const path = window.location.pathname || ""
+        if (path !== "/login") {
+          window.location.href = "/login"
+        }
+        setTimeout(() => {
+          isHandlingExpiredToken = false
+        }, 250)
+      }
+    }
+
+    return Promise.reject(error)
+  }
+)
+
 export default api
