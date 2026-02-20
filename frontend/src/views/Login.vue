@@ -12,8 +12,8 @@
         <div v-else class="logo-circle">S</div>
       </div>
       <h1>SKY ePOS</h1>
-      <p class="subtitle">SKY ePOS SYSTEMS</p>
-      <p class="subtitle subtitle-login">System Login</p>
+      <p class="subtitle">Dibuat Khusus Untuk NUMARS </p>
+      <p class="subtitle subtitle-login">Silahkan Login</p>
 
       <form class="login-form" @submit.prevent="handleLogin">
         <input
