@@ -12,15 +12,17 @@
       <table>
         <thead>
           <tr>
-            <th>Name</th><th>Address</th><th>Operating Hours</th><th>Users</th><th>Status</th><th width="260">Actions</th>
+            <th>Name</th><th>Address</th><th>Phone</th><th>Logo</th><th>Operating Hours</th><th>Users</th><th>Status</th><th width="260">Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-if="loading"><td colspan="6" class="empty">Loading...</td></tr>
-          <tr v-else-if="!branches.length"><td colspan="6" class="empty">No branches found</td></tr>
+          <tr v-if="loading"><td colspan="8" class="empty">Loading...</td></tr>
+          <tr v-else-if="!branches.length"><td colspan="8" class="empty">No branches found</td></tr>
           <tr v-else v-for="b in branches" :key="b.id" class="row">
             <td class="bold">{{ b.name }}</td>
             <td>{{ b.address || '-' }}</td>
+            <td>{{ b.phone || '-' }}</td>
+            <td><img v-if="b.logo_url" :src="b.logo_url" class="logo-thumb" alt="logo" /><span v-else>-</span></td>
             <td>{{ b.open_time }} - {{ b.close_time }}</td>
             <td>{{ b.user_count || 0 }}</td>
             <td><span class="badge" :class="b.is_active ? 'success' : 'danger'">{{ b.is_active ? 'ACTIVE' : 'DISABLED' }}</span></td>
@@ -112,4 +114,5 @@ td { padding: 10px; border-top: 1px solid #222; }
 .actions .btn-gold { border-color: #c9a24d; color: #c9a24d; }
 .btn-primary { background: #c9a24d; color: #000; border: none; border-radius: 8px; padding: 10px 16px; cursor: pointer; }
 .empty { text-align: center; color: #888; }
+.logo-thumb { width: 42px; height: 42px; object-fit: contain; border-radius: 6px; background: #fff; }
 </style>

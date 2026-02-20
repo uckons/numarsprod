@@ -5,6 +5,12 @@
 
       <input v-model="form.name" placeholder="Branch name" />
       <input v-model="form.address" placeholder="Address" />
+      <input v-model="form.phone" placeholder="Phone" />
+
+      <label class="file-label">Logo Outlet</label>
+      <input type="file" accept="image/*" @change="onLogoChange" />
+      <input v-model="form.logo_url" placeholder="atau paste URL logo" />
+      <img v-if="form.logo_url" :src="form.logo_url" class="logo-preview" alt="logo preview" />
 
       <div class="row">
         <input type="time" v-model="form.open_time" />
@@ -33,6 +39,8 @@ const props = defineProps({ edit: Boolean, data: Object })
 const form = ref({
   name: "",
   address: "",
+  phone: "",
+  logo_url: "",
   open_time: "10:00",
   close_time: "03:00"
 })
@@ -102,6 +110,16 @@ const save = async () => {
     loading.value = false
   }
 }
+
+const onLogoChange = (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    form.value.logo_url = String(reader.result || "")
+  }
+  reader.readAsDataURL(file)
+}
 </script>
 
 <style scoped>
@@ -128,6 +146,24 @@ input {
   background: black;
   border: 1px solid #333;
   color: white;
+}
+
+.file-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #ddd;
+  font-size: 13px;
+}
+
+.logo-preview {
+  max-width: 120px;
+  max-height: 80px;
+  object-fit: contain;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 10px;
+  background: #0b0b0b;
 }
 
 .row {
