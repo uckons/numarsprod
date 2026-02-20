@@ -1011,6 +1011,7 @@ const closePrintModal = async () => {
 }
 
 const receiptPrintStyles = `
+  /* TM-58V profile: CMD ESC, Font 12x24, LF, Max dots 128, CP437 */
   @page {
     size: 58mm auto;
     margin: 0;
@@ -1020,10 +1021,10 @@ const receiptPrintStyles = `
     padding: 0;
     width: 58mm;
     background: #fff;
-    font-family: 'Courier New', 'Liberation Mono', monospace;
+    font-family: 'Courier New', monospace;
     font-weight: 400;
     letter-spacing: 0;
-    text-rendering: optimizeLegibility;
+    text-rendering: geometricPrecision;
     -webkit-font-smoothing: none;
     -webkit-text-size-adjust: 100%;
     print-color-adjust: exact;
@@ -1035,11 +1036,11 @@ const receiptPrintStyles = `
     margin: 0;
     padding: 0;
     font-size: 10px;
-    line-height: 1.25;
+    line-height: 1.2;
   }
   .receipt {
-    width: 47mm;
-    max-width: 47mm;
+    width: 42mm;
+    max-width: 42mm;
     margin: 0;
     padding: 1.2mm 0 2mm;
   }
@@ -1048,12 +1049,12 @@ const receiptPrintStyles = `
     margin-bottom: 10px;
   }
   .receipt-header h2 {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     margin: 0 0 5px;
     text-transform: uppercase;
   }
-  .receipt-header p { font-size: 10px; margin: 2px 0; }
+  .receipt-header p { font-size: 9px; margin: 2px 0; }
   .receipt-divider { text-align: center; margin: 8px 0; font-size: 9px; color: #333; }
   .receipt-info, .receipt-items, .receipt-total { margin: 10px 0; }
   .info-row, .total-row {
@@ -1073,17 +1074,17 @@ const receiptPrintStyles = `
     border-bottom: 1px dashed #666;
   }
   .item-row { margin: 6px 0; }
-  .item-name { font-size: 10px; font-weight: 700; margin-bottom: 3px; }
+  .item-name { font-size: 9px; font-weight: 700; margin-bottom: 3px; }
   .item-detail {
     display: grid;
     grid-template-columns: 2fr 1fr 1.5fr;
-    font-size: 10px;
+    font-size: 9px;
     color: #333;
   }
   .item-subtotal { font-weight: 600; text-align: right; }
   .total-row:first-child { font-size: 11px; font-weight: 700; margin-top: 8px; }
   .total-amount { font-weight: 700; font-size: 11px; }
-  .payment-method { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #666; font-style: italic; }
+  .payment-method { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #666; font-style: normal; }
   .receipt-footer { text-align: center; margin-top: 12px; font-size: 10px; }
   .receipt-footer p { margin: 3px 0; }
   .reprint-note { margin-top: 10px; font-weight: 700; font-size: 10px; color: #666; }
@@ -1231,7 +1232,7 @@ th, td {
   padding: 12px;
   text-align: left;
   border-bottom: 1px solid #222;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 th {
@@ -1493,7 +1494,7 @@ th {
 
 .result-count {
   margin-top: 16px;
-  font-size: 13px;
+  font-size: 12px;
   color: #888;
   font-weight: 600;
 }
@@ -1560,7 +1561,7 @@ th {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .per-page label {
@@ -1574,7 +1575,7 @@ th {
   color: #fff;
   padding: 8px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   outline: none;
@@ -1602,7 +1603,7 @@ th {
   color: #fff;
   padding: 8px 16px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -1631,7 +1632,7 @@ th {
   color: #fff;
   padding: 8px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   min-width: 40px;
@@ -1662,7 +1663,7 @@ th {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .jump-to-page label {
@@ -1676,7 +1677,7 @@ th {
   color: #fff;
   padding: 8px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   width: 60px;
   text-align: center;
   outline: none;
@@ -1694,7 +1695,7 @@ th {
   color: #000;
   padding: 8px 16px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
