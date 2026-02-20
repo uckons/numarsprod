@@ -1,6 +1,13 @@
 const escpos = require("escpos")
 escpos.USB = require("escpos-usb")
 
+const THERMAL_PROFILE = {
+  lineFeedMode: "LF",
+  maxDots: 128,
+  font: "A_12x24",
+  codePage: 0 // CP437
+}
+
 exports.printOrder = async (order) => {
   const device = new escpos.USB()
   const printer = new escpos.Printer(device)
@@ -10,8 +17,12 @@ exports.printOrder = async (order) => {
       if (err) return reject(err)
 
       printer
+        .raw(Buffer.from([0x1b, 0x40])) // ESC @ Initialize
+        .raw(Buffer.from([0x1b, 0x74, THERMAL_PROFILE.codePage])) // ESC t n : CP437
+        .raw(Buffer.from([0x1b, 0x21, 0x00])) // ESC ! n : Font A 12x24, normal
+        .raw(Buffer.from([0x1b, 0x20, 0x00])) // ESC SP n : right spacing 0
+        .raw(Buffer.from([0x1b, 0x33, 30])) // ESC 3 n : line spacing default 30
         .align("CT")
-        .style("B")
         .size(1,1)
         .text("NUMARS POS")
         .text("------------------------")
@@ -32,6 +43,7 @@ exports.printOrder = async (order) => {
         .text("")
         .text(new Date().toLocaleString("id-ID"))
         .cut()
+        .raw(Buffer.from([0x0a])) // LF
         .close()
 
       resolve(true)
