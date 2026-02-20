@@ -1024,8 +1024,7 @@ const receiptPrintStyles = `
     font-family: 'Courier New', monospace;
     font-weight: 400;
     letter-spacing: 0;
-    text-rendering: geometricPrecision;
-    -webkit-font-smoothing: none;
+    text-rendering: auto;
     -webkit-text-size-adjust: 100%;
     print-color-adjust: exact;
   }
@@ -1039,8 +1038,8 @@ const receiptPrintStyles = `
     line-height: 1.2;
   }
   .receipt {
-    width: 42mm;
-    max-width: 42mm;
+    width: 46mm;
+    max-width: 46mm;
     margin: 0;
     padding: 1.2mm 0 2mm;
   }
@@ -1054,7 +1053,7 @@ const receiptPrintStyles = `
     margin: 0 0 5px;
     text-transform: uppercase;
   }
-  .receipt-header p { font-size: 9px; margin: 2px 0; }
+  .receipt-header p { font-size: 10px; margin: 2px 0; }
   .receipt-divider { text-align: center; margin: 8px 0; font-size: 9px; color: #333; }
   .receipt-info, .receipt-items, .receipt-total { margin: 10px 0; }
   .info-row, .total-row {
@@ -1074,11 +1073,11 @@ const receiptPrintStyles = `
     border-bottom: 1px dashed #666;
   }
   .item-row { margin: 6px 0; }
-  .item-name { font-size: 9px; font-weight: 700; margin-bottom: 3px; }
+  .item-name { font-size: 10px; font-weight: 700; margin-bottom: 3px; }
   .item-detail {
     display: grid;
     grid-template-columns: 2fr 1fr 1.5fr;
-    font-size: 9px;
+    font-size: 10px;
     color: #333;
   }
   .item-subtotal { font-weight: 600; text-align: right; }

@@ -388,24 +388,23 @@ const printPosReport = () => {
         font-family: 'Courier New', monospace;
         font-weight: 400;
         letter-spacing: 0;
-        text-rendering: geometricPrecision;
-        -webkit-font-smoothing: none;
-        font-size: 8px;
+        text-rendering: auto;
+        font-size: 9px;
         line-height: 1.2;
         -webkit-text-size-adjust: 100%;
         print-color-adjust: exact;
       }
       * { box-sizing: border-box; }
-      .wrap { width: 42mm; margin: 0 auto; padding: 1.5mm 0 2mm; }
+      .wrap { width: 46mm; margin: 0 auto; padding: 1.5mm 0 2mm; }
       .center { text-align: center; }
       .line { border-top: 1px dashed #111; margin: 1.25mm 0; }
       .row { display: flex; justify-content: space-between; gap: 2mm; }
-      .section-title { margin: 0 0 1mm; font-weight: 700; font-size: 8.5px; }
+      .section-title { margin: 0 0 1mm; font-weight: 700; font-size: 9px; }
       .item-row { margin: 0.75mm 0; }
       .item-name { font-weight: 700; overflow-wrap: anywhere; }
       .item-sub { color: #222; }
       .item-subtotal { text-align: right; font-weight: 600; }
-      .total { font-size: 8.5px; font-weight: 700; }
+      .total { font-size: 9px; font-weight: 700; }
     </style>
     </head><body>
       <div class="wrap">
