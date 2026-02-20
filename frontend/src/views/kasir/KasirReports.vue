@@ -356,7 +356,7 @@ const printPosReport = () => {
   const reportWindow = window.open('', '_blank', 'width=380,height=760')
   if (!reportWindow) return
 
-  const line = '--------------------------------'
+  const line = '------------------------------'
   const textRows = [
     'NUMARS POS - RECAP PENDAPATAN',
     `Periode: ${analytics.value.range.from} s/d ${analytics.value.range.to}`,
@@ -383,9 +383,25 @@ const printPosReport = () => {
   reportWindow.document.write(`
     <html><head><title>POS Report</title>
     <style>
-      @media print { @page { size: 80mm auto; margin: 2mm; } }
-      body { font-family: 'Courier New', monospace; width: 72mm; font-size: 11px; margin: 0 auto; }
-      pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
+      @media print { @page { size: 58mm auto; margin: 1.5mm; } }
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #fff;
+      }
+      body {
+        font-family: 'Courier New', monospace;
+        width: 54mm;
+        font-size: 10px;
+        line-height: 1.3;
+        margin: 0 auto;
+      }
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        margin: 0;
+      }
     </style>
     </head><body><pre>${textRows.join('\n')}</pre></body></html>
   `)

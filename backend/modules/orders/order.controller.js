@@ -1275,6 +1275,8 @@ exports.getById = async (req, res) => {
 exports.getOrderDetail = async (req, res) => {
   try {
     const db = req.app.get("db")
+    await db.query(`ALTER TABLE branches ADD COLUMN IF NOT EXISTS phone VARCHAR(40)`) 
+    await db.query(`ALTER TABLE branches ADD COLUMN IF NOT EXISTS logo_url TEXT`)
     const orderId = parseOrderId(req.params.id)
     const branchId = req.user.branch_id
 
@@ -1290,6 +1292,8 @@ exports.getOrderDetail = async (req, res) => {
         r.name AS room_name,
         b.name AS branch_name,
         b.address AS branch_address,
+        b.phone AS branch_phone,
+        b.logo_url AS branch_logo_url,
         u.name AS cashier_name
       FROM orders o
       LEFT JOIN therapists th ON th.id = o.therapist_id
@@ -1352,9 +1356,6 @@ exports.getOrderDetail = async (req, res) => {
     order.payment_amount = order.total
     order.change_amount = 0
     
-    // Set default phone (column doesn't exist in branches table)
-    order.branch_phone = "021-xxx-xxxx"
-
     await writeAuditEntry(db, req.user?.id, "ORDER_REPRINT_VIEW", { order_id: orderId, branch_id: branchId })
 
     res.json(order)
