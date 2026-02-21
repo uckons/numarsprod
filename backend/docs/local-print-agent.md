@@ -163,7 +163,7 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
 3. Set manual IP/port (dua pilihan):
 
    **A. Via Environment Variables**
-   - `PRINT_AGENT_HOST` (contoh: `+` untuk semua interface, atau `192.168.1.10`)
+   - `PRINT_AGENT_HOST` (default `localhost`; gunakan `+` atau IP spesifik jika butuh akses dari VPS/LAN)
    - `PRINT_AGENT_PORT` (default `19000`)
    - `PRINT_AGENT_TOKEN` (token auth, optional)
    - `PRINT_AGENT_PRINTER` (nama printer Windows; kalau kosong pakai default printer)
@@ -172,7 +172,7 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
 
 ```json
 {
-  "host": "+",
+  "host": "localhost",
   "port": "19000",
   "token": "secret123",
   "printerName": "EPSON TM-T82 Receipt"
@@ -191,3 +191,29 @@ PRINT_AGENT_TOKEN=secret123
 ```
 
 Jadi ini cocok untuk tim yang tidak ingin instal/runtime Node.js di kasir.
+
+
+### Troubleshooting `HttpListenerException: Access is denied`
+
+Jika agent .NET error:
+
+- `System.Net.HttpListenerException: Access is denied`
+
+penyebabnya biasanya URL ACL Windows belum diizinkan untuk host/port tersebut.
+
+Perbaikan:
+
+1. Paling aman: pakai host `localhost` (default) saat uji lokal.
+2. Jika harus bind ke IP/LAN, jalankan CMD **as Administrator** lalu daftarkan URL ACL:
+
+```cmd
+netsh http add urlacl url=http://+:19000/ user=Everyone
+```
+
+Atau untuk IP spesifik:
+
+```cmd
+netsh http add urlacl url=http://192.168.1.10:19000/ user=Everyone
+```
+
+3. Restart agent setelah URL ACL berhasil ditambahkan.

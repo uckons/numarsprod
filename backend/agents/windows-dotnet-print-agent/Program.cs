@@ -5,7 +5,7 @@ using System.Text.Json;
 
 var config = AgentConfig.Load();
 
-var host = Environment.GetEnvironmentVariable("PRINT_AGENT_HOST") ?? config.Host ?? "+";
+var host = Environment.GetEnvironmentVariable("PRINT_AGENT_HOST") ?? config.Host ?? "localhost";
 var port = Environment.GetEnvironmentVariable("PRINT_AGENT_PORT") ?? config.Port ?? "19000";
 var token = Environment.GetEnvironmentVariable("PRINT_AGENT_TOKEN") ?? config.Token ?? string.Empty;
 var printerName = Environment.GetEnvironmentVariable("PRINT_AGENT_PRINTER") ?? config.PrinterName ?? string.Empty;
@@ -13,7 +13,19 @@ var printerName = Environment.GetEnvironmentVariable("PRINT_AGENT_PRINTER") ?? c
 var prefix = $"http://{host}:{port}/";
 var listener = new HttpListener();
 listener.Prefixes.Add(prefix);
-listener.Start();
+
+try
+{
+    listener.Start();
+}
+catch (HttpListenerException ex) when (ex.ErrorCode == 5)
+{
+    Console.WriteLine("[ERROR] HttpListener access denied.");
+    Console.WriteLine($"[HINT] Jalankan sebagai Administrator, atau daftarkan URL ACL:");
+    Console.WriteLine($"       netsh http add urlacl url={prefix} user=Everyone");
+    Console.WriteLine("[HINT] Alternatif paling mudah: pakai host=localhost di agent-config.json / PRINT_AGENT_HOST.");
+    throw;
+}
 
 Console.WriteLine($"[windows-dotnet-print-agent] listening on {prefix}");
 Console.WriteLine(string.IsNullOrWhiteSpace(printerName)
