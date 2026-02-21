@@ -1166,18 +1166,19 @@ const sendToThermalPrinter = async () => {
       })
     }
 
+    await closePrintModal()
     await Swal.fire({
       icon: 'success',
-      title: 'Berhasil',
-      text: 'Struk sudah dikirim ke printer thermal tanpa dialog browser.',
+      title: 'Print berhasil',
+      text: 'Struk order berhasil dikirim ke printer.',
       background: '#111',
       color: '#fff'
     })
-    await closePrintModal()
   } catch (err) {
+    await closePrintModal()
     await Swal.fire({
       icon: 'error',
-      title: 'Gagal kirim ke printer thermal',
+      title: 'Gagal kirim ke printer',
       text: err.response?.data?.message || err.message || 'Terjadi kesalahan',
       background: '#111',
       color: '#fff'

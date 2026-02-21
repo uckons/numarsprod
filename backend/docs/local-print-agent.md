@@ -157,6 +157,7 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
   - `GET /uix` (UIX local untuk cek status/test print/update config runtime)
   - `GET /health`
   - `GET /printers` (daftar printer terdeteksi + default printer)
+  - `GET /ports` (daftar port USB/COM untuk direct mode)
   - `GET /config`
   - `POST /config/update`
   - `POST /print/test`
@@ -173,7 +174,8 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
    - `PRINT_AGENT_PORT` (default `19000`)
    - `PRINT_AGENT_TOKEN` (token auth, optional)
    - `PRINT_AGENT_PRINTER` (nama printer Windows; kalau kosong pakai default printer)
-  - `PRINT_AGENT_DATATYPE` (default `AUTO`: hanya `RAW` lalu `RAW + FF` untuk kompatibilitas thermal. Gunakan `AUTO_EXTENDED` jika ingin fallback tambahan `NT EMF` dan `TEXT`; jika diisi `RAW`, agent hanya mencoba mode RAW; jika diisi `TEXT`, agent hanya pakai `TEXT`)
+  - `PRINT_AGENT_PORT_NAME` (opsional, contoh `USB001`/`COM3` untuk direct-port bypass spooler)
+  - `PRINT_AGENT_DATATYPE` (default `AUTO`: hanya `RAW` lalu `RAW + FF` untuk kompatibilitas thermal. Gunakan `AUTO_EXTENDED` jika ingin fallback tambahan `NT EMF` dan `TEXT`; gunakan `GDI_RECEIPT` untuk layout struk yang lebih mirip preview browser; jika diisi `RAW`, agent hanya mencoba mode RAW; jika diisi `TEXT`, agent hanya pakai `TEXT`)
 
    **B. Via file config `agent-config.json`** di folder hasil build EXE (copy dari `agent-config.example.json`):
 
@@ -183,7 +185,8 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
   "port": "19000",
   "token": "secret123",
   "printerName": "EPSON TM-T82 Receipt",
-  "dataType": "AUTO"
+  "dataType": "AUTO",
+  "portName": "USB001"
 }
 ```
 
@@ -358,9 +361,11 @@ Di PC kasir tetap lakukan langkah ini setelah pull terbaru:
 Jika agent mengembalikan error ini, driver printer tidak menerima `RAW` pada `StartDocPrinter`.
 
 Perbaikan yang sudah diterapkan:
+- Jika `PRINT_AGENT_PORT_NAME` diisi, agent akan coba direct-port dulu (bypass spooler).
 - Agent sekarang memakai aturan berikut:
 - `PRINT_AGENT_DATATYPE=AUTO` (atau kosong): fokus thermal (`RAW` -> `RAW + FF`).
 - `PRINT_AGENT_DATATYPE=AUTO_EXTENDED`: fallback lengkap (`RAW` -> `RAW + FF` -> `NT EMF 1.008` -> `NT EMF 1.007` -> `TEXT`).
+- `PRINT_AGENT_DATATYPE=GDI_RECEIPT`: cetak via GDI (layout lebih rapih/mirip preview browser).
 - `PRINT_AGENT_DATATYPE=TEXT`: pakai `TEXT` saja.
 - `PRINT_AGENT_DATATYPE=RAW`: hanya mode RAW (`RAW` -> `RAW + FF`) agar tidak menghasilkan fallback menyesatkan.
 

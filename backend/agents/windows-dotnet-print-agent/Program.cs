@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.ComponentModel;
 using System.Drawing.Printing;
+using Microsoft.Win32;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
@@ -29,7 +30,8 @@ var port = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_PORT"), config.P
 var token = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_TOKEN"), config.Token, string.Empty);
 var printerName = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_PRINTER"), config.PrinterName, string.Empty);
 var dataType = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_DATATYPE"), config.DataType, "AUTO").ToUpperInvariant();
-var runtime = new AgentRuntimeState(host, port, token, printerName, dataType, config.ConfigPath);
+var portName = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_PORT_NAME"), config.PortName, string.Empty);
+var runtime = new AgentRuntimeState(host, port, token, printerName, dataType, portName, config.ConfigPath);
 
 var prefix = $"http://{host}:{port}/";
 var listener = new HttpListener();
@@ -53,6 +55,9 @@ Console.WriteLine(string.IsNullOrWhiteSpace(runtime.PrinterName)
     ? "[windows-dotnet-print-agent] printer: default windows printer"
     : $"[windows-dotnet-print-agent] printer: {runtime.PrinterName}");
 Console.WriteLine($"[windows-dotnet-print-agent] datatype: {runtime.DataType}");
+Console.WriteLine(string.IsNullOrWhiteSpace(runtime.PortName)
+    ? "[windows-dotnet-print-agent] port: auto-detect from printer"
+    : $"[windows-dotnet-print-agent] port: {runtime.PortName} (direct USB mode)");
 Console.WriteLine($"[windows-dotnet-print-agent] UIX: {prefix}uix");
 
 while (true)
@@ -72,7 +77,7 @@ static async Task HandleRequest(HttpListenerContext ctx, AgentRuntimeState runti
 
         if (req.HttpMethod == "GET" && path == "/")
         {
-            await Json(res, 200, new { ok = true, service = "windows-dotnet-print-agent", hint = "use POST /print/receipt", dataType = runtime.DataType, uix = "/uix" });
+            await Json(res, 200, new { ok = true, service = "windows-dotnet-print-agent", hint = "use POST /print/receipt", dataType = runtime.DataType, portName = runtime.PortName, uix = "/uix" });
             return;
         }
 
@@ -98,6 +103,13 @@ static async Task HandleRequest(HttpListenerContext ctx, AgentRuntimeState runti
                 defaultPrinter = RawPrinterHelper.GetDefaultPrinterName(),
                 printers = list
             });
+            return;
+        }
+
+        if (req.HttpMethod == "GET" && path == "/ports")
+        {
+            var ports = DirectPortWriter.ListAvailablePorts();
+            await Json(res, 200, new { ok = true, ports, hint = "Set portName in config to use direct USB mode (bypasses spooler)" });
             return;
         }
 
@@ -133,63 +145,93 @@ static async Task HandleRequest(HttpListenerContext ctx, AgentRuntimeState runti
 
         if (req.HttpMethod == "POST" && path == "/print/test")
         {
-            if (!string.IsNullOrEmpty(runtime.Token))
+            if (!CheckToken(req, runtime, out var tokenErr))
             {
-                var incoming = req.Headers["x-print-agent-token"] ?? string.Empty;
-                if (!string.Equals(incoming, runtime.Token, StringComparison.Ordinal))
-                {
-                    await Json(res, 401, new { message = "invalid print agent token" });
-                    return;
-                }
+                await Json(res, 401, new { message = tokenErr });
+                return;
             }
 
             using var reader = new StreamReader(req.InputStream, req.ContentEncoding ?? Encoding.UTF8);
             var body = await reader.ReadToEndAsync();
             var payload = JsonSerializer.Deserialize<PrintPayload>(body, JsonOptions.Default) ?? new PrintPayload();
 
-            var targetPrinter = !string.IsNullOrWhiteSpace(payload.Printer_Name)
-                ? payload.Printer_Name
-                : (string.IsNullOrWhiteSpace(runtime.PrinterName) ? RawPrinterHelper.GetDefaultPrinterName() : runtime.PrinterName);
-
-            if (string.IsNullOrWhiteSpace(targetPrinter))
+            var targetPrinter = ResolvePrinter(payload.Printer_Name, runtime);
+            if (string.IsNullOrWhiteSpace(targetPrinter) && string.IsNullOrWhiteSpace(runtime.PortName))
             {
-                await Json(res, 500, new { message = "No printer found. Set PRINT_AGENT_PRINTER or set default printer in Windows." });
+                await Json(res, 500, new { message = "No printer or port found. Set printerName or portName in config." });
                 return;
             }
 
-            var testRaw = "NUMARS TEST PRINT\n------------------------\nJika ini tercetak, koneksi VPS -> agent -> printer OK.\n\n\x1dV\x00";
-            var ok = RawPrinterHelper.SendStringToPrinter(targetPrinter, testRaw, runtime.DataType, out var errCode, out var errMessage, out var attemptTrace);
-            if (!ok)
+            var testReceipt = new ReceiptModel
+            {
+                Title = "NUMARS TEST PRINT",
+                Divider = "------------------------",
+                Printed_At = DateTime.Now.ToString("dd/MM/yyyy HH:mm"),
+                Total = 0,
+                Items = new List<ReceiptItem>
+                {
+                    new ReceiptItem { Service_Name = "Tes koneksi agent", Qty = 1, Subtotal = 0 }
+                }
+            };
+
+            if (!string.IsNullOrWhiteSpace(targetPrinter) && (runtime.DataType == "GDI_RECEIPT" || runtime.DataType == "GDI_LAYOUT"))
+            {
+                var gdiOk = GdiReceiptPrinter.PrintReceipt(targetPrinter, testReceipt, out var gdiError);
+                if (!gdiOk)
+                {
+                    var list = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
+                    await Json(res, 500, new
+                    {
+                        message = "Failed printing via GDI receipt mode",
+                        printer = targetPrinter,
+                        portName = runtime.PortName,
+                        dataType = runtime.DataType,
+                        method = "gdi-layout",
+                        errorCode = 0,
+                        errorMessage = gdiError,
+                        attemptTrace = "GDI_RECEIPT",
+                        defaultPrinter = RawPrinterHelper.GetDefaultPrinterName(),
+                        printers = list
+                    });
+                    return;
+                }
+
+                await Json(res, 200, new { success = true, printer = targetPrinter, portName = runtime.PortName, mode = "test-print", method = "gdi-layout", dataType = runtime.DataType });
+                return;
+            }
+
+            var testRaw = BuildTestReceipt();
+            var result = PrintBytes(targetPrinter, runtime, Encoding.GetEncoding(437).GetBytes(testRaw));
+
+            if (!result.Ok)
             {
                 var list = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
                 await Json(res, 500, new
                 {
                     message = "Failed sending raw bytes to printer",
                     printer = targetPrinter,
+                    portName = runtime.PortName,
                     dataType = runtime.DataType,
-                    errorCode = errCode,
-                    errorMessage = errMessage,
-                    attemptTrace,
+                    method = result.Method,
+                    errorCode = result.ErrorCode,
+                    errorMessage = result.ErrorMessage,
+                    attemptTrace = result.AttemptTrace,
                     defaultPrinter = RawPrinterHelper.GetDefaultPrinterName(),
                     printers = list
                 });
                 return;
             }
 
-            await Json(res, 200, new { success = true, printer = targetPrinter, mode = "test-print", dataType = runtime.DataType });
+            await Json(res, 200, new { success = true, printer = targetPrinter, portName = runtime.PortName, mode = "test-print", method = result.Method, dataType = runtime.DataType });
             return;
         }
 
         if (req.HttpMethod == "POST" && path == "/print/receipt")
         {
-            if (!string.IsNullOrEmpty(runtime.Token))
+            if (!CheckToken(req, runtime, out var tokenErr))
             {
-                var incoming = req.Headers["x-print-agent-token"] ?? string.Empty;
-                if (!string.Equals(incoming, runtime.Token, StringComparison.Ordinal))
-                {
-                    await Json(res, 401, new { message = "invalid print agent token" });
-                    return;
-                }
+                await Json(res, 401, new { message = tokenErr });
+                return;
             }
 
             using var reader = new StreamReader(req.InputStream, req.ContentEncoding ?? Encoding.UTF8);
@@ -197,36 +239,63 @@ static async Task HandleRequest(HttpListenerContext ctx, AgentRuntimeState runti
             var payload = JsonSerializer.Deserialize<PrintPayload>(body, JsonOptions.Default) ?? new PrintPayload();
 
             var raw = ReceiptBuilder.BuildRaw(payload.Receipt);
-            var requestedPrinter = payload.Printer_Name;
-            var targetPrinter = !string.IsNullOrWhiteSpace(requestedPrinter)
-                ? requestedPrinter
-                : (string.IsNullOrWhiteSpace(runtime.PrinterName) ? RawPrinterHelper.GetDefaultPrinterName() : runtime.PrinterName);
+            var targetPrinter = ResolvePrinter(payload.Printer_Name, runtime);
 
-            if (string.IsNullOrWhiteSpace(targetPrinter))
+            if (string.IsNullOrWhiteSpace(targetPrinter) && string.IsNullOrWhiteSpace(runtime.PortName))
             {
-                await Json(res, 500, new { message = "No printer found. Set PRINT_AGENT_PRINTER or set default printer in Windows." });
+                await Json(res, 500, new { message = "No printer or port found. Set printerName or portName in config." });
                 return;
             }
 
-            var ok = RawPrinterHelper.SendStringToPrinter(targetPrinter, raw, runtime.DataType, out var errCode, out var errMessage, out var attemptTrace);
-            if (!ok)
+            if (!string.IsNullOrWhiteSpace(targetPrinter) && (runtime.DataType == "GDI_RECEIPT" || runtime.DataType == "GDI_LAYOUT"))
+            {
+                var gdiOk = GdiReceiptPrinter.PrintReceipt(targetPrinter, payload.Receipt, out var gdiError);
+                if (!gdiOk)
+                {
+                    var list = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
+                    await Json(res, 500, new
+                    {
+                        message = "Failed printing via GDI receipt mode",
+                        printer = targetPrinter,
+                        portName = runtime.PortName,
+                        dataType = runtime.DataType,
+                        method = "gdi-layout",
+                        errorCode = 0,
+                        errorMessage = gdiError,
+                        attemptTrace = "GDI_RECEIPT",
+                        defaultPrinter = RawPrinterHelper.GetDefaultPrinterName(),
+                        printers = list
+                    });
+                    return;
+                }
+
+                await Json(res, 200, new { success = true, printer = targetPrinter, portName = runtime.PortName, method = "gdi-layout", dataType = runtime.DataType });
+                return;
+            }
+
+            var bytes = Encoding.GetEncoding(437).GetBytes(raw);
+            var result = PrintBytes(targetPrinter, runtime, bytes);
+
+            if (!result.Ok)
             {
                 var list = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
                 await Json(res, 500, new
                 {
                     message = "Failed sending raw bytes to printer",
                     printer = targetPrinter,
+                    portName = runtime.PortName,
                     dataType = runtime.DataType,
-                    errorCode = errCode,
-                    errorMessage = errMessage,
-                    attemptTrace,
+                    method = result.Method,
+                    errorCode = result.ErrorCode,
+                    errorMessage = result.ErrorMessage,
+                    attemptTrace = result.AttemptTrace,
                     defaultPrinter = RawPrinterHelper.GetDefaultPrinterName(),
                     printers = list
                 });
                 return;
             }
 
-            await Json(res, 200, new { success = true, printer = targetPrinter, dataType = runtime.DataType });
+            await Json(res, 200, new { success = true, printer = targetPrinter, portName = runtime.PortName, method = result.Method, dataType = runtime.DataType });
             return;
         }
 
@@ -236,6 +305,77 @@ static async Task HandleRequest(HttpListenerContext ctx, AgentRuntimeState runti
     {
         await Json(ctx.Response, 500, new { message = ex.Message });
     }
+}
+
+static PrintResult PrintBytes(string? printerName, AgentRuntimeState runtime, byte[] bytes)
+{
+    var traces = new List<string>();
+
+    var portToUse = runtime.PortName;
+    if (!string.IsNullOrWhiteSpace(portToUse))
+    {
+        var portOk = DirectPortWriter.Write(portToUse, bytes, out var portErr);
+        if (portOk)
+        {
+            return new PrintResult(true, "direct-port", 0, string.Empty, string.Empty);
+        }
+        traces.Add($"[direct-port] {portErr}");
+    }
+
+    if (string.IsNullOrWhiteSpace(printerName))
+    {
+        return new PrintResult(false, "none", 0, "No printer name or port configured.", string.Join(" | ", traces));
+    }
+
+    var spoolerOk = RawPrinterHelper.SendBytesToPrinter(printerName, bytes, runtime.DataType, out var errCode, out var errMsg, out var spoolerTrace);
+    if (spoolerOk)
+    {
+        return new PrintResult(true, "spooler", 0, string.Empty, string.Empty);
+    }
+    traces.Add($"[spooler] {spoolerTrace}");
+
+    var gdiOk = GdiPrinter.Print(printerName, bytes, out var gdiErr);
+    if (gdiOk)
+    {
+        return new PrintResult(true, "gdi-passthrough", 0, string.Empty, string.Empty);
+    }
+    traces.Add($"[gdi] {gdiErr}");
+
+    return new PrintResult(false, "all-failed", errCode, errMsg, string.Join(" | ", traces));
+}
+
+static bool CheckToken(HttpListenerRequest req, AgentRuntimeState runtime, out string error)
+{
+    error = string.Empty;
+    if (string.IsNullOrEmpty(runtime.Token)) return true;
+    var incoming = req.Headers["x-print-agent-token"] ?? string.Empty;
+    if (string.Equals(incoming, runtime.Token, StringComparison.Ordinal)) return true;
+    error = "invalid print agent token";
+    return false;
+}
+
+static string? ResolvePrinter(string? requested, AgentRuntimeState runtime)
+{
+    if (!string.IsNullOrWhiteSpace(requested)) return requested;
+    if (!string.IsNullOrWhiteSpace(runtime.PrinterName)) return runtime.PrinterName;
+    return RawPrinterHelper.GetDefaultPrinterName();
+}
+
+static string BuildTestReceipt()
+{
+    var sb = new StringBuilder();
+    sb.AppendLine("NUMARS TEST PRINT");
+    sb.AppendLine("------------------------");
+    sb.AppendLine("Jika ini tercetak,");
+    sb.AppendLine("koneksi OK!");
+    sb.AppendLine();
+    sb.AppendLine(DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"));
+    sb.AppendLine();
+    sb.AppendLine();
+    sb.AppendLine();
+    sb.Append(''); sb.Append('@');
+    sb.Append('\x1d'); sb.Append('V'); sb.Append('\x00');
+    return sb.ToString();
 }
 
 static async Task Html(HttpListenerResponse res, int code, string html)
@@ -252,6 +392,7 @@ static string BuildUixHtml(AgentRuntimeState runtime)
     var escapedToken = WebUtility.HtmlEncode(runtime.Token);
     var escapedPrinter = WebUtility.HtmlEncode(runtime.PrinterName);
     var escapedDataType = WebUtility.HtmlEncode(runtime.DataType);
+    var escapedPortName = WebUtility.HtmlEncode(runtime.PortName);
 
     return $$"""
 <!doctype html>
@@ -262,33 +403,40 @@ static string BuildUixHtml(AgentRuntimeState runtime)
   <title>NUMARS Print Agent UIX</title>
   <style>
     body { font-family: Segoe UI, Arial, sans-serif; margin: 24px; background: #111; color: #f2f2f2; }
-    .card { max-width: 860px; border: 1px solid #333; border-radius: 12px; padding: 16px; background: #1a1a1a; }
+    .card { max-width: 900px; border: 1px solid #333; border-radius: 12px; padding: 16px; background: #1a1a1a; }
     h1 { margin-top: 0; color: #d4af37; }
+    h3 { color: #d4af37; }
     .grid { display: grid; gap: 10px; }
     label { display: grid; gap: 6px; font-size: 14px; }
     input, select, textarea { background: #0e0e0e; border: 1px solid #444; color: #fff; border-radius: 8px; padding: 10px; }
     button { margin-right: 8px; margin-top: 10px; border: 1px solid #555; border-radius: 8px; padding: 10px 14px; background: #262626; color: #fff; cursor: pointer; }
     button.primary { background: #d4af37; color: #111; border-color: #d4af37; font-weight: 600; }
-    pre { background: #0f0f0f; border: 1px solid #333; padding: 12px; border-radius: 8px; overflow: auto; }
     .hint { color: #bbb; font-size: 13px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; background: #d4af37; color: #111; margin-left: 8px; }
+    pre { background: #0f0f0f; border: 1px solid #333; padding: 12px; border-radius: 8px; overflow: auto; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>NUMARS Print Agent UIX</h1>
-    <p class="hint">Gunakan halaman ini untuk cek status, test print, dan ubah config agent (runtime + optional simpan file).</p>
+    <p class="hint">Gunakan halaman ini untuk cek status, test print, dan ubah config agent.</p>
 
     <div class="grid">
       <label>Token (untuk test endpoint)
         <input id="token" value="{{escapedToken}}" />
       </label>
-      <label>Printer Name
+      <label>Printer Name (Windows printer name)
         <input id="printerName" value="{{escapedPrinter}}" placeholder="kosong = default printer" />
       </label>
+      <label>Port Name (USB/COM langsung — bypass spooler) <span class="badge">BARU</span>
+        <input id="portName" value="{{escapedPortName}}" placeholder="contoh: USB001 / COM3" />
+      </label>
+      <p class="hint">Jika error 1804, isi Port Name agar direct-port diprioritaskan.</p>
       <label>DataType
         <select id="dataType">
           <option value="AUTO">AUTO (recommended thermal)</option>
           <option value="AUTO_EXTENDED">AUTO_EXTENDED (RAW + EMF + TEXT)</option>
+          <option value="GDI_RECEIPT">GDI_RECEIPT (browser-like layout)</option>
           <option value="RAW">RAW</option>
           <option value="TEXT">TEXT</option>
           <option value="NT EMF 1.008">NT EMF 1.008</option>
@@ -298,7 +446,7 @@ static string BuildUixHtml(AgentRuntimeState runtime)
       <label>Host
         <input id="host" value="{{WebUtility.HtmlEncode(runtime.Host)}}" />
       </label>
-      <label>Port
+      <label>Port (HTTP)
         <input id="port" value="{{WebUtility.HtmlEncode(runtime.Port)}}" />
       </label>
       <label><input type="checkbox" id="saveFile" /> Simpan ke agent-config.json</label>
@@ -308,7 +456,8 @@ static string BuildUixHtml(AgentRuntimeState runtime)
       <button class="primary" onclick="saveConfig()">Simpan Config</button>
       <button onclick="checkStatus()">Cek Status</button>
       <button onclick="testPrint()">Test Print</button>
-      <button onclick="loadPrinters()">Refresh Printers</button>
+      <button onclick="loadPrinters()">Daftar Printer</button>
+      <button onclick="loadPorts()">Daftar Port USB/COM</button>
     </div>
 
     <h3>Output</h3>
@@ -339,20 +488,22 @@ static string BuildUixHtml(AgentRuntimeState runtime)
 
     async function checkStatus() {
       try {
-        const [health, cfg, printers] = await Promise.all([
+        const [health, cfg, printers, ports] = await Promise.all([
           req('/health', { headers: headers() }),
           req('/config', { headers: headers() }),
-          req('/printers', { headers: headers() })
+          req('/printers', { headers: headers() }),
+          req('/ports', { headers: headers() })
         ]);
-        out({ health, config: cfg, printers });
+        out({ health, config: cfg, printers, ports });
       } catch (e) { out(e); }
     }
 
     async function loadPrinters() {
-      try {
-        const data = await req('/printers', { headers: headers() });
-        out(data);
-      } catch (e) { out(e); }
+      try { out(await req('/printers', { headers: headers() })); } catch (e) { out(e); }
+    }
+
+    async function loadPorts() {
+      try { out(await req('/ports', { headers: headers() })); } catch (e) { out(e); }
     }
 
     async function saveConfig() {
@@ -362,19 +513,18 @@ static string BuildUixHtml(AgentRuntimeState runtime)
           port: document.getElementById('port').value.trim(),
           token: document.getElementById('token').value,
           printer_name: document.getElementById('printerName').value.trim(),
+          port_name: document.getElementById('portName').value.trim(),
           data_type: document.getElementById('dataType').value,
           save_to_file: document.getElementById('saveFile').checked
         };
-        const data = await req('/config/update', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
-        out(data);
+        out(await req('/config/update', { method: 'POST', headers: headers(), body: JSON.stringify(payload) }));
       } catch (e) { out(e); }
     }
 
     async function testPrint() {
       try {
         const payload = { printer_name: document.getElementById('printerName').value.trim() || null };
-        const data = await req('/print/test', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
-        out(data);
+        out(await req('/print/test', { method: 'POST', headers: headers(), body: JSON.stringify(payload) }));
       } catch (e) { out(e); }
     }
   </script>
@@ -382,6 +532,7 @@ static string BuildUixHtml(AgentRuntimeState runtime)
 </html>
 """;
 }
+
 
 static async Task Json(HttpListenerResponse res, int code, object data)
 {
@@ -392,6 +543,8 @@ static async Task Json(HttpListenerResponse res, int code, object data)
     await res.OutputStream.WriteAsync(bytes);
     res.OutputStream.Close();
 }
+
+internal sealed record PrintResult(bool Ok, string Method, int ErrorCode, string ErrorMessage, string AttemptTrace);
 
 internal sealed class PrintPayload
 {
@@ -446,6 +599,245 @@ internal static class ReceiptBuilder
     }
 }
 
+internal static class GdiReceiptPrinter
+{
+    public static bool PrintReceipt(string printerName, ReceiptModel receipt, out string errorMessage)
+    {
+        errorMessage = string.Empty;
+
+        try
+        {
+            using var doc = new PrintDocument();
+            doc.PrinterSettings.PrinterName = printerName;
+
+            if (!doc.PrinterSettings.IsValid)
+            {
+                errorMessage = $"Printer tidak valid: {printerName}";
+                return false;
+            }
+
+            const float mmToHundredthInch = 3.93701f;
+            var width = (int)Math.Round(58f * mmToHundredthInch);
+            doc.DefaultPageSettings.PaperSize = new PaperSize("NUMARS58", width, 3000);
+            doc.DefaultPageSettings.Margins = new Margins(6, 6, 6, 6);
+
+            doc.PrintPage += (sender, ev) =>
+            {
+                var g = ev.Graphics;
+                var left = ev.MarginBounds.Left;
+                var top = ev.MarginBounds.Top;
+                var maxWidth = ev.MarginBounds.Width;
+                var y = top;
+
+                using var titleFont = new Font("Segoe UI", 9f, FontStyle.Bold);
+                using var normalFont = new Font("Segoe UI", 7.5f, FontStyle.Regular);
+                using var smallFont = new Font("Segoe UI", 7f, FontStyle.Regular);
+                using var totalFont = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+                using var center = new StringFormat { Alignment = StringAlignment.Center };
+                using var right = new StringFormat { Alignment = StringAlignment.Far };
+                using var linePen = new Pen(Color.Black, 1f);
+
+                g.DrawString(receipt.Title ?? "NUMARS POS", titleFont, Brushes.Black, new RectangleF(left, y, maxWidth, 20), center);
+                y += 18;
+
+                var divider = receipt.Divider ?? "------------------------";
+                g.DrawString(divider, smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12), center);
+                y += 12;
+
+                foreach (var item in receipt.Items)
+                {
+                    g.DrawString($"{item.Service_Name} x{item.Qty}", normalFont, Brushes.Black, new RectangleF(left, y, maxWidth, 14));
+                    y += 13;
+                    if (!string.IsNullOrWhiteSpace(item.Therapist_Name))
+                    {
+                        g.DrawString($"  Terapis: {item.Therapist_Name}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12));
+                        y += 11;
+                    }
+                    g.DrawString($"Rp {item.Subtotal:N0}".Replace(',', '.'), normalFont, Brushes.Black, new RectangleF(left, y, maxWidth, 14), right);
+                    y += 13;
+                }
+
+                y += 2;
+                g.DrawLine(linePen, left, y, left + maxWidth, y);
+                y += 6;
+
+                g.DrawString("TOTAL", totalFont, Brushes.Black, new RectangleF(left, y, maxWidth / 2f, 16));
+                g.DrawString($"Rp {receipt.Total:N0}".Replace(',', '.'), totalFont, Brushes.Black, new RectangleF(left + maxWidth / 2f, y, maxWidth / 2f, 16), right);
+                y += 18;
+
+                var printedAt = receipt.Printed_At ?? DateTime.Now.ToString("dd/MM/yyyy HH:mm");
+                g.DrawString(printedAt, smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 14), center);
+                y += 14;
+                g.DrawString("Terima kasih", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 14), center);
+
+                ev.HasMorePages = false;
+            };
+
+            doc.Print();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            return false;
+        }
+    }
+}
+
+internal static class GdiPrinter
+{
+    [DllImport("gdi32.dll")] private static extern int Escape(IntPtr hdc, int nEscape, int cbInput, byte[] lpvInData, IntPtr lpvOutData);
+    private const int PASSTHROUGH = 19;
+
+    public static bool Print(string printerName, byte[] data, out string errorMessage)
+    {
+        errorMessage = string.Empty;
+        try
+        {
+            var buffer = new byte[2 + data.Length];
+            buffer[0] = (byte)(data.Length & 0xFF);
+            buffer[1] = (byte)((data.Length >> 8) & 0xFF);
+            Array.Copy(data, 0, buffer, 2, data.Length);
+
+            var printed = false;
+            var pd = new PrintDocument();
+            pd.PrinterSettings.PrinterName = printerName;
+            if (!pd.PrinterSettings.IsValid)
+            {
+                errorMessage = $"Printer '{printerName}' is not valid/available.";
+                return false;
+            }
+
+            pd.PrintPage += (sender, e) =>
+            {
+                try
+                {
+                    if (e.Graphics == null) return;
+                    var hdc = e.Graphics.GetHdc();
+                    try
+                    {
+                        var result = Escape(hdc, PASSTHROUGH, buffer.Length, buffer, IntPtr.Zero);
+                        if (result > 0) printed = true;
+                    }
+                    finally
+                    {
+                        e.Graphics.ReleaseHdc(hdc);
+                    }
+                }
+                finally
+                {
+                    e.HasMorePages = false;
+                }
+            };
+
+            pd.Print();
+            return printed || string.IsNullOrEmpty(errorMessage);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"GDI print exception: {ex.Message}";
+            return false;
+        }
+    }
+}
+
+internal static class DirectPortWriter
+{
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr CreateFile(string lpFileName, uint dwDesiredAccess, uint dwShareMode, IntPtr lpSecurityAttributes, uint dwCreationDisposition, uint dwFlagsAndAttributes, IntPtr hTemplateFile);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool WriteFile(IntPtr hFile, byte[] lpBuffer, uint nNumberOfBytesToWrite, out uint lpNumberOfBytesWritten, IntPtr lpOverlapped);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr hObject);
+
+    private const uint GENERIC_WRITE = 0x40000000;
+    private const uint FILE_SHARE_READ = 0x00000001;
+    private const uint OPEN_EXISTING = 3;
+    private const uint FILE_ATTRIBUTE_NORMAL = 0x80;
+    private static readonly IntPtr INVALID_HANDLE_VALUE = new(-1);
+
+    public static bool Write(string portName, byte[] data, out string errorMessage)
+    {
+        errorMessage = string.Empty;
+        var devicePath = portName.StartsWith(@"\\.\") ? portName : $@"\\.\{portName}";
+        var handle = CreateFile(devicePath, GENERIC_WRITE, FILE_SHARE_READ, IntPtr.Zero, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, IntPtr.Zero);
+
+        if (handle == INVALID_HANDLE_VALUE)
+        {
+            var code = Marshal.GetLastWin32Error();
+            errorMessage = $"CreateFile({devicePath}) failed: {new Win32Exception(code).Message} (code {code})";
+            return false;
+        }
+
+        try
+        {
+            var ok = WriteFile(handle, data, (uint)data.Length, out _, IntPtr.Zero);
+            if (!ok)
+            {
+                var code = Marshal.GetLastWin32Error();
+                errorMessage = $"WriteFile({devicePath}) failed: {new Win32Exception(code).Message} (code {code})";
+                return false;
+            }
+            return true;
+        }
+        finally
+        {
+            CloseHandle(handle);
+        }
+    }
+
+    public static List<PortInfo> ListAvailablePorts()
+    {
+        var result = new List<PortInfo>();
+
+        for (int i = 1; i <= 9; i++)
+        {
+            var name = $"USB00{i}";
+            var device = $@"\\.\{name}";
+            var handle = CreateFile(device, GENERIC_WRITE, FILE_SHARE_READ, IntPtr.Zero, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, IntPtr.Zero);
+            if (handle != INVALID_HANDLE_VALUE)
+            {
+                CloseHandle(handle);
+                result.Add(new PortInfo(name, device, "USB printer port"));
+            }
+        }
+
+        for (int i = 1; i <= 20; i++)
+        {
+            var name = $"COM{i}";
+            var device = $@"\\.\{name}";
+            var handle = CreateFile(device, GENERIC_WRITE, FILE_SHARE_READ, IntPtr.Zero, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, IntPtr.Zero);
+            if (handle != INVALID_HANDLE_VALUE)
+            {
+                CloseHandle(handle);
+                result.Add(new PortInfo(name, device, "COM/Serial port"));
+            }
+        }
+
+        try
+        {
+            var printers = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Print\Printers");
+            if (printers != null)
+            {
+                foreach (var printerKey in printers.GetSubKeyNames())
+                {
+                    var sub = printers.OpenSubKey(printerKey);
+                    var port = sub?.GetValue("Port") as string;
+                    if (!string.IsNullOrWhiteSpace(port) && !result.Any(r => r.Name.Equals(port, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        result.Add(new PortInfo(port, $@"\\.\{port}", $"Port of printer: {printerKey}"));
+                    }
+                }
+            }
+        }
+        catch { }
+
+        return result;
+    }
+
+    public sealed record PortInfo(string Name, string DevicePath, string Description);
+}
+
 internal sealed class AgentConfig
 {
     public string? Host { get; set; }
@@ -453,6 +845,7 @@ internal sealed class AgentConfig
     public string? Token { get; set; }
     public string? PrinterName { get; set; }
     public string? DataType { get; set; }
+    public string? PortName { get; set; }
     public string? ConfigPath { get; set; }
 
     public static AgentConfig Load()
@@ -493,6 +886,7 @@ internal sealed class AgentConfigUpdate
     public string? Token { get; set; }
     public string? Printer_Name { get; set; }
     public string? Data_Type { get; set; }
+    public string? Port_Name { get; set; }
     public bool Save_To_File { get; set; }
 }
 
@@ -500,13 +894,14 @@ internal sealed class AgentRuntimeState
 {
     private readonly object _sync = new();
 
-    public AgentRuntimeState(string host, string port, string token, string printerName, string dataType, string? configPath)
+    public AgentRuntimeState(string host, string port, string token, string printerName, string dataType, string portName, string? configPath)
     {
         Host = host;
         Port = port;
         Token = token;
         PrinterName = printerName;
         DataType = string.IsNullOrWhiteSpace(dataType) ? "AUTO" : dataType.Trim().ToUpperInvariant();
+        PortName = portName.Trim();
         ConfigPath = string.IsNullOrWhiteSpace(configPath)
             ? Path.Combine(AppContext.BaseDirectory, "agent-config.json")
             : configPath;
@@ -517,6 +912,7 @@ internal sealed class AgentRuntimeState
     public string Token { get; private set; }
     public string PrinterName { get; private set; }
     public string DataType { get; private set; }
+    public string PortName { get; private set; }
     public string ConfigPath { get; }
 
     public object GetPublicConfig()
@@ -531,6 +927,7 @@ internal sealed class AgentRuntimeState
                 token = Token,
                 printer_name = PrinterName,
                 data_type = DataType,
+                port_name = PortName,
                 config_path = ConfigPath
             };
         }
@@ -545,6 +942,7 @@ internal sealed class AgentRuntimeState
             if (payload.Token is not null) Token = payload.Token.Trim();
             if (payload.Printer_Name is not null) PrinterName = payload.Printer_Name.Trim();
             if (payload.Data_Type is not null) DataType = payload.Data_Type.Trim().ToUpperInvariant();
+            if (payload.Port_Name is not null) PortName = payload.Port_Name.Trim();
 
             return new
             {
@@ -553,6 +951,7 @@ internal sealed class AgentRuntimeState
                 token = Token,
                 printer_name = PrinterName,
                 data_type = DataType,
+                port_name = PortName,
                 config_path = ConfigPath
             };
         }
@@ -576,7 +975,8 @@ internal sealed class AgentRuntimeState
                     port = Port,
                     token = Token,
                     printerName = PrinterName,
-                    dataType = DataType
+                    dataType = DataType,
+                    portName = PortName
                 };
                 var json = JsonSerializer.Serialize(cfg, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(ConfigPath, json);
@@ -643,16 +1043,18 @@ internal static class RawPrinterHelper
         return GetDefaultPrinter(sb, ref size) ? sb.ToString() : string.Empty;
     }
 
-    public static bool SendStringToPrinter(string printerName, string data, string preferredDataType, out int errorCode, out string errorMessage, out string attemptTrace)
+    public static bool SendBytesToPrinter(string printerName, byte[] data, string preferredDataType, out int errorCode, out string errorMessage, out string attemptTrace)
     {
         errorCode = 0;
         errorMessage = string.Empty;
         attemptTrace = string.Empty;
 
-        var bytes = Encoding.GetEncoding(437).GetBytes(data);
-        var bytesWithFormFeed = Encoding.GetEncoding(437).GetBytes(data + "\f");
         IntPtr pUnmanagedBytes = IntPtr.Zero;
         IntPtr hPrinter = IntPtr.Zero;
+
+        var dataWithFF = new byte[data.Length + 1];
+        Array.Copy(data, dataWithFF, data.Length);
+        dataWithFF[data.Length] = 0x0C;
 
         try
         {
@@ -687,7 +1089,7 @@ internal static class RawPrinterHelper
                     return false;
                 }
 
-                var bytesToWrite = attempt.AppendFormFeed ? bytesWithFormFeed : bytes;
+                var bytesToWrite = attempt.AppendFormFeed ? dataWithFF : data;
                 pUnmanagedBytes = Marshal.AllocCoTaskMem(bytesToWrite.Length);
                 Marshal.Copy(bytesToWrite, 0, pUnmanagedBytes, bytesToWrite.Length);
 
@@ -710,6 +1112,12 @@ internal static class RawPrinterHelper
             if (pUnmanagedBytes != IntPtr.Zero) Marshal.FreeCoTaskMem(pUnmanagedBytes);
             if (hPrinter != IntPtr.Zero) ClosePrinter(hPrinter);
         }
+    }
+
+    public static bool SendStringToPrinter(string printerName, string data, string preferredDataType, out int errorCode, out string errorMessage, out string attemptTrace)
+    {
+        var bytes = Encoding.GetEncoding(437).GetBytes(data);
+        return SendBytesToPrinter(printerName, bytes, preferredDataType, out errorCode, out errorMessage, out attemptTrace);
     }
 
     private static List<DataTypeAttempt> BuildDataTypeAttempts(string preferredDataType)
