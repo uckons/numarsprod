@@ -501,8 +501,11 @@
 
       <!-- Action Buttons -->
       <div class="modal-actions">
-        <button class="btn btn-print" @click="printReceipt">
+        <button class="btn btn-print" @click="sendToThermalPrinter" :disabled="printLoading">
           🖨️ Print Sekarang
+        </button>
+        <button class="btn btn-cancel" @click="printReceipt" :disabled="printLoading">
+          Preview Browser
         </button>
         <button class="btn btn-cancel" @click="closePrintModal">
           Batal
@@ -1011,76 +1014,92 @@ const closePrintModal = async () => {
 }
 
 const receiptPrintStyles = `
-  @page { margin: 0; }
+  /* TM-58V profile: CMD ESC, Font 12x24, LF, Max dots 128, CP437 */
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
   html, body {
     margin: 0;
     padding: 0;
+    width: 58mm;
     background: #fff;
     font-family: 'Courier New', monospace;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-rendering: auto;
+    -webkit-text-size-adjust: 100%;
+    print-color-adjust: exact;
   }
+  * { box-sizing: border-box; }
   .receipt-preview {
     color: #000;
     width: 58mm;
     margin: 0;
     padding: 0;
-    font-size: 12px;
-    line-height: 1.4;
+    font-size: 10px;
+    line-height: 1.2;
   }
   .receipt {
-    max-width: 58mm;
+    width: 46mm;
+    max-width: 46mm;
     margin: 0;
-    padding: 1mm 2mm 2mm;
+    padding: 1.2mm 0 2mm;
   }
   .receipt-header {
     text-align: center;
     margin-bottom: 10px;
   }
   .receipt-header h2 {
-    font-size: 16px;
+    font-size: 12px;
     font-weight: 700;
     margin: 0 0 5px;
     text-transform: uppercase;
   }
-  .receipt-header p { font-size: 11px; margin: 2px 0; }
-  .receipt-divider { text-align: center; margin: 10px 0; font-size: 10px; color: #333; }
+  .receipt-header p { font-size: 10px; margin: 2px 0; }
+  .receipt-divider { text-align: center; margin: 8px 0; font-size: 9px; color: #333; }
   .receipt-info, .receipt-items, .receipt-total { margin: 10px 0; }
   .info-row, .total-row {
     display: flex;
     justify-content: space-between;
-    margin: 5px 0;
-    font-size: 11px;
+    margin: 4px 0;
+    font-size: 10px;
   }
   .info-row span:first-child { font-weight: 600; }
   .item-header {
     display: grid;
     grid-template-columns: 2fr 1fr 1.5fr;
     font-weight: 700;
-    font-size: 11px;
+    font-size: 10px;
     margin-bottom: 8px;
     padding-bottom: 5px;
     border-bottom: 1px dashed #666;
   }
-  .item-row { margin: 8px 0; }
-  .item-name { font-size: 11px; font-weight: 600; margin-bottom: 3px; }
+  .item-row { margin: 6px 0; }
+  .item-name { font-size: 10px; font-weight: 700; margin-bottom: 3px; }
   .item-detail {
     display: grid;
     grid-template-columns: 2fr 1fr 1.5fr;
-    font-size: 11px;
+    font-size: 10px;
     color: #333;
   }
-  .item-subtotal { font-weight: 700; text-align: right; }
-  .total-row:first-child { font-size: 14px; font-weight: 700; margin-top: 10px; }
-  .total-amount { font-weight: 700; font-size: 14px; }
-  .payment-method { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #666; font-style: italic; }
-  .receipt-footer { text-align: center; margin-top: 15px; font-size: 11px; }
+  .item-subtotal { font-weight: 600; text-align: right; }
+  .total-row:first-child { font-size: 11px; font-weight: 700; margin-top: 8px; }
+  .total-amount { font-weight: 700; font-size: 11px; }
+  .payment-method { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #666; font-style: normal; }
+  .receipt-footer { text-align: center; margin-top: 12px; font-size: 10px; }
   .receipt-footer p { margin: 3px 0; }
   .reprint-note { margin-top: 10px; font-weight: 700; font-size: 10px; color: #666; }
-  .item-meta { display: block; font-size: 10px; color: #666; }
+  .item-meta { display: block; font-size: 9px; color: #666; }
   .receipt--compact .receipt-divider { margin: 6px 0; }
   .receipt--compact .item-row,
   .receipt--compact .info-row,
   .receipt--compact .total-row { margin: 3px 0; }
   .receipt--compact .receipt-footer { margin-top: 10px; }
+  .info-row span,
+  .total-row span,
+  .item-name,
+  .item-detail span { page-break-inside: avoid; }
 `
 
 const printReceipt = () => {
@@ -1108,11 +1127,62 @@ const printReceipt = () => {
     </html>
   `)
   printWindow.document.close()
-  printWindow.focus()
-  setTimeout(() => {
+
+  const triggerPrint = () => {
+    printWindow.focus()
     printWindow.print()
+  }
+
+  printWindow.onafterprint = () => {
     printWindow.close()
-  }, 250)
+  }
+
+  setTimeout(triggerPrint, 450)
+}
+
+const sendToThermalPrinter = async () => {
+  const orderIds = bulkReceipt.value?.order_ids?.length
+    ? bulkReceipt.value.order_ids
+    : (printOrder.value?.id ? [printOrder.value.id] : [])
+
+  if (!orderIds.length) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Order tidak ditemukan',
+      text: 'Tidak ada order_id untuk dikirim ke printer thermal.',
+      background: '#111',
+      color: '#fff'
+    })
+    return
+  }
+
+  try {
+    printLoading.value = true
+    for (const orderId of orderIds) {
+      await api.post('/printers/print-order', {
+        order_id: Number(orderId)
+      })
+    }
+
+    await Swal.fire({
+      icon: 'success',
+      title: 'Berhasil',
+      text: 'Struk sudah dikirim ke printer thermal tanpa dialog browser.',
+      background: '#111',
+      color: '#fff'
+    })
+    await closePrintModal()
+  } catch (err) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Gagal kirim ke printer thermal',
+      text: err.response?.data?.message || err.message || 'Terjadi kesalahan',
+      background: '#111',
+      color: '#fff'
+    })
+  } finally {
+    printLoading.value = false
+  }
 }
 
 // 🖨️ FORMAT CURRENCY
@@ -1209,7 +1279,7 @@ th, td {
   padding: 12px;
   text-align: left;
   border-bottom: 1px solid #222;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 th {
@@ -1471,7 +1541,7 @@ th {
 
 .result-count {
   margin-top: 16px;
-  font-size: 13px;
+  font-size: 12px;
   color: #888;
   font-weight: 600;
 }
@@ -1538,7 +1608,7 @@ th {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .per-page label {
@@ -1552,7 +1622,7 @@ th {
   color: #fff;
   padding: 8px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   outline: none;
@@ -1580,7 +1650,7 @@ th {
   color: #fff;
   padding: 8px 16px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -1609,7 +1679,7 @@ th {
   color: #fff;
   padding: 8px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   min-width: 40px;
@@ -1640,7 +1710,7 @@ th {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .jump-to-page label {
@@ -1654,7 +1724,7 @@ th {
   color: #fff;
   padding: 8px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   width: 60px;
   text-align: center;
   outline: none;
@@ -1672,7 +1742,7 @@ th {
   color: #000;
   padding: 8px 16px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
