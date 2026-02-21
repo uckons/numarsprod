@@ -501,8 +501,11 @@
 
       <!-- Action Buttons -->
       <div class="modal-actions">
-        <button class="btn btn-print" @click="printReceipt">
+        <button class="btn btn-print" @click="sendToThermalPrinter" :disabled="printLoading">
           🖨️ Print Sekarang
+        </button>
+        <button class="btn btn-cancel" @click="printReceipt" :disabled="printLoading">
+          Preview Browser
         </button>
         <button class="btn btn-cancel" @click="closePrintModal">
           Batal
@@ -1135,6 +1138,51 @@ const printReceipt = () => {
   }
 
   setTimeout(triggerPrint, 450)
+}
+
+const sendToThermalPrinter = async () => {
+  const orderIds = bulkReceipt.value?.order_ids?.length
+    ? bulkReceipt.value.order_ids
+    : (printOrder.value?.id ? [printOrder.value.id] : [])
+
+  if (!orderIds.length) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Order tidak ditemukan',
+      text: 'Tidak ada order_id untuk dikirim ke printer thermal.',
+      background: '#111',
+      color: '#fff'
+    })
+    return
+  }
+
+  try {
+    printLoading.value = true
+    for (const orderId of orderIds) {
+      await api.post('/printers/print-order', {
+        order_id: Number(orderId)
+      })
+    }
+
+    await Swal.fire({
+      icon: 'success',
+      title: 'Berhasil',
+      text: 'Struk sudah dikirim ke printer thermal tanpa dialog browser.',
+      background: '#111',
+      color: '#fff'
+    })
+    await closePrintModal()
+  } catch (err) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Gagal kirim ke printer thermal',
+      text: err.response?.data?.message || err.message || 'Terjadi kesalahan',
+      background: '#111',
+      color: '#fff'
+    })
+  } finally {
+    printLoading.value = false
+  }
 }
 
 // 🖨️ FORMAT CURRENCY
