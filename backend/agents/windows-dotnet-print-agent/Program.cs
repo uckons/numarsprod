@@ -2,6 +2,8 @@ using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.ComponentModel;
+using System.Drawing.Printing;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
@@ -59,6 +61,19 @@ static async Task HandleRequest(HttpListenerContext ctx, string token, string pr
             return;
         }
 
+        if (req.HttpMethod == "GET" && req.Url?.AbsolutePath == "/printers")
+        {
+            var list = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
+            await Json(res, 200, new
+            {
+                ok = true,
+                service = "windows-dotnet-print-agent",
+                defaultPrinter = RawPrinterHelper.GetDefaultPrinterName(),
+                printers = list
+            });
+            return;
+        }
+
         if (req.HttpMethod == "POST" && req.Url?.AbsolutePath == "/print/receipt")
         {
             if (!string.IsNullOrEmpty(token))
@@ -76,7 +91,10 @@ static async Task HandleRequest(HttpListenerContext ctx, string token, string pr
             var payload = JsonSerializer.Deserialize<PrintPayload>(body, JsonOptions.Default) ?? new PrintPayload();
 
             var raw = ReceiptBuilder.BuildRaw(payload.Receipt);
-            var targetPrinter = string.IsNullOrWhiteSpace(printerName) ? RawPrinterHelper.GetDefaultPrinterName() : printerName;
+            var requestedPrinter = payload.Printer_Name;
+            var targetPrinter = !string.IsNullOrWhiteSpace(requestedPrinter)
+                ? requestedPrinter
+                : (string.IsNullOrWhiteSpace(printerName) ? RawPrinterHelper.GetDefaultPrinterName() : printerName);
 
             if (string.IsNullOrWhiteSpace(targetPrinter))
             {
@@ -84,10 +102,19 @@ static async Task HandleRequest(HttpListenerContext ctx, string token, string pr
                 return;
             }
 
-            var ok = RawPrinterHelper.SendStringToPrinter(targetPrinter, raw);
+            var ok = RawPrinterHelper.SendStringToPrinter(targetPrinter, raw, out var errCode, out var errMessage);
             if (!ok)
             {
-                await Json(res, 500, new { message = "Failed sending raw bytes to printer" });
+                var list = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
+                await Json(res, 500, new
+                {
+                    message = "Failed sending raw bytes to printer",
+                    printer = targetPrinter,
+                    errorCode = errCode,
+                    errorMessage = errMessage,
+                    defaultPrinter = RawPrinterHelper.GetDefaultPrinterName(),
+                    printers = list
+                });
                 return;
             }
 
@@ -115,6 +142,7 @@ static async Task Json(HttpListenerResponse res, int code, object data)
 
 internal sealed class PrintPayload
 {
+    public string? Printer_Name { get; set; }
     public ReceiptModel Receipt { get; set; } = new();
 }
 
@@ -241,23 +269,47 @@ internal static class RawPrinterHelper
         return GetDefaultPrinter(sb, ref size) ? sb.ToString() : string.Empty;
     }
 
-    public static bool SendStringToPrinter(string printerName, string data)
+    public static bool SendStringToPrinter(string printerName, string data, out int errorCode, out string errorMessage)
     {
+        errorCode = 0;
+        errorMessage = string.Empty;
+
         var bytes = Encoding.GetEncoding(437).GetBytes(data);
         IntPtr pUnmanagedBytes = IntPtr.Zero;
         IntPtr hPrinter = IntPtr.Zero;
 
         try
         {
-            if (!OpenPrinter(printerName, out hPrinter, IntPtr.Zero)) return false;
+            if (!OpenPrinter(printerName, out hPrinter, IntPtr.Zero))
+            {
+                errorCode = Marshal.GetLastWin32Error();
+                errorMessage = new Win32Exception(errorCode).Message;
+                return false;
+            }
             var di = new DOCINFOA();
-            if (!StartDocPrinter(hPrinter, 1, di)) return false;
-            if (!StartPagePrinter(hPrinter)) return false;
+            if (!StartDocPrinter(hPrinter, 1, di))
+            {
+                errorCode = Marshal.GetLastWin32Error();
+                errorMessage = new Win32Exception(errorCode).Message;
+                return false;
+            }
+            if (!StartPagePrinter(hPrinter))
+            {
+                errorCode = Marshal.GetLastWin32Error();
+                errorMessage = new Win32Exception(errorCode).Message;
+                return false;
+            }
 
             pUnmanagedBytes = Marshal.AllocCoTaskMem(bytes.Length);
             Marshal.Copy(bytes, 0, pUnmanagedBytes, bytes.Length);
 
             var ok = WritePrinter(hPrinter, pUnmanagedBytes, bytes.Length, out _);
+            if (!ok)
+            {
+                errorCode = Marshal.GetLastWin32Error();
+                errorMessage = new Win32Exception(errorCode).Message;
+            }
+
             EndPagePrinter(hPrinter);
             EndDocPrinter(hPrinter);
             return ok;

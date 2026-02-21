@@ -155,6 +155,7 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
 - Project: `WindowsDotnetPrintAgent.csproj`
 - Endpoint kompatibel dengan backend saat ini:
   - `GET /health`
+  - `GET /printers` (daftar printer terdeteksi + default printer)
   - `POST /print/receipt`
 
 ### Cara run di Windows (Visual Studio)
@@ -273,3 +274,21 @@ Perbaikan yang sudah diterapkan di source:
 - referensi package: `System.Text.Encoding.CodePages`
 
 Di PC kasir, lakukan rebuild/publish ulang agent .NET lalu restart aplikasinya.
+
+
+### Override nama printer dari backend
+
+Jika default printer Windows salah, bisa override dari request backend:
+
+```json
+{
+  "order_id": 123,
+  "printer": {
+    "agent_url": "http://172.200.201.101:19000",
+    "agent_token": "secret123",
+    "agent_printer_name": "POS-58"
+  }
+}
+```
+
+Tip: cek daftar printer yang dikenali agent lewat `GET /printers`.

@@ -21,8 +21,9 @@ const toHeatIntervalUnit = (microseconds) => {
   return Math.max(0, Math.min(255, units))
 }
 
-const buildReceiptPayload = (order) => ({
+const buildReceiptPayload = (order, options = {}) => ({
   profile: THERMAL_PROFILE,
+  printer_name: options.printerName || null,
   receipt: {
     title: "NUMARS POS",
     divider: "------------------------",
@@ -87,8 +88,8 @@ const printViaUsb = async (order) => {
   })
 }
 
-async function printViaAgent ({ order, agentUrl, token }) {
-  const payload = buildReceiptPayload(order)
+async function printViaAgent ({ order, agentUrl, token, printerName }) {
+  const payload = buildReceiptPayload(order, { printerName })
   const headers = token ? { "x-print-agent-token": token } : {}
   const timeoutMs = Number(process.env.PRINT_AGENT_TIMEOUT_MS || 45000)
   const endpoint = `${agentUrl.replace(/\/$/, "")}/print/receipt`
@@ -181,7 +182,8 @@ exports.printOrder = async ({ order, printer = {} }) => {
     return printViaAgent({
       order,
       agentUrl,
-      token: printer.agent_token || process.env.PRINT_AGENT_TOKEN
+      token: printer.agent_token || process.env.PRINT_AGENT_TOKEN,
+      printerName: printer.agent_printer_name || process.env.PRINT_AGENT_PRINTER
     })
   }
 
