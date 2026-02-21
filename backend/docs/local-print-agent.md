@@ -169,7 +169,7 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
    - `PRINT_AGENT_PORT` (default `19000`)
    - `PRINT_AGENT_TOKEN` (token auth, optional)
    - `PRINT_AGENT_PRINTER` (nama printer Windows; kalau kosong pakai default printer)
-   - `PRINT_AGENT_DATATYPE` (default `RAW`, fallback otomatis ke `TEXT` jika RAW tidak didukung driver)
+   - `PRINT_AGENT_DATATYPE` (default `AUTO`: coba `RAW`, lalu `TEXT`; jika diisi `TEXT` atau `RAW`, agent hanya pakai nilai itu saja)
 
    **B. Via file config `agent-config.json`** di folder hasil build EXE (copy dari `agent-config.example.json`):
 
@@ -179,7 +179,7 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
   "port": "19000",
   "token": "secret123",
   "printerName": "EPSON TM-T82 Receipt",
-  "dataType": "RAW"
+  "dataType": "AUTO"
 }
 ```
 
@@ -335,7 +335,10 @@ Jika gagal, response akan berisi detail Win32 dari agent (`errorCode`, `errorMes
 Jika agent mengembalikan error ini, driver printer tidak menerima `RAW` pada `StartDocPrinter`.
 
 Perbaikan yang sudah diterapkan:
-- Agent sekarang mencoba datatype berurutan: nilai `PRINT_AGENT_DATATYPE` -> `RAW` -> `TEXT`.
+- Agent sekarang memakai aturan berikut:
+- `PRINT_AGENT_DATATYPE=AUTO` (atau kosong): coba `RAW` lalu `TEXT`.
+- `PRINT_AGENT_DATATYPE=TEXT`: pakai `TEXT` saja (tanpa fallback ke `RAW`).
+- `PRINT_AGENT_DATATYPE=RAW`: pakai `RAW` saja.
 
 Langkah operator:
 1. Pull source terbaru dan publish ulang .NET agent.

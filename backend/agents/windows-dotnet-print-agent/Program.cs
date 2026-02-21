@@ -28,7 +28,7 @@ var host = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_HOST"), config.H
 var port = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_PORT"), config.Port, "19000");
 var token = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_TOKEN"), config.Token, string.Empty);
 var printerName = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_PRINTER"), config.PrinterName, string.Empty);
-var dataType = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_DATATYPE"), config.DataType, "RAW").ToUpperInvariant();
+var dataType = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_DATATYPE"), config.DataType, "AUTO").ToUpperInvariant();
 
 var prefix = $"http://{host}:{port}/";
 var listener = new HttpListener();
@@ -370,10 +370,7 @@ internal static class RawPrinterHelper
                 return false;
             }
 
-            var dataTypes = new List<string>();
-            if (!string.IsNullOrWhiteSpace(preferredDataType)) dataTypes.Add(preferredDataType);
-            if (!dataTypes.Contains("RAW")) dataTypes.Add("RAW");
-            if (!dataTypes.Contains("TEXT")) dataTypes.Add("TEXT");
+            var dataTypes = BuildDataTypeAttempts(preferredDataType);
 
             foreach (var dt in dataTypes)
             {
@@ -414,5 +411,15 @@ internal static class RawPrinterHelper
             if (pUnmanagedBytes != IntPtr.Zero) Marshal.FreeCoTaskMem(pUnmanagedBytes);
             if (hPrinter != IntPtr.Zero) ClosePrinter(hPrinter);
         }
+    }
+
+    private static List<string> BuildDataTypeAttempts(string preferredDataType)
+    {
+        if (string.IsNullOrWhiteSpace(preferredDataType) || string.Equals(preferredDataType, "AUTO", StringComparison.OrdinalIgnoreCase))
+        {
+            return new List<string> { "RAW", "TEXT" };
+        }
+
+        return new List<string> { preferredDataType.Trim().ToUpperInvariant() };
     }
 }
