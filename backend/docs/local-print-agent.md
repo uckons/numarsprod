@@ -262,3 +262,14 @@ Jika masih muncul, jalankan:
 pm2 delete numars-pos-backend
 pm2 start server.js --name numars-pos-backend
 ```
+
+
+### Troubleshooting .NET: `No data is available for encoding 437`
+
+Jika muncul error ini dari agent .NET, pastikan build terbaru sudah dipakai.
+
+Perbaikan yang sudah diterapkan di source:
+- register code page provider: `Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)`
+- referensi package: `System.Text.Encoding.CodePages`
+
+Di PC kasir, lakukan rebuild/publish ulang agent .NET lalu restart aplikasinya.

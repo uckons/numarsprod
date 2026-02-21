@@ -3,6 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
 var config = AgentConfig.Load();
 
 var host = Environment.GetEnvironmentVariable("PRINT_AGENT_HOST") ?? config.Host ?? "localhost";

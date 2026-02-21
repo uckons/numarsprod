@@ -6,4 +6,7 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>false</UseWindowsForms>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+  </ItemGroup>
 </Project>
