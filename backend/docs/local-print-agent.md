@@ -357,7 +357,7 @@ Perbaikan yang sudah diterapkan:
 - Agent sekarang memakai aturan berikut:
 - `PRINT_AGENT_DATATYPE=AUTO` (atau kosong): coba berurutan `RAW` -> `RAW + FF` -> `NT EMF 1.008` -> `NT EMF 1.007` -> `TEXT`.
 - `PRINT_AGENT_DATATYPE=TEXT`: pakai `TEXT` saja.
-- `PRINT_AGENT_DATATYPE=RAW`: pakai `RAW` lalu `RAW + FF`.
+- `PRINT_AGENT_DATATYPE=RAW`: sekarang tetap kompatibel otomatis (`RAW` -> `RAW + FF` -> `NT EMF 1.008` -> `NT EMF 1.007` -> `TEXT`) supaya tidak mentok di error 1804.
 
 Langkah operator:
 1. Pull source terbaru dan publish ulang .NET agent.

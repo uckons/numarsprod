@@ -379,7 +379,7 @@ internal static class RawPrinterHelper
                 if (!StartDocPrinter(hPrinter, 1, di))
                 {
                     errorCode = Marshal.GetLastWin32Error();
-                    errorMessage = $"StartDocPrinter({attempt.Label}) failed: {new Win32Exception(errorCode).Message}";
+                    errorMessage = $"StartDocPrinter({attempt.DataType}) failed: {new Win32Exception(errorCode).Message}";
                     if (errorCode == 1804) continue;
                     return false;
                 }
@@ -435,7 +435,10 @@ internal static class RawPrinterHelper
             return new List<DataTypeAttempt>
             {
                 new("RAW", "RAW", AppendFormFeed: false),
-                new("RAW", "RAW + FF", AppendFormFeed: true)
+                new("RAW", "RAW + FF", AppendFormFeed: true),
+                new("NT EMF 1.008", "NT EMF 1.008", AppendFormFeed: false),
+                new("NT EMF 1.007", "NT EMF 1.007", AppendFormFeed: false),
+                new("TEXT", "TEXT", AppendFormFeed: false)
             };
         }
 
