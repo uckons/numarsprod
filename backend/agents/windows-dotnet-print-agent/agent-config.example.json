@@ -1,0 +1,6 @@
+{
+  "host": "localhost",
+  "port": "19000",
+  "token": "secret123",
+  "printerName": "EPSON TM-T82 Receipt"
+}
