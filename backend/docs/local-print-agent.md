@@ -349,3 +349,18 @@ Langkah operator:
 ```
 
 4. Ulangi tes lewat `POST /api/printers/test-agent-print`.
+
+
+### Kenapa setelah publish tetap `localhost`?
+
+Biasanya karena `agent-config.json` tidak terbaca (lokasi salah) atau JSON tidak valid.
+
+Checklist:
+1. Simpan `agent-config.json` di folder **yang sama** dengan file `.exe` hasil publish.
+2. Pastikan JSON valid (tanpa karakter aneh sebelum `{`, tanpa typo).
+3. Jalankan agent, lalu lihat log startup:
+   - `config loaded: ...` -> config terbaca
+   - `config not found...` -> file tidak ketemu
+   - `gagal parse config...` -> JSON invalid
+
+Jika tetap fallback ke localhost/default printer, cek juga apakah env var lama masih aktif (`PRINT_AGENT_HOST`, `PRINT_AGENT_PRINTER`) karena env var akan override config file.

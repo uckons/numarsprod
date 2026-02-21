@@ -8,6 +8,14 @@ using System.Drawing.Printing;
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
 var config = AgentConfig.Load();
+if (!string.IsNullOrWhiteSpace(config.ConfigPath))
+{
+    Console.WriteLine($"[windows-dotnet-print-agent] config loaded: {config.ConfigPath}");
+}
+else
+{
+    Console.WriteLine("[windows-dotnet-print-agent] config not found, using defaults/env");
+}
 
 var host = Environment.GetEnvironmentVariable("PRINT_AGENT_HOST") ?? config.Host ?? "localhost";
 var port = Environment.GetEnvironmentVariable("PRINT_AGENT_PORT") ?? config.Port ?? "19000";
@@ -249,21 +257,36 @@ internal sealed class AgentConfig
     public string? Token { get; set; }
     public string? PrinterName { get; set; }
     public string? DataType { get; set; }
+    public string? ConfigPath { get; set; }
 
     public static AgentConfig Load()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "agent-config.json");
-        if (!File.Exists(path)) return new AgentConfig();
+        var candidates = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "agent-config.json"),
+            Path.Combine(Directory.GetCurrentDirectory(), "agent-config.json")
+        }.Distinct().ToArray();
 
-        try
+        foreach (var path in candidates)
         {
-            var json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<AgentConfig>(json, JsonOptions.Default) ?? new AgentConfig();
+            if (!File.Exists(path)) continue;
+
+            try
+            {
+                var json = File.ReadAllText(path);
+                var cfg = JsonSerializer.Deserialize<AgentConfig>(json, JsonOptions.Default) ?? new AgentConfig();
+                cfg.ConfigPath = path;
+                return cfg;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[WARN] gagal parse config: {path}");
+                Console.WriteLine($"[WARN] {ex.Message}");
+                return new AgentConfig();
+            }
         }
-        catch
-        {
-            return new AgentConfig();
-        }
+
+        return new AgentConfig();
     }
 }
 
