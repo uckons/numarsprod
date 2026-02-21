@@ -95,3 +95,24 @@ exports.testAgentPrint = async (req, res) => {
     })
   }
 }
+
+exports.agentDiagnostics = async (req, res) => {
+  try {
+    const printer = req.body?.printer || {}
+    const agentUrl = printer.agent_url || process.env.PRINT_AGENT_URL
+    const token = printer.agent_token || process.env.PRINT_AGENT_TOKEN
+
+    const result = await printerService.getAgentDiagnostics({
+      agentUrl,
+      token
+    })
+
+    res.json(result)
+  } catch (err) {
+    console.error("AGENT DIAGNOSTICS ERROR:", err)
+    res.status(500).json({
+      message: err.message,
+      hint: "Pastikan endpoint /health dan /printers di print agent bisa diakses dari VPS."
+    })
+  }
+}

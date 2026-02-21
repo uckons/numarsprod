@@ -154,8 +154,12 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
 - Folder: `backend/agents/windows-dotnet-print-agent`
 - Project: `WindowsDotnetPrintAgent.csproj`
 - Endpoint kompatibel dengan backend saat ini:
+  - `GET /uix` (UIX local untuk cek status/test print/update config runtime)
   - `GET /health`
   - `GET /printers` (daftar printer terdeteksi + default printer)
+  - `GET /config`
+  - `POST /config/update`
+  - `POST /print/test`
   - `POST /print/receipt`
 
 ### Cara run di Windows (Visual Studio)
@@ -169,7 +173,7 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
    - `PRINT_AGENT_PORT` (default `19000`)
    - `PRINT_AGENT_TOKEN` (token auth, optional)
    - `PRINT_AGENT_PRINTER` (nama printer Windows; kalau kosong pakai default printer)
-   - `PRINT_AGENT_DATATYPE` (default `AUTO`: coba `RAW`, `RAW + FF` (tetap datatype RAW), `NT EMF`, lalu `TEXT`; jika diisi `TEXT`, agent hanya pakai `TEXT`)
+  - `PRINT_AGENT_DATATYPE` (default `AUTO`: coba `RAW`, `RAW + FF` (tetap datatype RAW), `NT EMF`, lalu `TEXT`; jika diisi `RAW`, agent hanya mencoba mode RAW; jika diisi `TEXT`, agent hanya pakai `TEXT`)
 
    **B. Via file config `agent-config.json`** di folder hasil build EXE (copy dari `agent-config.example.json`):
 
