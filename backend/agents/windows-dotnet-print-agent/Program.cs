@@ -421,11 +421,11 @@ internal static class RawPrinterHelper
         {
             return new List<DataTypeAttempt>
             {
-                new("RAW", "RAW", appendFormFeed: false),
-                new("RAW", "RAW + FF", appendFormFeed: true),
-                new("NT EMF 1.008", "NT EMF 1.008", appendFormFeed: false),
-                new("NT EMF 1.007", "NT EMF 1.007", appendFormFeed: false),
-                new("TEXT", "TEXT", appendFormFeed: false)
+                new("RAW", "RAW", AppendFormFeed: false),
+                new("RAW", "RAW + FF", AppendFormFeed: true),
+                new("NT EMF 1.008", "NT EMF 1.008", AppendFormFeed: false),
+                new("NT EMF 1.007", "NT EMF 1.007", AppendFormFeed: false),
+                new("TEXT", "TEXT", AppendFormFeed: false)
             };
         }
 
@@ -434,12 +434,12 @@ internal static class RawPrinterHelper
         {
             return new List<DataTypeAttempt>
             {
-                new("RAW", "RAW", appendFormFeed: false),
-                new("RAW", "RAW + FF", appendFormFeed: true)
+                new("RAW", "RAW", AppendFormFeed: false),
+                new("RAW", "RAW + FF", AppendFormFeed: true)
             };
         }
 
-        return new List<DataTypeAttempt> { new(normalized, normalized, appendFormFeed: false) };
+        return new List<DataTypeAttempt> { new(normalized, normalized, AppendFormFeed: false) };
     }
 
     private sealed record DataTypeAttempt(string DataType, string Label, bool AppendFormFeed);
