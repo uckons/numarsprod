@@ -330,6 +330,25 @@ Body optional:
 Jika gagal, response akan berisi detail Win32 dari agent (`errorCode`, `errorMessage`, `printers`).
 
 
+### Troubleshooting .NET build: duplicate attributes / `Only one compilation unit can have top-level statements`
+
+Jika Visual Studio menampilkan error seperti:
+- `Duplicate global::System.Runtime.Versioning.TargetFrameworkAttribute`
+- `Duplicate System.Reflection.Assembly...Attribute`
+- `Only one compilation unit can have top-level statements`
+- `Ambiguity between 'AgentConfig....' and 'AgentConfig....'`
+
+Penyebab paling umum: file compile ter-load ganda (mis. cache `obj/bin` lama atau wildcard compile yang ikut membaca file generated).
+
+Perbaikan di project ini:
+- `WindowsDotnetPrintAgent.csproj` sekarang dipaksa compile hanya `Program.cs`.
+- Generate assembly attributes otomatis dimatikan agar tidak bentrok.
+
+Di PC kasir tetap lakukan langkah ini setelah pull terbaru:
+1. Tutup Visual Studio.
+2. Hapus folder `bin` dan `obj` di `backend/agents/windows-dotnet-print-agent`.
+3. Buka lagi project, lalu **Restore** dan **Rebuild**.
+
 ### Troubleshooting Win32 `errorCode: 1804` (The specified datatype is invalid)
 
 Jika agent mengembalikan error ini, driver printer tidak menerima `RAW` pada `StartDocPrinter`.
