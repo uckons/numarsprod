@@ -158,7 +158,7 @@ static async Task HandleRequest(HttpListenerContext ctx, AgentRuntimeState runti
             }
 
             var testRaw = "NUMARS TEST PRINT\n------------------------\nJika ini tercetak, koneksi VPS -> agent -> printer OK.\n\n\x1dV\x00";
-            var ok = RawPrinterHelper.SendStringToPrinter(targetPrinter, testRaw, runtime.DataType, out var errCode, out var errMessage);
+            var ok = RawPrinterHelper.SendStringToPrinter(targetPrinter, testRaw, runtime.DataType, out var errCode, out var errMessage, out var attemptTrace);
             if (!ok)
             {
                 var list = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
@@ -169,6 +169,7 @@ static async Task HandleRequest(HttpListenerContext ctx, AgentRuntimeState runti
                     dataType = runtime.DataType,
                     errorCode = errCode,
                     errorMessage = errMessage,
+                    attemptTrace,
                     defaultPrinter = RawPrinterHelper.GetDefaultPrinterName(),
                     printers = list
                 });
@@ -207,7 +208,7 @@ static async Task HandleRequest(HttpListenerContext ctx, AgentRuntimeState runti
                 return;
             }
 
-            var ok = RawPrinterHelper.SendStringToPrinter(targetPrinter, raw, runtime.DataType, out var errCode, out var errMessage);
+            var ok = RawPrinterHelper.SendStringToPrinter(targetPrinter, raw, runtime.DataType, out var errCode, out var errMessage, out var attemptTrace);
             if (!ok)
             {
                 var list = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
@@ -218,6 +219,7 @@ static async Task HandleRequest(HttpListenerContext ctx, AgentRuntimeState runti
                     dataType = runtime.DataType,
                     errorCode = errCode,
                     errorMessage = errMessage,
+                    attemptTrace,
                     defaultPrinter = RawPrinterHelper.GetDefaultPrinterName(),
                     printers = list
                 });
@@ -640,10 +642,11 @@ internal static class RawPrinterHelper
         return GetDefaultPrinter(sb, ref size) ? sb.ToString() : string.Empty;
     }
 
-    public static bool SendStringToPrinter(string printerName, string data, string preferredDataType, out int errorCode, out string errorMessage)
+    public static bool SendStringToPrinter(string printerName, string data, string preferredDataType, out int errorCode, out string errorMessage, out string attemptTrace)
     {
         errorCode = 0;
         errorMessage = string.Empty;
+        attemptTrace = string.Empty;
 
         var bytes = Encoding.GetEncoding(437).GetBytes(data);
         var bytesWithFormFeed = Encoding.GetEncoding(437).GetBytes(data + "\f");
@@ -660,6 +663,7 @@ internal static class RawPrinterHelper
             }
 
             var dataTypes = BuildDataTypeAttempts(preferredDataType);
+            var traces = new List<string>();
 
             foreach (var attempt in dataTypes)
             {
@@ -668,7 +672,9 @@ internal static class RawPrinterHelper
                 {
                     errorCode = Marshal.GetLastWin32Error();
                     errorMessage = $"StartDocPrinter({attempt.DataType}) failed: {new Win32Exception(errorCode).Message}";
+                    traces.Add($"{attempt.Label}: {errorMessage} (code {errorCode})");
                     if (errorCode == 1804) continue;
+                    attemptTrace = string.Join(" | ", traces);
                     return false;
                 }
 
@@ -692,8 +698,10 @@ internal static class RawPrinterHelper
 
                 errorCode = Marshal.GetLastWin32Error();
                 errorMessage = $"WritePrinter({attempt.Label}) failed: {new Win32Exception(errorCode).Message}";
+                traces.Add($"{attempt.Label}: {errorMessage} (code {errorCode})");
             }
 
+            attemptTrace = string.Join(" | ", traces);
             return false;
         }
         finally
@@ -723,10 +731,7 @@ internal static class RawPrinterHelper
             return new List<DataTypeAttempt>
             {
                 new("RAW", "RAW", AppendFormFeed: false),
-                new("RAW", "RAW + FF", AppendFormFeed: true),
-                new("NT EMF 1.008", "NT EMF 1.008", AppendFormFeed: false),
-                new("NT EMF 1.007", "NT EMF 1.007", AppendFormFeed: false),
-                new("TEXT", "TEXT", AppendFormFeed: false)
+                new("RAW", "RAW + FF", AppendFormFeed: true)
             };
         }
 
