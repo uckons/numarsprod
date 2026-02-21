@@ -169,6 +169,7 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
    - `PRINT_AGENT_PORT` (default `19000`)
    - `PRINT_AGENT_TOKEN` (token auth, optional)
    - `PRINT_AGENT_PRINTER` (nama printer Windows; kalau kosong pakai default printer)
+   - `PRINT_AGENT_DATATYPE` (default `RAW`, fallback otomatis ke `TEXT` jika RAW tidak didukung driver)
 
    **B. Via file config `agent-config.json`** di folder hasil build EXE (copy dari `agent-config.example.json`):
 
@@ -177,7 +178,8 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
   "host": "localhost",
   "port": "19000",
   "token": "secret123",
-  "printerName": "EPSON TM-T82 Receipt"
+  "printerName": "EPSON TM-T82 Receipt",
+  "dataType": "RAW"
 }
 ```
 
@@ -326,3 +328,24 @@ Body optional:
 ```
 
 Jika gagal, response akan berisi detail Win32 dari agent (`errorCode`, `errorMessage`, `printers`).
+
+
+### Troubleshooting Win32 `errorCode: 1804` (The specified datatype is invalid)
+
+Jika agent mengembalikan error ini, driver printer tidak menerima `RAW` pada `StartDocPrinter`.
+
+Perbaikan yang sudah diterapkan:
+- Agent sekarang mencoba datatype berurutan: nilai `PRINT_AGENT_DATATYPE` -> `RAW` -> `TEXT`.
+
+Langkah operator:
+1. Pull source terbaru dan publish ulang .NET agent.
+2. Restart agent.
+3. Jika masih gagal, set di `agent-config.json`:
+
+```json
+{
+  "dataType": "TEXT"
+}
+```
+
+4. Ulangi tes lewat `POST /api/printers/test-agent-print`.

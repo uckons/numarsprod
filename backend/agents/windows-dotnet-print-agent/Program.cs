@@ -13,6 +13,7 @@ var host = Environment.GetEnvironmentVariable("PRINT_AGENT_HOST") ?? config.Host
 var port = Environment.GetEnvironmentVariable("PRINT_AGENT_PORT") ?? config.Port ?? "19000";
 var token = Environment.GetEnvironmentVariable("PRINT_AGENT_TOKEN") ?? config.Token ?? string.Empty;
 var printerName = Environment.GetEnvironmentVariable("PRINT_AGENT_PRINTER") ?? config.PrinterName ?? string.Empty;
+var dataType = Environment.GetEnvironmentVariable("PRINT_AGENT_DATATYPE") ?? config.DataType ?? "RAW";
 
 var prefix = $"http://{host}:{port}/";
 var listener = new HttpListener();
@@ -39,10 +40,10 @@ Console.WriteLine(string.IsNullOrWhiteSpace(printerName)
 while (true)
 {
     var ctx = await listener.GetContextAsync();
-    _ = Task.Run(() => HandleRequest(ctx, token, printerName));
+    _ = Task.Run(() => HandleRequest(ctx, token, printerName, dataType));
 }
 
-static async Task HandleRequest(HttpListenerContext ctx, string token, string printerName)
+static async Task HandleRequest(HttpListenerContext ctx, string token, string printerName, string dataType)
 {
     try
     {
@@ -102,7 +103,7 @@ static async Task HandleRequest(HttpListenerContext ctx, string token, string pr
             }
 
             var testRaw = "NUMARS TEST PRINT\n------------------------\nJika ini tercetak, koneksi VPS -> agent -> printer OK.\n\n\x1dV\x00";
-            var ok = RawPrinterHelper.SendStringToPrinter(targetPrinter, testRaw, out var errCode, out var errMessage);
+            var ok = RawPrinterHelper.SendStringToPrinter(targetPrinter, testRaw, dataType, out var errCode, out var errMessage);
             if (!ok)
             {
                 var list = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
@@ -150,7 +151,7 @@ static async Task HandleRequest(HttpListenerContext ctx, string token, string pr
                 return;
             }
 
-            var ok = RawPrinterHelper.SendStringToPrinter(targetPrinter, raw, out var errCode, out var errMessage);
+            var ok = RawPrinterHelper.SendStringToPrinter(targetPrinter, raw, dataType, out var errCode, out var errMessage);
             if (!ok)
             {
                 var list = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
@@ -247,6 +248,7 @@ internal sealed class AgentConfig
     public string? Port { get; set; }
     public string? Token { get; set; }
     public string? PrinterName { get; set; }
+    public string? DataType { get; set; }
 
     public static AgentConfig Load()
     {
@@ -276,7 +278,7 @@ internal static class JsonOptions
 internal static class RawPrinterHelper
 {
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private class DOCINFOA
+    private class DOCINFO
     {
         [MarshalAs(UnmanagedType.LPWStr)] public string pDocName = "NUMARS POS";
         [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile = string.Empty;
@@ -290,7 +292,7 @@ internal static class RawPrinterHelper
     private static extern bool ClosePrinter(IntPtr hPrinter);
 
     [DllImport("winspool.Drv", SetLastError = true)]
-    private static extern bool StartDocPrinter(IntPtr hPrinter, int level, [In] DOCINFOA di);
+    private static extern bool StartDocPrinter(IntPtr hPrinter, int level, [In] DOCINFO di);
 
     [DllImport("winspool.Drv", SetLastError = true)]
     private static extern bool EndDocPrinter(IntPtr hPrinter);
@@ -317,7 +319,7 @@ internal static class RawPrinterHelper
         return GetDefaultPrinter(sb, ref size) ? sb.ToString() : string.Empty;
     }
 
-    public static bool SendStringToPrinter(string printerName, string data, out int errorCode, out string errorMessage)
+    public static bool SendStringToPrinter(string printerName, string data, string preferredDataType, out int errorCode, out string errorMessage)
     {
         errorCode = 0;
         errorMessage = string.Empty;
@@ -334,33 +336,45 @@ internal static class RawPrinterHelper
                 errorMessage = new Win32Exception(errorCode).Message;
                 return false;
             }
-            var di = new DOCINFOA();
-            if (!StartDocPrinter(hPrinter, 1, di))
+
+            var dataTypes = new List<string>();
+            if (!string.IsNullOrWhiteSpace(preferredDataType)) dataTypes.Add(preferredDataType);
+            if (!dataTypes.Contains("RAW")) dataTypes.Add("RAW");
+            if (!dataTypes.Contains("TEXT")) dataTypes.Add("TEXT");
+
+            foreach (var dt in dataTypes)
             {
+                var di = new DOCINFO { pDataType = dt };
+                if (!StartDocPrinter(hPrinter, 1, di))
+                {
+                    errorCode = Marshal.GetLastWin32Error();
+                    errorMessage = $"StartDocPrinter({dt}) failed: {new Win32Exception(errorCode).Message}";
+                    if (errorCode == 1804) continue;
+                    return false;
+                }
+
+                if (!StartPagePrinter(hPrinter))
+                {
+                    errorCode = Marshal.GetLastWin32Error();
+                    errorMessage = new Win32Exception(errorCode).Message;
+                    EndDocPrinter(hPrinter);
+                    return false;
+                }
+
+                pUnmanagedBytes = Marshal.AllocCoTaskMem(bytes.Length);
+                Marshal.Copy(bytes, 0, pUnmanagedBytes, bytes.Length);
+
+                var ok = WritePrinter(hPrinter, pUnmanagedBytes, bytes.Length, out _);
+                EndPagePrinter(hPrinter);
+                EndDocPrinter(hPrinter);
+
+                if (ok) return true;
+
                 errorCode = Marshal.GetLastWin32Error();
-                errorMessage = new Win32Exception(errorCode).Message;
-                return false;
-            }
-            if (!StartPagePrinter(hPrinter))
-            {
-                errorCode = Marshal.GetLastWin32Error();
-                errorMessage = new Win32Exception(errorCode).Message;
-                return false;
+                errorMessage = $"WritePrinter({dt}) failed: {new Win32Exception(errorCode).Message}";
             }
 
-            pUnmanagedBytes = Marshal.AllocCoTaskMem(bytes.Length);
-            Marshal.Copy(bytes, 0, pUnmanagedBytes, bytes.Length);
-
-            var ok = WritePrinter(hPrinter, pUnmanagedBytes, bytes.Length, out _);
-            if (!ok)
-            {
-                errorCode = Marshal.GetLastWin32Error();
-                errorMessage = new Win32Exception(errorCode).Message;
-            }
-
-            EndPagePrinter(hPrinter);
-            EndDocPrinter(hPrinter);
-            return ok;
+            return false;
         }
         finally
         {
