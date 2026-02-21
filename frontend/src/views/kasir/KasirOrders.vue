@@ -520,6 +520,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue"
 import { useRouter } from "vue-router"
 import Swal from "sweetalert2"
 import api from "@/services/api"
+import { getPrinterAgentConfig } from "@/utils/printerAgentConfig"
 
 const router = useRouter()
 const orders = ref([])
@@ -1160,7 +1161,8 @@ const sendToThermalPrinter = async () => {
     printLoading.value = true
     for (const orderId of orderIds) {
       await api.post('/printers/print-order', {
-        order_id: Number(orderId)
+        order_id: Number(orderId),
+        printer: getPrinterAgentConfig()
       })
     }
 
