@@ -25,8 +25,19 @@ const buildReceiptPayload = (order, options = {}) => ({
   profile: THERMAL_PROFILE,
   printer_name: options.printerName || null,
   receipt: {
-    title: "NUMARS POS",
+    title: order.branch_name || "NUMARS POS",
     divider: "------------------------",
+    order_id: Number(order.id || 0),
+    created_at: order.created_at || null,
+    branch_name: order.branch_name || null,
+    branch_address: order.branch_address || null,
+    branch_phone: order.branch_phone || null,
+    branch_logo_url: order.branch_logo_url || null,
+    cashier_name: order.cashier_name || null,
+    room_name: order.room_name || null,
+    payment_method: order.payment_method || "CASH",
+    payment_amount: Number(order.payment_amount || order.total || 0),
+    change_amount: Number(order.change_amount || 0),
     items: (order.items || []).map((item) => ({
       service_name: item.service_name,
       qty: Number(item.qty || 0),
@@ -248,5 +259,40 @@ exports.testAgentPrint = async ({ agentUrl, token, printerName }) => {
       ? JSON.stringify(err.response.data)
       : (err.code || err.message)
     throw new Error(`Test print agent gagal (${base}/print/test): ${detail}`)
+  }
+}
+
+exports.getAgentDiagnostics = async ({ agentUrl, token }) => {
+  if (!agentUrl) {
+    throw new Error("PRINT_AGENT_URL belum di-set")
+  }
+
+  const headers = token ? { "x-print-agent-token": token } : {}
+  const timeoutMs = Number(process.env.PRINT_AGENT_TIMEOUT_MS || 45000)
+  const base = agentUrl.replace(/\/$/, "")
+
+  try {
+    const [healthRes, printersRes] = await Promise.all([
+      axios.get(`${base}/health`, { headers, timeout: timeoutMs }),
+      axios.get(`${base}/printers`, { headers, timeout: timeoutMs })
+    ])
+
+    return {
+      ok: true,
+      base_url: base,
+      health: {
+        status: healthRes.status,
+        data: healthRes.data
+      },
+      printers: {
+        status: printersRes.status,
+        data: printersRes.data
+      }
+    }
+  } catch (err) {
+    const detail = err.response?.data
+      ? JSON.stringify(err.response.data)
+      : (err.code || err.message)
+    throw new Error(`Diagnosa agent gagal (${base}): ${detail}`)
   }
 }

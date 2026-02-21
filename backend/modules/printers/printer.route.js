@@ -22,5 +22,10 @@ router.post(
   controller.testAgentPrint
 )
 
-module.exports = router
+router.post(
+  "/agent-diagnostics",
+  auth,
+  controller.agentDiagnostics
+)
 
+module.exports = router

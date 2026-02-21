@@ -9,12 +9,25 @@ exports.printOrder = async (req, res) => {
       return res.status(400).json({ message: "order_id required" })
     }
 
-    // 🔹 ambil order
+    // 🔹 ambil order (detail lengkap untuk layout receipt enterprise)
     const orderRes = await db.query(
       `
-      SELECT id, total
-      FROM orders
-      WHERE id = $1
+      SELECT
+        o.id,
+        o.total,
+        o.payment_method,
+        o.created_at,
+        b.name AS branch_name,
+        b.address AS branch_address,
+        b.phone AS branch_phone,
+        b.logo_url AS branch_logo_url,
+        u.name AS cashier_name,
+        r.name AS room_name
+      FROM orders o
+      LEFT JOIN branches b ON b.id = o.branch_id
+      LEFT JOIN users u ON u.id = o.user_id
+      LEFT JOIN rooms r ON r.id = o.room_id
+      WHERE o.id = $1
       `,
       [order_id]
     )
@@ -36,6 +49,8 @@ exports.printOrder = async (req, res) => {
     )
 
     order.items = itemsRes.rows
+    order.payment_amount = Number(order.total || 0)
+    order.change_amount = 0
 
     // 🔹 PRINT
     await printerService.printOrder({ order, printer })
@@ -92,6 +107,27 @@ exports.testAgentPrint = async (req, res) => {
     res.status(500).json({
       message: err.message,
       hint: "Gunakan /api/printers/test-agent untuk cek konektivitas dan /printers endpoint di agent untuk cek nama printer."
+    })
+  }
+}
+
+exports.agentDiagnostics = async (req, res) => {
+  try {
+    const printer = req.body?.printer || {}
+    const agentUrl = printer.agent_url || process.env.PRINT_AGENT_URL
+    const token = printer.agent_token || process.env.PRINT_AGENT_TOKEN
+
+    const result = await printerService.getAgentDiagnostics({
+      agentUrl,
+      token
+    })
+
+    res.json(result)
+  } catch (err) {
+    console.error("AGENT DIAGNOSTICS ERROR:", err)
+    res.status(500).json({
+      message: err.message,
+      hint: "Pastikan endpoint /health dan /printers di print agent bisa diakses dari VPS."
     })
   }
 }
