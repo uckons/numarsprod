@@ -71,3 +71,27 @@ exports.testAgent = async (req, res) => {
     })
   }
 }
+
+
+exports.testAgentPrint = async (req, res) => {
+  try {
+    const printer = req.body?.printer || {}
+    const agentUrl = printer.agent_url || process.env.PRINT_AGENT_URL
+    const token = printer.agent_token || process.env.PRINT_AGENT_TOKEN
+    const printerName = printer.agent_printer_name || process.env.PRINT_AGENT_PRINTER
+
+    const result = await printerService.testAgentPrint({
+      agentUrl,
+      token,
+      printerName
+    })
+
+    res.json(result)
+  } catch (err) {
+    console.error("AGENT TEST PRINT ERROR:", err)
+    res.status(500).json({
+      message: err.message,
+      hint: "Gunakan /api/printers/test-agent untuk cek konektivitas dan /printers endpoint di agent untuk cek nama printer."
+    })
+  }
+}

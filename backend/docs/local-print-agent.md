@@ -303,3 +303,26 @@ Jika error ini muncul saat build agent .NET:
   - `System.Drawing.Common` package
 
 Lalu lakukan restore + rebuild di Visual Studio.
+
+
+### Test print end-to-end dari backend
+
+Selain cek health, sekarang ada endpoint backend untuk tes print langsung ke agent:
+
+```http
+POST /api/printers/test-agent-print
+```
+
+Body optional:
+
+```json
+{
+  "printer": {
+    "agent_url": "http://172.200.201.101:19000",
+    "agent_token": "secret123",
+    "agent_printer_name": "POS-58"
+  }
+}
+```
+
+Jika gagal, response akan berisi detail Win32 dari agent (`errorCode`, `errorMessage`, `printers`).

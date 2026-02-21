@@ -100,7 +100,9 @@ async function printViaAgent ({ order, agentUrl, token, printerName }) {
       timeout: timeoutMs
     })
   } catch (err) {
-    const detail = err.response?.data?.message || err.code || err.message
+    const detail = err.response?.data
+      ? JSON.stringify(err.response.data)
+      : (err.code || err.message)
     throw new Error(`Gagal terhubung ke print agent (${endpoint}): ${detail}`)
   }
 
@@ -214,5 +216,37 @@ exports.testAgentConnection = async ({ agentUrl, token }) => {
   } catch (err) {
     const detail = err.response?.data?.message || err.code || err.message
     throw new Error(`Koneksi agent gagal (${base}/health): ${detail}`)
+  }
+}
+
+
+exports.testAgentPrint = async ({ agentUrl, token, printerName }) => {
+  if (!agentUrl) {
+    throw new Error("PRINT_AGENT_URL belum di-set")
+  }
+
+  const headers = token ? { "x-print-agent-token": token } : {}
+  const timeoutMs = Number(process.env.PRINT_AGENT_TIMEOUT_MS || 45000)
+  const base = agentUrl.replace(/\/$/, "")
+
+  try {
+    const res = await axios.post(`${base}/print/test`, {
+      printer_name: printerName || null
+    }, {
+      headers,
+      timeout: timeoutMs
+    })
+
+    return {
+      ok: true,
+      endpoint: `${base}/print/test`,
+      status: res.status,
+      data: res.data
+    }
+  } catch (err) {
+    const detail = err.response?.data
+      ? JSON.stringify(err.response.data)
+      : (err.code || err.message)
+    throw new Error(`Test print agent gagal (${base}/print/test): ${detail}`)
   }
 }

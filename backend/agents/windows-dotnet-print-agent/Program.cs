@@ -74,6 +74,54 @@ static async Task HandleRequest(HttpListenerContext ctx, string token, string pr
             return;
         }
 
+
+        if (req.HttpMethod == "POST" && req.Url?.AbsolutePath == "/print/test")
+        {
+            if (!string.IsNullOrEmpty(token))
+            {
+                var incoming = req.Headers["x-print-agent-token"] ?? string.Empty;
+                if (!string.Equals(incoming, token, StringComparison.Ordinal))
+                {
+                    await Json(res, 401, new { message = "invalid print agent token" });
+                    return;
+                }
+            }
+
+            using var reader = new StreamReader(req.InputStream, req.ContentEncoding ?? Encoding.UTF8);
+            var body = await reader.ReadToEndAsync();
+            var payload = JsonSerializer.Deserialize<PrintPayload>(body, JsonOptions.Default) ?? new PrintPayload();
+
+            var targetPrinter = !string.IsNullOrWhiteSpace(payload.Printer_Name)
+                ? payload.Printer_Name
+                : (string.IsNullOrWhiteSpace(printerName) ? RawPrinterHelper.GetDefaultPrinterName() : printerName);
+
+            if (string.IsNullOrWhiteSpace(targetPrinter))
+            {
+                await Json(res, 500, new { message = "No printer found. Set PRINT_AGENT_PRINTER or set default printer in Windows." });
+                return;
+            }
+
+            var testRaw = "NUMARS TEST PRINT\n------------------------\nJika ini tercetak, koneksi VPS -> agent -> printer OK.\n\n\x1dV\x00";
+            var ok = RawPrinterHelper.SendStringToPrinter(targetPrinter, testRaw, out var errCode, out var errMessage);
+            if (!ok)
+            {
+                var list = PrinterSettings.InstalledPrinters.Cast<string>().ToList();
+                await Json(res, 500, new
+                {
+                    message = "Failed sending raw bytes to printer",
+                    printer = targetPrinter,
+                    errorCode = errCode,
+                    errorMessage = errMessage,
+                    defaultPrinter = RawPrinterHelper.GetDefaultPrinterName(),
+                    printers = list
+                });
+                return;
+            }
+
+            await Json(res, 200, new { success = true, printer = targetPrinter, mode = "test-print" });
+            return;
+        }
+
         if (req.HttpMethod == "POST" && req.Url?.AbsolutePath == "/print/receipt")
         {
             if (!string.IsNullOrEmpty(token))
