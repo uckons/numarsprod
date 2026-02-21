@@ -3,7 +3,7 @@ const printerService = require("./printer.service")
 exports.printOrder = async (req, res) => {
   try {
     const db = req.app.get("db")
-    const { order_id } = req.body
+    const { order_id, printer } = req.body
 
     if (!order_id) {
       return res.status(400).json({ message: "order_id required" })
@@ -38,7 +38,7 @@ exports.printOrder = async (req, res) => {
     order.items = itemsRes.rows
 
     // 🔹 PRINT
-    await printerService.printOrder(order)
+    await printerService.printOrder({ order, printer })
 
     res.json({ success: true })
   } catch (err) {
