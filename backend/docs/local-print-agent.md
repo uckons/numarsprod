@@ -48,6 +48,7 @@ Set env di backend VPS:
 ```bash
 PRINT_AGENT_URL=http://IP-PC-KASIR:19000
 PRINT_AGENT_TOKEN=secret123
+PRINT_AGENT_TIMEOUT_MS=45000
 ```
 
 Backend `POST /api/printers/print-order` otomatis kirim job ke print agent jika `PRINT_AGENT_URL` tersedia.
@@ -188,6 +189,7 @@ Tetap sama seperti mode local print agent:
 ```bash
 PRINT_AGENT_URL=http://IP-PC-KASIR:19000
 PRINT_AGENT_TOKEN=secret123
+PRINT_AGENT_TIMEOUT_MS=45000
 ```
 
 Jadi ini cocok untuk tim yang tidak ingin instal/runtime Node.js di kasir.

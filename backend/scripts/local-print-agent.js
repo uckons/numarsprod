@@ -26,6 +26,10 @@ const toHeatIntervalUnit = (microseconds) => {
   return Math.max(0, Math.min(255, units))
 }
 
+app.get('/', (_req, res) => {
+  res.json({ ok: true, service: 'local-print-agent', hint: 'use POST /print/receipt' })
+})
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'local-print-agent' })
 })

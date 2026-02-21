@@ -90,11 +90,18 @@ const printViaUsb = async (order) => {
 const printViaAgent = async ({ order, agentUrl, token }) => {
   const payload = buildReceiptPayload(order)
   const headers = token ? { "x-print-agent-token": token } : {}
+  const timeoutMs = Number(process.env.PRINT_AGENT_TIMEOUT_MS || 45000)
+  const endpoint = `${agentUrl.replace(/\/$/, "")}/print/receipt`
 
-  await axios.post(`${agentUrl.replace(/\/$/, "")}/print/receipt`, payload, {
-    headers,
-    timeout: 15000
-  })
+  try {
+    await axios.post(endpoint, payload, {
+      headers,
+      timeout: timeoutMs
+    })
+  } catch (err) {
+    const detail = err.response?.data?.message || err.code || err.message
+    throw new Error(`Gagal terhubung ke print agent (${endpoint}): ${detail}`)
+  }
 
   return { mode: "agent", agent_url: agentUrl }
 }

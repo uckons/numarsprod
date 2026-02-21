@@ -45,6 +45,12 @@ static async Task HandleRequest(HttpListenerContext ctx, string token, string pr
         var req = ctx.Request;
         var res = ctx.Response;
 
+        if (req.HttpMethod == "GET" && req.Url?.AbsolutePath == "/")
+        {
+            await Json(res, 200, new { ok = true, service = "windows-dotnet-print-agent", hint = "use POST /print/receipt" });
+            return;
+        }
+
         if (req.HttpMethod == "GET" && req.Url?.AbsolutePath == "/health")
         {
             await Json(res, 200, new { ok = true, service = "windows-dotnet-print-agent" });
