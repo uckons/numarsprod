@@ -358,6 +358,7 @@ internal static class RawPrinterHelper
         errorMessage = string.Empty;
 
         var bytes = Encoding.GetEncoding(437).GetBytes(data);
+        var bytesWithFormFeed = Encoding.GetEncoding(437).GetBytes(data + "\f");
         IntPtr pUnmanagedBytes = IntPtr.Zero;
         IntPtr hPrinter = IntPtr.Zero;
 
@@ -372,13 +373,13 @@ internal static class RawPrinterHelper
 
             var dataTypes = BuildDataTypeAttempts(preferredDataType);
 
-            foreach (var dt in dataTypes)
+            foreach (var attempt in dataTypes)
             {
-                var di = new DOCINFO { pDataType = dt };
+                var di = new DOCINFO { pDataType = attempt.DataType };
                 if (!StartDocPrinter(hPrinter, 1, di))
                 {
                     errorCode = Marshal.GetLastWin32Error();
-                    errorMessage = $"StartDocPrinter({dt}) failed: {new Win32Exception(errorCode).Message}";
+                    errorMessage = $"StartDocPrinter({attempt.Label}) failed: {new Win32Exception(errorCode).Message}";
                     if (errorCode == 1804) continue;
                     return false;
                 }
@@ -391,17 +392,18 @@ internal static class RawPrinterHelper
                     return false;
                 }
 
-                pUnmanagedBytes = Marshal.AllocCoTaskMem(bytes.Length);
-                Marshal.Copy(bytes, 0, pUnmanagedBytes, bytes.Length);
+                var bytesToWrite = attempt.AppendFormFeed ? bytesWithFormFeed : bytes;
+                pUnmanagedBytes = Marshal.AllocCoTaskMem(bytesToWrite.Length);
+                Marshal.Copy(bytesToWrite, 0, pUnmanagedBytes, bytesToWrite.Length);
 
-                var ok = WritePrinter(hPrinter, pUnmanagedBytes, bytes.Length, out _);
+                var ok = WritePrinter(hPrinter, pUnmanagedBytes, bytesToWrite.Length, out _);
                 EndPagePrinter(hPrinter);
                 EndDocPrinter(hPrinter);
 
                 if (ok) return true;
 
                 errorCode = Marshal.GetLastWin32Error();
-                errorMessage = $"WritePrinter({dt}) failed: {new Win32Exception(errorCode).Message}";
+                errorMessage = $"WritePrinter({attempt.Label}) failed: {new Win32Exception(errorCode).Message}";
             }
 
             return false;
@@ -413,26 +415,32 @@ internal static class RawPrinterHelper
         }
     }
 
-    private static List<string> BuildDataTypeAttempts(string preferredDataType)
+    private static List<DataTypeAttempt> BuildDataTypeAttempts(string preferredDataType)
     {
         if (string.IsNullOrWhiteSpace(preferredDataType) || string.Equals(preferredDataType, "AUTO", StringComparison.OrdinalIgnoreCase))
         {
-            return new List<string>
+            return new List<DataTypeAttempt>
             {
-                "RAW",
-                "RAW [FF appended]",
-                "NT EMF 1.008",
-                "NT EMF 1.007",
-                "TEXT"
+                new("RAW", "RAW", appendFormFeed: false),
+                new("RAW", "RAW + FF", appendFormFeed: true),
+                new("NT EMF 1.008", "NT EMF 1.008", appendFormFeed: false),
+                new("NT EMF 1.007", "NT EMF 1.007", appendFormFeed: false),
+                new("TEXT", "TEXT", appendFormFeed: false)
             };
         }
 
         var normalized = preferredDataType.Trim().ToUpperInvariant();
         if (normalized == "RAW")
         {
-            return new List<string> { "RAW", "RAW [FF appended]" };
+            return new List<DataTypeAttempt>
+            {
+                new("RAW", "RAW", appendFormFeed: false),
+                new("RAW", "RAW + FF", appendFormFeed: true)
+            };
         }
 
-        return new List<string> { normalized };
+        return new List<DataTypeAttempt> { new(normalized, normalized, appendFormFeed: false) };
     }
+
+    private sealed record DataTypeAttempt(string DataType, string Label, bool AppendFormFeed);
 }
