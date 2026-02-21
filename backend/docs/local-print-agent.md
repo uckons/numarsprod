@@ -241,3 +241,24 @@ Body optional override:
 ```
 
 Jika gagal, response akan berisi detail error koneksi (`ETIMEDOUT`, `ECONNREFUSED`, dll).
+
+
+### Troubleshooting PM2: `Identifier 'printViaAgent' has already been declared`
+
+Jika PM2 log menampilkan error parser tersebut, biasanya proses backend masih membaca file lama/hasil merge deploy yang duplikat.
+
+Langkah cepat di VPS:
+
+```bash
+cd /home/numarsadmin/fullnumars/backend
+git pull
+node --check modules/printers/printer.service.js
+pm2 restart numars-pos-backend --update-env
+```
+
+Jika masih muncul, jalankan:
+
+```bash
+pm2 delete numars-pos-backend
+pm2 start server.js --name numars-pos-backend
+```
