@@ -9,12 +9,25 @@ exports.printOrder = async (req, res) => {
       return res.status(400).json({ message: "order_id required" })
     }
 
-    // 🔹 ambil order
+    // 🔹 ambil order (detail lengkap untuk layout receipt enterprise)
     const orderRes = await db.query(
       `
-      SELECT id, total
-      FROM orders
-      WHERE id = $1
+      SELECT
+        o.id,
+        o.total,
+        o.payment_method,
+        o.created_at,
+        b.name AS branch_name,
+        b.address AS branch_address,
+        b.phone AS branch_phone,
+        b.logo_url AS branch_logo_url,
+        u.name AS cashier_name,
+        r.name AS room_name
+      FROM orders o
+      LEFT JOIN branches b ON b.id = o.branch_id
+      LEFT JOIN users u ON u.id = o.user_id
+      LEFT JOIN rooms r ON r.id = o.room_id
+      WHERE o.id = $1
       `,
       [order_id]
     )
@@ -36,6 +49,8 @@ exports.printOrder = async (req, res) => {
     )
 
     order.items = itemsRes.rows
+    order.payment_amount = Number(order.total || 0)
+    order.change_amount = 0
 
     // 🔹 PRINT
     await printerService.printOrder({ order, printer })

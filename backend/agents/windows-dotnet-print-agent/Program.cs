@@ -556,6 +556,17 @@ internal sealed class ReceiptModel
 {
     public string? Title { get; set; }
     public string? Divider { get; set; }
+    public int Order_Id { get; set; }
+    public string? Created_At { get; set; }
+    public string? Branch_Name { get; set; }
+    public string? Branch_Address { get; set; }
+    public string? Branch_Phone { get; set; }
+    public string? Branch_Logo_Url { get; set; }
+    public string? Cashier_Name { get; set; }
+    public string? Room_Name { get; set; }
+    public string? Payment_Method { get; set; }
+    public decimal Payment_Amount { get; set; }
+    public decimal Change_Amount { get; set; }
     public List<ReceiptItem> Items { get; set; } = new();
     public decimal Total { get; set; }
     public string? Printed_At { get; set; }
@@ -574,27 +585,37 @@ internal static class ReceiptBuilder
     public static string BuildRaw(ReceiptModel receipt)
     {
         var sb = new StringBuilder();
-        sb.AppendLine(receipt.Title ?? "NUMARS POS");
-        sb.AppendLine(receipt.Divider ?? "------------------------");
+        var divider = receipt.Divider ?? "------------------------";
+
+        sb.AppendLine(receipt.Branch_Name ?? receipt.Title ?? "NUMARS POS");
+        if (!string.IsNullOrWhiteSpace(receipt.Branch_Address)) sb.AppendLine(receipt.Branch_Address);
+        if (!string.IsNullOrWhiteSpace(receipt.Branch_Phone)) sb.AppendLine($"Tel: {receipt.Branch_Phone}");
+        sb.AppendLine(divider);
+
+        if (receipt.Order_Id > 0) sb.AppendLine($"No: #{receipt.Order_Id}");
+        if (!string.IsNullOrWhiteSpace(receipt.Created_At)) sb.AppendLine($"Tanggal: {receipt.Created_At}");
+        if (!string.IsNullOrWhiteSpace(receipt.Cashier_Name)) sb.AppendLine($"Kasir: {receipt.Cashier_Name}");
+        if (!string.IsNullOrWhiteSpace(receipt.Room_Name)) sb.AppendLine($"Room: {receipt.Room_Name}");
+        sb.AppendLine(divider);
 
         foreach (var i in receipt.Items)
         {
             sb.AppendLine($"{i.Service_Name} x{i.Qty}");
-            if (!string.IsNullOrWhiteSpace(i.Therapist_Name))
-                sb.AppendLine($"  Terapis: {i.Therapist_Name}");
+            if (!string.IsNullOrWhiteSpace(i.Therapist_Name)) sb.AppendLine($"  Terapis: {i.Therapist_Name}");
             sb.AppendLine($"Rp {i.Subtotal:N0}".Replace(',', '.'));
         }
 
-        sb.AppendLine(receipt.Divider ?? "------------------------");
+        sb.AppendLine(divider);
         sb.AppendLine($"TOTAL : Rp {receipt.Total:N0}".Replace(',', '.'));
+        sb.AppendLine($"Bayar : Rp {(receipt.Payment_Amount > 0 ? receipt.Payment_Amount : receipt.Total):N0}".Replace(',', '.'));
+        sb.AppendLine($"Kembali: Rp {receipt.Change_Amount:N0}".Replace(',', '.'));
+        sb.AppendLine($"Metode: {receipt.Payment_Method ?? "CASH"}");
         sb.AppendLine();
         sb.AppendLine(receipt.Printed_At ?? DateTime.Now.ToString("dd/MM/yyyy HH:mm"));
 
-        // GS V 0 (full cut)
-        sb.Append('\x1d');
+        sb.Append('');
         sb.Append('V');
         sb.Append('\x00');
-
         return sb.ToString();
     }
 }
@@ -618,7 +639,7 @@ internal static class GdiReceiptPrinter
 
             const float mmToHundredthInch = 3.93701f;
             var width = (int)Math.Round(58f * mmToHundredthInch);
-            doc.DefaultPageSettings.PaperSize = new PaperSize("NUMARS58", width, 3000);
+            doc.DefaultPageSettings.PaperSize = new PaperSize("NUMARS58", width, 3200);
             doc.DefaultPageSettings.Margins = new Margins(6, 6, 6, 6);
 
             doc.PrintPage += (sender, ev) =>
@@ -637,10 +658,18 @@ internal static class GdiReceiptPrinter
                 using var right = new StringFormat { Alignment = StringAlignment.Far };
                 using var linePen = new Pen(Color.Black, 1f);
 
-                g.DrawString(receipt.Title ?? "NUMARS POS", titleFont, Brushes.Black, new RectangleF(left, y, maxWidth, 20), center);
-                y += 18;
-
                 var divider = receipt.Divider ?? "------------------------";
+                g.DrawString(receipt.Branch_Name ?? receipt.Title ?? "NUMARS POS", titleFont, Brushes.Black, new RectangleF(left, y, maxWidth, 20), center);
+                y += 16;
+                if (!string.IsNullOrWhiteSpace(receipt.Branch_Address)) { g.DrawString(receipt.Branch_Address, smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12), center); y += 11; }
+                if (!string.IsNullOrWhiteSpace(receipt.Branch_Phone)) { g.DrawString($"Tel: {receipt.Branch_Phone}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12), center); y += 11; }
+                g.DrawString(divider, smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12), center);
+                y += 12;
+
+                if (receipt.Order_Id > 0) { g.DrawString($"No: #{receipt.Order_Id}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12)); y += 11; }
+                if (!string.IsNullOrWhiteSpace(receipt.Created_At)) { g.DrawString($"Tanggal: {receipt.Created_At}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12)); y += 11; }
+                if (!string.IsNullOrWhiteSpace(receipt.Cashier_Name)) { g.DrawString($"Kasir: {receipt.Cashier_Name}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12)); y += 11; }
+                if (!string.IsNullOrWhiteSpace(receipt.Room_Name)) { g.DrawString($"Room: {receipt.Room_Name}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12)); y += 11; }
                 g.DrawString(divider, smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12), center);
                 y += 12;
 
@@ -663,7 +692,18 @@ internal static class GdiReceiptPrinter
 
                 g.DrawString("TOTAL", totalFont, Brushes.Black, new RectangleF(left, y, maxWidth / 2f, 16));
                 g.DrawString($"Rp {receipt.Total:N0}".Replace(',', '.'), totalFont, Brushes.Black, new RectangleF(left + maxWidth / 2f, y, maxWidth / 2f, 16), right);
-                y += 18;
+                y += 16;
+
+                var payAmount = receipt.Payment_Amount > 0 ? receipt.Payment_Amount : receipt.Total;
+                g.DrawString("Bayar", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth / 2f, 14));
+                g.DrawString($"Rp {payAmount:N0}".Replace(',', '.'), smallFont, Brushes.Black, new RectangleF(left + maxWidth / 2f, y, maxWidth / 2f, 14), right);
+                y += 13;
+                g.DrawString("Kembali", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth / 2f, 14));
+                g.DrawString($"Rp {receipt.Change_Amount:N0}".Replace(',', '.'), smallFont, Brushes.Black, new RectangleF(left + maxWidth / 2f, y, maxWidth / 2f, 14), right);
+                y += 13;
+                g.DrawString("Metode", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth / 2f, 14));
+                g.DrawString(receipt.Payment_Method ?? "CASH", smallFont, Brushes.Black, new RectangleF(left + maxWidth / 2f, y, maxWidth / 2f, 14), right);
+                y += 16;
 
                 var printedAt = receipt.Printed_At ?? DateTime.Now.ToString("dd/MM/yyyy HH:mm");
                 g.DrawString(printedAt, smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 14), center);
