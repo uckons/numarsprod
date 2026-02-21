@@ -10,5 +10,17 @@ router.post(
   controller.printOrder
 )
 
+router.post(
+  "/test-agent",
+  auth,
+  controller.testAgent
+)
+
+router.post(
+  "/test-agent-print",
+  auth,
+  controller.testAgentPrint
+)
+
 module.exports = router
 
