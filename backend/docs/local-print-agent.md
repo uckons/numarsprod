@@ -154,8 +154,12 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
 - Folder: `backend/agents/windows-dotnet-print-agent`
 - Project: `WindowsDotnetPrintAgent.csproj`
 - Endpoint kompatibel dengan backend saat ini:
+  - `GET /uix` (UIX local untuk cek status/test print/update config runtime)
   - `GET /health`
   - `GET /printers` (daftar printer terdeteksi + default printer)
+  - `GET /config`
+  - `POST /config/update`
+  - `POST /print/test`
   - `POST /print/receipt`
 
 ### Cara run di Windows (Visual Studio)

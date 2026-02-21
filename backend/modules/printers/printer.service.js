@@ -250,3 +250,38 @@ exports.testAgentPrint = async ({ agentUrl, token, printerName }) => {
     throw new Error(`Test print agent gagal (${base}/print/test): ${detail}`)
   }
 }
+
+exports.getAgentDiagnostics = async ({ agentUrl, token }) => {
+  if (!agentUrl) {
+    throw new Error("PRINT_AGENT_URL belum di-set")
+  }
+
+  const headers = token ? { "x-print-agent-token": token } : {}
+  const timeoutMs = Number(process.env.PRINT_AGENT_TIMEOUT_MS || 45000)
+  const base = agentUrl.replace(/\/$/, "")
+
+  try {
+    const [healthRes, printersRes] = await Promise.all([
+      axios.get(`${base}/health`, { headers, timeout: timeoutMs }),
+      axios.get(`${base}/printers`, { headers, timeout: timeoutMs })
+    ])
+
+    return {
+      ok: true,
+      base_url: base,
+      health: {
+        status: healthRes.status,
+        data: healthRes.data
+      },
+      printers: {
+        status: printersRes.status,
+        data: printersRes.data
+      }
+    }
+  } catch (err) {
+    const detail = err.response?.data
+      ? JSON.stringify(err.response.data)
+      : (err.code || err.message)
+    throw new Error(`Diagnosa agent gagal (${base}): ${detail}`)
+  }
+}
