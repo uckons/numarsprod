@@ -417,9 +417,22 @@ internal static class RawPrinterHelper
     {
         if (string.IsNullOrWhiteSpace(preferredDataType) || string.Equals(preferredDataType, "AUTO", StringComparison.OrdinalIgnoreCase))
         {
-            return new List<string> { "RAW", "TEXT" };
+            return new List<string>
+            {
+                "RAW",
+                "RAW [FF appended]",
+                "NT EMF 1.008",
+                "NT EMF 1.007",
+                "TEXT"
+            };
         }
 
-        return new List<string> { preferredDataType.Trim().ToUpperInvariant() };
+        var normalized = preferredDataType.Trim().ToUpperInvariant();
+        if (normalized == "RAW")
+        {
+            return new List<string> { "RAW", "RAW [FF appended]" };
+        }
+
+        return new List<string> { normalized };
     }
 }

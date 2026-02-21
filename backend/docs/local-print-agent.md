@@ -169,7 +169,7 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
    - `PRINT_AGENT_PORT` (default `19000`)
    - `PRINT_AGENT_TOKEN` (token auth, optional)
    - `PRINT_AGENT_PRINTER` (nama printer Windows; kalau kosong pakai default printer)
-   - `PRINT_AGENT_DATATYPE` (default `AUTO`: coba `RAW`, lalu `TEXT`; jika diisi `TEXT` atau `RAW`, agent hanya pakai nilai itu saja)
+   - `PRINT_AGENT_DATATYPE` (default `AUTO`: coba `RAW` (termasuk `RAW [FF appended]`), `NT EMF`, lalu `TEXT`; jika diisi `TEXT`, agent hanya pakai `TEXT`)
 
    **B. Via file config `agent-config.json`** di folder hasil build EXE (copy dari `agent-config.example.json`):
 
@@ -336,9 +336,9 @@ Jika agent mengembalikan error ini, driver printer tidak menerima `RAW` pada `St
 
 Perbaikan yang sudah diterapkan:
 - Agent sekarang memakai aturan berikut:
-- `PRINT_AGENT_DATATYPE=AUTO` (atau kosong): coba `RAW` lalu `TEXT`.
-- `PRINT_AGENT_DATATYPE=TEXT`: pakai `TEXT` saja (tanpa fallback ke `RAW`).
-- `PRINT_AGENT_DATATYPE=RAW`: pakai `RAW` saja.
+- `PRINT_AGENT_DATATYPE=AUTO` (atau kosong): coba berurutan `RAW` -> `RAW [FF appended]` -> `NT EMF 1.008` -> `NT EMF 1.007` -> `TEXT`.
+- `PRINT_AGENT_DATATYPE=TEXT`: pakai `TEXT` saja.
+- `PRINT_AGENT_DATATYPE=RAW`: pakai `RAW` lalu `RAW [FF appended]`.
 
 Langkah operator:
 1. Pull source terbaru dan publish ulang .NET agent.
