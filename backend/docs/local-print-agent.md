@@ -219,3 +219,25 @@ netsh http add urlacl url=http://192.168.1.10:19000/ user=Everyone
 ```
 
 3. Restart agent setelah URL ACL berhasil ditambahkan.
+
+
+### Diagnosa dari backend VPS (tanpa SSH ke kasir)
+
+Untuk cek apakah VPS bisa menjangkau agent, panggil endpoint backend ini:
+
+```http
+POST /api/printers/test-agent
+```
+
+Body optional override:
+
+```json
+{
+  "printer": {
+    "agent_url": "http://172.200.201.101:19000",
+    "agent_token": "secret123"
+  }
+}
+```
+
+Jika gagal, response akan berisi detail error koneksi (`ETIMEDOUT`, `ECONNREFUSED`, dll).
