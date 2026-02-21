@@ -173,7 +173,7 @@ Kalau lebih nyaman pakai Visual Studio, gunakan project ini:
    - `PRINT_AGENT_PORT` (default `19000`)
    - `PRINT_AGENT_TOKEN` (token auth, optional)
    - `PRINT_AGENT_PRINTER` (nama printer Windows; kalau kosong pakai default printer)
-  - `PRINT_AGENT_DATATYPE` (default `AUTO`: coba `RAW`, `RAW + FF` (tetap datatype RAW), `NT EMF`, lalu `TEXT`; jika diisi `RAW`, agent hanya mencoba mode RAW; jika diisi `TEXT`, agent hanya pakai `TEXT`)
+  - `PRINT_AGENT_DATATYPE` (default `AUTO`: hanya `RAW` lalu `RAW + FF` untuk kompatibilitas thermal. Gunakan `AUTO_EXTENDED` jika ingin fallback tambahan `NT EMF` dan `TEXT`; jika diisi `RAW`, agent hanya mencoba mode RAW; jika diisi `TEXT`, agent hanya pakai `TEXT`)
 
    **B. Via file config `agent-config.json`** di folder hasil build EXE (copy dari `agent-config.example.json`):
 
@@ -359,9 +359,10 @@ Jika agent mengembalikan error ini, driver printer tidak menerima `RAW` pada `St
 
 Perbaikan yang sudah diterapkan:
 - Agent sekarang memakai aturan berikut:
-- `PRINT_AGENT_DATATYPE=AUTO` (atau kosong): coba berurutan `RAW` -> `RAW + FF` -> `NT EMF 1.008` -> `NT EMF 1.007` -> `TEXT`.
+- `PRINT_AGENT_DATATYPE=AUTO` (atau kosong): fokus thermal (`RAW` -> `RAW + FF`).
+- `PRINT_AGENT_DATATYPE=AUTO_EXTENDED`: fallback lengkap (`RAW` -> `RAW + FF` -> `NT EMF 1.008` -> `NT EMF 1.007` -> `TEXT`).
 - `PRINT_AGENT_DATATYPE=TEXT`: pakai `TEXT` saja.
-- `PRINT_AGENT_DATATYPE=RAW`: sekarang tetap kompatibel otomatis (`RAW` -> `RAW + FF` -> `NT EMF 1.008` -> `NT EMF 1.007` -> `TEXT`) supaya tidak mentok di error 1804.
+- `PRINT_AGENT_DATATYPE=RAW`: hanya mode RAW (`RAW` -> `RAW + FF`) agar tidak menghasilkan fallback menyesatkan.
 
 Langkah operator:
 1. Pull source terbaru dan publish ulang .NET agent.

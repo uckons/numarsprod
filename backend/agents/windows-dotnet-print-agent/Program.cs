@@ -287,7 +287,8 @@ static string BuildUixHtml(AgentRuntimeState runtime)
       </label>
       <label>DataType
         <select id="dataType">
-          <option value="AUTO">AUTO</option>
+          <option value="AUTO">AUTO (recommended thermal)</option>
+          <option value="AUTO_EXTENDED">AUTO_EXTENDED (RAW + EMF + TEXT)</option>
           <option value="RAW">RAW</option>
           <option value="TEXT">TEXT</option>
           <option value="NT EMF 1.008">NT EMF 1.008</option>
@@ -713,8 +714,23 @@ internal static class RawPrinterHelper
 
     private static List<DataTypeAttempt> BuildDataTypeAttempts(string preferredDataType)
     {
-        if (string.IsNullOrWhiteSpace(preferredDataType) || string.Equals(preferredDataType, "AUTO", StringComparison.OrdinalIgnoreCase))
+        var normalized = string.IsNullOrWhiteSpace(preferredDataType)
+            ? "AUTO"
+            : preferredDataType.Trim().ToUpperInvariant();
+
+        if (normalized == "AUTO")
         {
+            // Default AUTO is optimized for thermal printer compatibility.
+            return new List<DataTypeAttempt>
+            {
+                new("RAW", "RAW", AppendFormFeed: false),
+                new("RAW", "RAW + FF", AppendFormFeed: true)
+            };
+        }
+
+        if (normalized == "AUTO_EXTENDED" || normalized == "AUTO-EXTENDED")
+        {
+            // Extended fallback for non-thermal printers.
             return new List<DataTypeAttempt>
             {
                 new("RAW", "RAW", AppendFormFeed: false),
@@ -725,7 +741,6 @@ internal static class RawPrinterHelper
             };
         }
 
-        var normalized = preferredDataType.Trim().ToUpperInvariant();
         if (normalized == "RAW")
         {
             return new List<DataTypeAttempt>
