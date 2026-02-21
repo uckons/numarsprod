@@ -17,11 +17,18 @@ else
     Console.WriteLine("[windows-dotnet-print-agent] config not found, using defaults/env");
 }
 
-var host = Environment.GetEnvironmentVariable("PRINT_AGENT_HOST") ?? config.Host ?? "localhost";
-var port = Environment.GetEnvironmentVariable("PRINT_AGENT_PORT") ?? config.Port ?? "19000";
-var token = Environment.GetEnvironmentVariable("PRINT_AGENT_TOKEN") ?? config.Token ?? string.Empty;
-var printerName = Environment.GetEnvironmentVariable("PRINT_AGENT_PRINTER") ?? config.PrinterName ?? string.Empty;
-var dataType = Environment.GetEnvironmentVariable("PRINT_AGENT_DATATYPE") ?? config.DataType ?? "RAW";
+static string Pick(string? envValue, string? configValue, string fallback)
+{
+    if (!string.IsNullOrWhiteSpace(envValue)) return envValue.Trim();
+    if (!string.IsNullOrWhiteSpace(configValue)) return configValue.Trim();
+    return fallback;
+}
+
+var host = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_HOST"), config.Host, "localhost");
+var port = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_PORT"), config.Port, "19000");
+var token = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_TOKEN"), config.Token, string.Empty);
+var printerName = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_PRINTER"), config.PrinterName, string.Empty);
+var dataType = Pick(Environment.GetEnvironmentVariable("PRINT_AGENT_DATATYPE"), config.DataType, "RAW").ToUpperInvariant();
 
 var prefix = $"http://{host}:{port}/";
 var listener = new HttpListener();
@@ -44,6 +51,7 @@ Console.WriteLine($"[windows-dotnet-print-agent] listening on {prefix}");
 Console.WriteLine(string.IsNullOrWhiteSpace(printerName)
     ? "[windows-dotnet-print-agent] printer: default windows printer"
     : $"[windows-dotnet-print-agent] printer: {printerName}");
+Console.WriteLine($"[windows-dotnet-print-agent] datatype: {dataType}");
 
 while (true)
 {
@@ -60,13 +68,13 @@ static async Task HandleRequest(HttpListenerContext ctx, string token, string pr
 
         if (req.HttpMethod == "GET" && req.Url?.AbsolutePath == "/")
         {
-            await Json(res, 200, new { ok = true, service = "windows-dotnet-print-agent", hint = "use POST /print/receipt" });
+            await Json(res, 200, new { ok = true, service = "windows-dotnet-print-agent", hint = "use POST /print/receipt", dataType });
             return;
         }
 
         if (req.HttpMethod == "GET" && req.Url?.AbsolutePath == "/health")
         {
-            await Json(res, 200, new { ok = true, service = "windows-dotnet-print-agent" });
+            await Json(res, 200, new { ok = true, service = "windows-dotnet-print-agent", dataType });
             return;
         }
 
@@ -119,6 +127,7 @@ static async Task HandleRequest(HttpListenerContext ctx, string token, string pr
                 {
                     message = "Failed sending raw bytes to printer",
                     printer = targetPrinter,
+                    dataType,
                     errorCode = errCode,
                     errorMessage = errMessage,
                     defaultPrinter = RawPrinterHelper.GetDefaultPrinterName(),
@@ -127,7 +136,7 @@ static async Task HandleRequest(HttpListenerContext ctx, string token, string pr
                 return;
             }
 
-            await Json(res, 200, new { success = true, printer = targetPrinter, mode = "test-print" });
+            await Json(res, 200, new { success = true, printer = targetPrinter, mode = "test-print", dataType });
             return;
         }
 
@@ -167,6 +176,7 @@ static async Task HandleRequest(HttpListenerContext ctx, string token, string pr
                 {
                     message = "Failed sending raw bytes to printer",
                     printer = targetPrinter,
+                    dataType,
                     errorCode = errCode,
                     errorMessage = errMessage,
                     defaultPrinter = RawPrinterHelper.GetDefaultPrinterName(),
@@ -175,7 +185,7 @@ static async Task HandleRequest(HttpListenerContext ctx, string token, string pr
                 return;
             }
 
-            await Json(res, 200, new { success = true, printer = targetPrinter });
+            await Json(res, 200, new { success = true, printer = targetPrinter, dataType });
             return;
         }
 
