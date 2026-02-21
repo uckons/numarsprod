@@ -292,3 +292,14 @@ Jika default printer Windows salah, bisa override dari request backend:
 ```
 
 Tip: cek daftar printer yang dikenali agent lewat `GET /printers`.
+
+
+### Troubleshooting .NET build: `The name 'PrinterSettings' does not exist in the current context`
+
+Jika error ini muncul saat build agent .NET:
+
+- pastikan project terbaru sudah ter-pull, karena `.csproj` sudah ditambah:
+  - `<UseSystemDrawing>true</UseSystemDrawing>`
+  - `System.Drawing.Common` package
+
+Lalu lakukan restore + rebuild di Visual Studio.
