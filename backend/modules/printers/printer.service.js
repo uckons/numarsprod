@@ -21,6 +21,43 @@ const toHeatIntervalUnit = (microseconds) => {
   return Math.max(0, Math.min(255, units))
 }
 
+
+const formatReceiptDateTime = (value) => {
+  try {
+    if (!value) return null
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return null
+
+    const datePart = date.toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    })
+    const timePart = date.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).replace('.', ':')
+
+    return `${datePart}, ${timePart}`
+  } catch {
+    return null
+  }
+}
+
+const formatReceiptTime = (value = new Date()) => {
+  try {
+    const date = new Date(value)
+    return date.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).replace('.', ':')
+  } catch {
+    return "00:00"
+  }
+}
+
 const buildReceiptPayload = (order, options = {}) => ({
   profile: THERMAL_PROFILE,
   printer_name: options.printerName || null,
@@ -28,13 +65,14 @@ const buildReceiptPayload = (order, options = {}) => ({
     title: order.branch_name || "NUMARS POS",
     divider: "------------------------",
     order_id: Number(order.id || 0),
-    created_at: order.created_at || null,
+    created_at: formatReceiptDateTime(order.created_at),
     branch_name: order.branch_name || null,
     branch_address: order.branch_address || null,
     branch_phone: order.branch_phone || null,
     branch_logo_url: order.branch_logo_url || null,
     cashier_name: order.cashier_name || null,
     room_name: order.room_name || null,
+    therapist_name: order.therapist_name || null,
     payment_method: order.payment_method || "CASH",
     payment_amount: Number(order.payment_amount || order.total || 0),
     change_amount: Number(order.change_amount || 0),
@@ -45,7 +83,7 @@ const buildReceiptPayload = (order, options = {}) => ({
       therapist_name: item.therapist_name || null
     })),
     total: Number(order.total || 0),
-    printed_at: new Date().toLocaleString("id-ID")
+    printed_at: formatReceiptTime()
   }
 })
 

@@ -166,7 +166,7 @@ static async Task HandleRequest(HttpListenerContext ctx, AgentRuntimeState runti
             {
                 Title = "NUMARS TEST PRINT",
                 Divider = "------------------------",
-                Printed_At = DateTime.Now.ToString("dd/MM/yyyy HH:mm"),
+                Printed_At = DateTime.Now.ToString("HH:mm"),
                 Total = 0,
                 Items = new List<ReceiptItem>
                 {
@@ -564,6 +564,7 @@ internal sealed class ReceiptModel
     public string? Branch_Logo_Url { get; set; }
     public string? Cashier_Name { get; set; }
     public string? Room_Name { get; set; }
+    public string? Therapist_Name { get; set; }
     public string? Payment_Method { get; set; }
     public decimal Payment_Amount { get; set; }
     public decimal Change_Amount { get; set; }
@@ -595,6 +596,7 @@ internal static class ReceiptBuilder
         if (receipt.Order_Id > 0) sb.AppendLine($"No: #{receipt.Order_Id}");
         if (!string.IsNullOrWhiteSpace(receipt.Created_At)) sb.AppendLine($"Tanggal: {receipt.Created_At}");
         if (!string.IsNullOrWhiteSpace(receipt.Cashier_Name)) sb.AppendLine($"Kasir: {receipt.Cashier_Name}");
+        if (!string.IsNullOrWhiteSpace(receipt.Therapist_Name)) sb.AppendLine($"Terapis: {receipt.Therapist_Name}");
         if (!string.IsNullOrWhiteSpace(receipt.Room_Name)) sb.AppendLine($"Room: {receipt.Room_Name}");
         sb.AppendLine(divider);
 
@@ -611,9 +613,12 @@ internal static class ReceiptBuilder
         sb.AppendLine($"Kembali: Rp {receipt.Change_Amount:N0}".Replace(',', '.'));
         sb.AppendLine($"Metode: {receipt.Payment_Method ?? "CASH"}");
         sb.AppendLine();
-        sb.AppendLine(receipt.Printed_At ?? DateTime.Now.ToString("dd/MM/yyyy HH:mm"));
+        sb.AppendLine($"Jam: {receipt.Printed_At ?? DateTime.Now.ToString("HH:mm")}");
+        sb.AppendLine();
+        sb.AppendLine("Terima kasih atas kunjungan Anda");
+        sb.AppendLine("Semoga sehat selalu!");
 
-        sb.Append('');
+        sb.Append('\x1d');
         sb.Append('V');
         sb.Append('\x00');
         return sb.ToString();
@@ -650,10 +655,10 @@ internal static class GdiReceiptPrinter
                 var maxWidth = ev.MarginBounds.Width;
                 var y = top;
 
-                using var titleFont = new Font("Segoe UI", 9f, FontStyle.Bold);
-                using var normalFont = new Font("Segoe UI", 7.5f, FontStyle.Regular);
-                using var smallFont = new Font("Segoe UI", 7f, FontStyle.Regular);
-                using var totalFont = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+                using var titleFont = new Font("Courier New", 10f, FontStyle.Bold);
+                using var normalFont = new Font("Courier New", 8f, FontStyle.Regular);
+                using var smallFont = new Font("Courier New", 7.5f, FontStyle.Regular);
+                using var totalFont = new Font("Courier New", 9.5f, FontStyle.Bold);
                 using var center = new StringFormat { Alignment = StringAlignment.Center };
                 using var right = new StringFormat { Alignment = StringAlignment.Far };
                 using var linePen = new Pen(Color.Black, 1f);
@@ -669,21 +674,28 @@ internal static class GdiReceiptPrinter
                 if (receipt.Order_Id > 0) { g.DrawString($"No: #{receipt.Order_Id}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12)); y += 11; }
                 if (!string.IsNullOrWhiteSpace(receipt.Created_At)) { g.DrawString($"Tanggal: {receipt.Created_At}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12)); y += 11; }
                 if (!string.IsNullOrWhiteSpace(receipt.Cashier_Name)) { g.DrawString($"Kasir: {receipt.Cashier_Name}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12)); y += 11; }
+                if (!string.IsNullOrWhiteSpace(receipt.Therapist_Name)) { g.DrawString($"Terapis: {receipt.Therapist_Name}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12)); y += 11; }
                 if (!string.IsNullOrWhiteSpace(receipt.Room_Name)) { g.DrawString($"Room: {receipt.Room_Name}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12)); y += 11; }
+                g.DrawString(divider, smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12), center);
+                y += 12;
+                g.DrawString("Item", normalFont, Brushes.Black, new RectangleF(left, y, maxWidth * 0.55f, 14));
+                g.DrawString("Qty", normalFont, Brushes.Black, new RectangleF(left + maxWidth * 0.55f, y, maxWidth * 0.15f, 14), right);
+                g.DrawString("Subtotal", normalFont, Brushes.Black, new RectangleF(left + maxWidth * 0.70f, y, maxWidth * 0.30f, 14), right);
+                y += 13;
                 g.DrawString(divider, smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12), center);
                 y += 12;
 
                 foreach (var item in receipt.Items)
                 {
-                    g.DrawString($"{item.Service_Name} x{item.Qty}", normalFont, Brushes.Black, new RectangleF(left, y, maxWidth, 14));
+                    g.DrawString(item.Service_Name ?? "-", normalFont, Brushes.Black, new RectangleF(left, y, maxWidth * 0.55f, 14));
+                    g.DrawString($"{item.Qty}x", normalFont, Brushes.Black, new RectangleF(left + maxWidth * 0.55f, y, maxWidth * 0.15f, 14), right);
+                    g.DrawString($"Rp {item.Subtotal:N0}".Replace(',', '.'), normalFont, Brushes.Black, new RectangleF(left + maxWidth * 0.70f, y, maxWidth * 0.30f, 14), right);
                     y += 13;
                     if (!string.IsNullOrWhiteSpace(item.Therapist_Name))
                     {
-                        g.DrawString($"  Terapis: {item.Therapist_Name}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12));
+                        g.DrawString($"Terapis: {item.Therapist_Name}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 12));
                         y += 11;
                     }
-                    g.DrawString($"Rp {item.Subtotal:N0}".Replace(',', '.'), normalFont, Brushes.Black, new RectangleF(left, y, maxWidth, 14), right);
-                    y += 13;
                 }
 
                 y += 2;
@@ -705,10 +717,12 @@ internal static class GdiReceiptPrinter
                 g.DrawString(receipt.Payment_Method ?? "CASH", smallFont, Brushes.Black, new RectangleF(left + maxWidth / 2f, y, maxWidth / 2f, 14), right);
                 y += 16;
 
-                var printedAt = receipt.Printed_At ?? DateTime.Now.ToString("dd/MM/yyyy HH:mm");
-                g.DrawString(printedAt, smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 14), center);
+                var printedAt = receipt.Printed_At ?? DateTime.Now.ToString("HH:mm");
+                g.DrawString($"Jam: {printedAt}", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 14), center);
                 y += 14;
-                g.DrawString("Terima kasih", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 14), center);
+                g.DrawString("Terima kasih atas kunjungan Anda", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 14), center);
+                y += 12;
+                g.DrawString("Semoga sehat selalu!", smallFont, Brushes.Black, new RectangleF(left, y, maxWidth, 14), center);
 
                 ev.HasMorePages = false;
             };

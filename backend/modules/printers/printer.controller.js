@@ -22,11 +22,19 @@ exports.printOrder = async (req, res) => {
         b.phone AS branch_phone,
         b.logo_url AS branch_logo_url,
         u.name AS cashier_name,
-        r.name AS room_name
+        r.name AS room_name,
+        ot.therapist_name
       FROM orders o
       LEFT JOIN branches b ON b.id = o.branch_id
       LEFT JOIN users u ON u.id = o.user_id
       LEFT JOIN rooms r ON r.id = o.room_id
+      LEFT JOIN LATERAL (
+        SELECT string_agg(DISTINCT oi2.therapist_name, ', ' ORDER BY oi2.therapist_name) AS therapist_name
+        FROM order_items oi2
+        WHERE oi2.order_id = o.id
+          AND oi2.therapist_name IS NOT NULL
+          AND oi2.therapist_name <> ''
+      ) ot ON true
       WHERE o.id = $1
       `,
       [order_id]
