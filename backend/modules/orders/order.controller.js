@@ -1812,7 +1812,7 @@ exports.reprintBarOrder = async (req, res) => {
          (
            SELECT string_agg(DISTINCT t_name, ', ' ORDER BY t_name)
            FROM (
-             SELECT NULLIF(BTRIM(regexp_split_to_table(COALESCE(oi.therapist_name, '')), ','), '') AS t_name
+             SELECT NULLIF(BTRIM(regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',')), '') AS t_name
              FROM order_items oi
              WHERE oi.order_id = o.id
            ) t
