@@ -1,5 +1,40 @@
 const service = require("./timer.service")
 const { writeAuditLog: writeAuditEntry } = require("../../utils/audit")
+const printerService = require("../printers/printer.service")
+const printerTargetService = require("../printers/printer-target.service")
+
+
+
+const queueBarInboxAutoPrint = (req, payload = {}) => {
+  Promise.resolve().then(async () => {
+    const db = req.app.get("db")
+    const target = await printerTargetService.getResolvedPrinterTarget({
+      db,
+      branchId: payload.branch_id,
+      channel: printerTargetService.CHANNELS.BAR_INBOX
+    })
+
+    if (!target?.agent_url || target.is_active === false) return
+
+    await printerService.printBarInboxTicket({
+      ticket: {
+        order_id: payload.order_id,
+        branch_name: payload.branch_name || "BAR",
+        created_at: new Date().toISOString(),
+        note: payload.note || null,
+        source: payload.source || "TIMER KTV -> BAR",
+        items: Array.isArray(payload.items) ? payload.items : []
+      },
+      printer: {
+        agent_url: target.agent_url,
+        agent_token: target.agent_token,
+        agent_printer_name: target.agent_printer_name
+      }
+    })
+  }).catch((err) => {
+    console.error("BAR AUTO PRINT TIMER ERROR:", err.message || err)
+  })
+}
 
 exports.start = async (req, res) => {
 
@@ -679,6 +714,14 @@ exports.startTimer = async (req, res) => {
           order_id: finalOrderId,
           branch_id: branchId,
           status: 'PENDING',
+          note: barNote,
+          items: barSnapshot
+        })
+
+        queueBarInboxAutoPrint(req, {
+          order_id: finalOrderId,
+          branch_id: branchId,
+          source: "KTV TIMER",
           note: barNote,
           items: barSnapshot
         })
