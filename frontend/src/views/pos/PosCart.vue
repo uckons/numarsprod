@@ -58,12 +58,39 @@
     </div>
   </div>
 
+
+  <!-- 💳 PAYMENT CONFIRM MODAL -->
+  <div v-if="showPaymentConfirmModal" class="modal-overlay" @click="closePaymentConfirmModal">
+    <div class="modal-content receipt-modal" @click.stop>
+      <div class="modal-header">
+        <h2>Konfirmasi Pembayaran</h2>
+        <button class="modal-close" @click="closePaymentConfirmModal">✕</button>
+      </div>
+
+      <div class="receipt-preview" style="padding:20px;text-align:center;">
+        <p style="margin:0 0 10px 0;">Pastikan pembayaran sudah benar.</p>
+        <p style="margin:0 0 4px 0;"><strong>Metode:</strong> {{ receiptData?.payment_method || 'CASH' }}</p>
+        <p style="margin:0 0 4px 0;"><strong>Total:</strong> {{ formatRupiah(receiptData?.total || 0) }}</p>
+        <p style="margin:0;"><strong>Bayar:</strong> {{ formatRupiah(receiptData?.payment_amount || 0) }}</p>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-print" @click="proceedToPrintCartStep">
+          🧾 Lanjut Print
+        </button>
+        <button class="btn btn-close" @click="closePaymentConfirmModal">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- 🖨️ RECEIPT PREVIEW MODAL -->
   <div v-if="showReceiptModal" class="modal-overlay" @click="closeReceiptModal">
     <div class="modal-content receipt-modal" @click.stop>
       <!-- Header -->
       <div class="modal-header">
-        <h2>Konfirmasi Pembayaran</h2>
+        <h2>Print Cart</h2>
         <button class="modal-close" @click="closeReceiptModal">✕</button>
       </div>
 
@@ -406,6 +433,7 @@ const lastOrder = ref({
 
 // 🖨️ RECEIPT PREVIEW STATE
 const showReceiptModal = ref(false)
+const showPaymentConfirmModal = ref(false)
 const receiptData = ref(null)
 const receiptLoading = ref(false)
 const pendingPayment = ref(null)
@@ -602,7 +630,7 @@ const checkout = async () => {
   pendingFinalizedOrderId.value = null
   inPrintCartStep.value = false
   receiptData.value = buildDraftReceiptPreview(payment)
-  showReceiptModal.value = true
+  showPaymentConfirmModal.value = true
 }
 
 // 🖨️ SHOW RECEIPT PREVIEW
@@ -662,12 +690,24 @@ const finalizeCompletedOrder = async (orderId) => {
 
 // backward-compatible handler for stale cached templates
 const proceedToPrintCartStep = async () => {
+  showPaymentConfirmModal.value = false
+  showReceiptModal.value = true
   inPrintCartStep.value = true
+}
+
+const closePaymentConfirmModal = async () => {
+  showPaymentConfirmModal.value = false
+  receiptData.value = null
+  pendingPayment.value = null
+  pendingPrinted.value = false
+  pendingFinalizedOrderId.value = null
+  inPrintCartStep.value = false
 }
 
 // 🖨️ CLOSE RECEIPT MODAL
 const closeReceiptModal = async () => {
   showReceiptModal.value = false
+  showPaymentConfirmModal.value = false
   receiptData.value = null
   inPrintCartStep.value = false
 
