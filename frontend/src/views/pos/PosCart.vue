@@ -567,15 +567,15 @@ const printReceipt = async () => {
       printer: getPrinterAgentConfig()
     })
 
+    closeReceiptModal()
     await SwalTheme.fire({
       icon: "success",
       title: "Struk dikirim",
       text: "🖨 Struk langsung dikirim ke printer POS",
       confirmButtonText: "OK"
     })
-
-    closeReceiptModal()
   } catch (err) {
+    closeReceiptModal()
     await SwalTheme.fire({
       icon: "error",
       title: "Gagal cetak",
