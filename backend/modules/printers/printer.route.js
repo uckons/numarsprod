@@ -11,6 +11,12 @@ router.post(
 )
 
 router.post(
+  "/print-recap",
+  auth,
+  controller.printRecap
+)
+
+router.post(
   "/test-agent",
   auth,
   controller.testAgent
