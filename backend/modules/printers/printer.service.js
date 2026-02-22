@@ -100,7 +100,8 @@ const buildRecapPayload = (report, options = {}) => {
     .map((row) => {
       const category = normalizeCategory(row.category)
       return {
-        service_name: `${category} ${String(row.service_name || '-').trim()}`,
+        category,
+        service_name: String(row.service_name || '-').trim(),
         qty: Number(row.qty || 0),
         subtotal: Number(row.revenue || 0)
       }
@@ -113,8 +114,8 @@ const buildRecapPayload = (report, options = {}) => {
     receipt: {
       title: 'RECAP LAPORAN PENDAPATAN',
       divider: '------------------------',
-      order_id: 0,
-      created_at: null,
+      order_id: Number(report.summary?.paid_orders || 0),
+      created_at: report.range ? `${report.range.from || '-'} - ${report.range.to || '-'}` : null,
       branch_name: report.branch_name || report.outlet_name || 'SKY ePOS',
       branch_address: null,
       branch_phone: null,
