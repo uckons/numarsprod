@@ -763,12 +763,12 @@ internal static class GdiReceiptPrinter
                 var maxWidth = (float)ev.MarginBounds.Width;
                 var y        = (float)ev.MarginBounds.Top;
 
-                // ── Fonts ─────────────────────────────────────────────────────
-                using var fAddr    = new Font("Arial",  7f,   FontStyle.Regular);
-                using var fLabel   = new Font("Arial",  7.5f, FontStyle.Regular);
-                using var fBold    = new Font("Arial",  7.5f, FontStyle.Bold);
-                using var fTotal   = new Font("Arial",  9f,   FontStyle.Bold);
-                using var fFooter  = new Font("Arial",  7.5f, FontStyle.Italic);
+                // ── Fonts — semua Courier New ─────────────────────────────────
+                using var fAddr   = new Font("Courier New", 7f,   FontStyle.Regular);
+                using var fLabel  = new Font("Courier New", 7f,   FontStyle.Regular);
+                using var fBold   = new Font("Courier New", 7f,   FontStyle.Bold);
+                using var fTotal  = new Font("Courier New", 8f,   FontStyle.Bold);
+                using var fFooter = new Font("Courier New", 7f,   FontStyle.Regular);
 
                 using var sfC = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
                 using var sfL = new StringFormat { Alignment = StringAlignment.Near,   LineAlignment = StringAlignment.Near };
@@ -778,7 +778,6 @@ internal static class GdiReceiptPrinter
                 using var penThick = new Pen(Color.Black, 1.5f);
                 var brush = Brushes.Black;
 
-                // helper: draw a left-right label/value row
                 void LabelRow(string lbl, string val, Font f)
                 {
                     g.DrawString(lbl, f, brush, new RectangleF(left,                    y, maxWidth * 0.42f, 13), sfL);
@@ -786,48 +785,37 @@ internal static class GdiReceiptPrinter
                     y += 12;
                 }
 
-                // ── Brand header — auto-shrink font to fit single line ─────────
+                // ── Brand name — auto-shrink until fits 1 line ────────────────
                 var brandName = receipt.Branch_Name ?? receipt.Title ?? "NUMARS POS";
-                var brandFontSize = 11f;
+                var brandSize = 8f;
                 Font fBrand;
-                // Shrink font until brand name fits in one line
                 while (true)
                 {
-                    fBrand = new Font("Arial", brandFontSize, FontStyle.Bold);
-                    var measured = g.MeasureString(brandName, fBrand);
-                    if (measured.Width <= maxWidth || brandFontSize <= 7f) break;
+                    fBrand = new Font("Courier New", brandSize, FontStyle.Bold);
+                    if (g.MeasureString(brandName, fBrand).Width <= maxWidth || brandSize <= 5.5f) break;
                     fBrand.Dispose();
-                    brandFontSize -= 0.5f;
+                    brandSize -= 0.5f;
                 }
                 using (fBrand)
                 {
-                    var brandHeight = fBrand.GetHeight(g) + 2f;
-                    g.DrawString(brandName, fBrand, brush, new RectangleF(left, y, maxWidth, brandHeight + 4), sfC);
-                    y += brandHeight;
+                    g.DrawString(brandName, fBrand, brush, new RectangleF(left, y, maxWidth, fBrand.GetHeight(g) + 4), sfC);
+                    y += fBrand.GetHeight(g) + 2;
                 }
 
-                // Auto-shrink address/phone to always fit single line
-                void SingleLine(string text, float startSize = 7f)
-                {
-                    var fs = startSize;
-                    Font f;
-                    while (true)
-                    {
-                        f = new Font("Arial", fs, FontStyle.Regular);
-                        if (g.MeasureString(text, f).Width <= maxWidth || fs <= 5.5f) break;
-                        f.Dispose(); fs -= 0.5f;
-                    }
-                    using (f)
-                    {
-                        g.DrawString(text, f, brush, new RectangleF(left, y, maxWidth, f.GetHeight(g) + 2), sfC);
-                        y += f.GetHeight(g) + 1;
-                    }
-                }
-
+                // ── Alamat & Telp — natural wrap, centered ────────────────────
                 if (!string.IsNullOrWhiteSpace(receipt.Branch_Address))
-                    SingleLine(receipt.Branch_Address);
+                {
+                    var addrSize = g.MeasureString(receipt.Branch_Address, fAddr, (int)maxWidth);
+                    g.DrawString(receipt.Branch_Address, fAddr, brush, new RectangleF(left, y, maxWidth, addrSize.Height + 2), sfC);
+                    y += addrSize.Height + 1;
+                }
                 if (!string.IsNullOrWhiteSpace(receipt.Branch_Phone))
-                    SingleLine($"Telp: {receipt.Branch_Phone}");
+                {
+                    var phoneStr  = $"Tel: {receipt.Branch_Phone}";
+                    var phoneSize = g.MeasureString(phoneStr, fAddr, (int)maxWidth);
+                    g.DrawString(phoneStr, fAddr, brush, new RectangleF(left, y, maxWidth, phoneSize.Height + 2), sfC);
+                    y += phoneSize.Height + 1;
+                }
 
                 y += 3;
                 g.DrawLine(penThick, left, y, left + maxWidth, y); y += 6;
