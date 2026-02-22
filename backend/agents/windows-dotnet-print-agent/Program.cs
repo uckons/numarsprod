@@ -793,7 +793,13 @@ internal static class GdiReceiptPrinter
                 }
 
                 // ── Brand name — auto-shrink until fits 1 line ────────────────
-                var brandName = (receipt.Branch_Name ?? receipt.Title ?? "NUMARS POS").Trim();
+                var rawBrandName = receipt.Branch_Name ?? receipt.Title ?? "NUMARS POS";
+                var brandName = string.Join(" ", rawBrandName
+                    .Replace("\r", " ")
+                    .Replace("\n", " ")
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                    .Trim();
+                if (string.IsNullOrWhiteSpace(brandName)) brandName = "SKY ePOS";
                 var brandSize = 8f;
                 Font fBrand;
                 while (true)
