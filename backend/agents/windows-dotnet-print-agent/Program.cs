@@ -582,6 +582,26 @@ internal sealed class ReceiptItem
     public string? Therapist_Name { get; set; }
 }
 
+
+internal static class PrintLayoutRules
+{
+    private static readonly string[] QtyOnlyDepartments = new[] { "FNB", "SPA", "LC", "KTV" };
+
+    public static bool IsRecapPosReport(ReceiptModel receipt)
+    {
+        var title = receipt.Title ?? string.Empty;
+        return title.Contains("RECAP", StringComparison.OrdinalIgnoreCase)
+            || title.Contains("LAPORAN", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool IsQtyOnlyDepartment(string? serviceName)
+    {
+        if (string.IsNullOrWhiteSpace(serviceName)) return false;
+        var normalized = serviceName.Trim().ToUpperInvariant();
+        return QtyOnlyDepartments.Any(code => normalized == code || normalized.StartsWith(code + " "));
+    }
+}
+
 internal static class ReceiptBuilder
 {
     // ESC/POS command helpers
@@ -648,22 +668,39 @@ internal static class ReceiptBuilder
 
         Divider('-');
 
+        var isRecapPosReport = PrintLayoutRules.IsRecapPosReport(receipt);
+        if (isRecapPosReport)
+        {
+            Write(BOLD_ON);
+            WriteLine(Center("REKAP LAYANAN POS", WIDTH));
+            Write(BOLD_OFF);
+            Divider('-');
+        }
+
         // ── Column header ────────────────────────────────────────────────────
         Write(BOLD_ON);
-        WriteLine(PadRow("Layanan", "Subtotal", WIDTH));
+        WriteLine(PadRow("Layanan", isRecapPosReport ? "QTY" : "Subtotal", WIDTH));
         Write(BOLD_OFF);
         Divider('-');
 
         // ── Items ────────────────────────────────────────────────────────────
         foreach (var item in receipt.Items)
         {
-            var name    = item.Service_Name ?? "-";
-            var sub     = FormatRp(item.Subtotal);
-            var qtyLine = $"  {item.Qty}x @ {FormatRp(item.Subtotal / (item.Qty > 0 ? item.Qty : 1))}";
+            var name = item.Service_Name ?? "-";
+            var qtyOnlyItem = isRecapPosReport && PrintLayoutRules.IsQtyOnlyDepartment(name);
 
-            // service name left, subtotal right
+            if (isRecapPosReport)
+            {
+                if (qtyOnlyItem) Write(BOLD_ON);
+                WriteLine(PadRow(Truncate(name, WIDTH - 6), $"{item.Qty}x", WIDTH));
+                if (qtyOnlyItem) Write(BOLD_OFF);
+                Divider('.');
+                continue;
+            }
+
+            var sub = FormatRp(item.Subtotal);
+            var qtyLine = $"  {item.Qty}x @ {FormatRp(item.Subtotal / (item.Qty > 0 ? item.Qty : 1))}";
             WriteLine(PadRow(Truncate(name, WIDTH - sub.Length - 1), sub, WIDTH));
-            // qty detail indented
             WriteLine(qtyLine);
 
             if (!string.IsNullOrWhiteSpace(item.Therapist_Name))
@@ -673,19 +710,22 @@ internal static class ReceiptBuilder
         Divider('-');
 
         // ── Totals ───────────────────────────────────────────────────────────
-        Write(ALIGN_LEFT);
-        var payAmount = receipt.Payment_Amount > 0 ? receipt.Payment_Amount : receipt.Total;
+        if (!isRecapPosReport)
+        {
+            Write(ALIGN_LEFT);
+            var payAmount = receipt.Payment_Amount > 0 ? receipt.Payment_Amount : receipt.Total;
 
-        // TOTAL — bold + double width
-        Write(BOLD_ON);
-        WriteLine(PadRow("TOTAL", FormatRp(receipt.Total), WIDTH));
-        Write(BOLD_OFF);
+            // TOTAL — bold + double width
+            Write(BOLD_ON);
+            WriteLine(PadRow("TOTAL", FormatRp(receipt.Total), WIDTH));
+            Write(BOLD_OFF);
 
-        WriteLine(PadRow("Bayar", FormatRp(payAmount), WIDTH));
+            WriteLine(PadRow("Bayar", FormatRp(payAmount), WIDTH));
 
-        Write(BOLD_ON);
-        WriteLine(PadRow("Kembali", FormatRp(receipt.Change_Amount), WIDTH));
-        Write(BOLD_OFF);
+            Write(BOLD_ON);
+            WriteLine(PadRow("Kembali", FormatRp(receipt.Change_Amount), WIDTH));
+            Write(BOLD_OFF);
+        }
 
         Write(LF);
         Write(ALIGN_LEFT);
@@ -773,6 +813,13 @@ internal static class GdiReceiptPrinter
                 using var sfC = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
                 using var sfL = new StringFormat { Alignment = StringAlignment.Near,   LineAlignment = StringAlignment.Near };
                 using var sfR = new StringFormat { Alignment = StringAlignment.Far,    LineAlignment = StringAlignment.Near };
+                using var sfBrand = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Near,
+                    FormatFlags = StringFormatFlags.NoWrap,
+                    Trimming = StringTrimming.EllipsisCharacter
+                };
 
                 using var penThin  = new Pen(Color.Black, 0.5f);
                 using var penThick = new Pen(Color.Black, 1.5f);
@@ -786,19 +833,25 @@ internal static class GdiReceiptPrinter
                 }
 
                 // ── Brand name — auto-shrink until fits 1 line ────────────────
-                var brandName = receipt.Branch_Name ?? receipt.Title ?? "NUMARS POS";
+                var rawBrandName = receipt.Branch_Name ?? receipt.Title ?? "NUMARS POS";
+                var brandName = string.Join(" ", rawBrandName
+                    .Replace("\r", " ")
+                    .Replace("\n", " ")
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                    .Trim();
+                if (string.IsNullOrWhiteSpace(brandName)) brandName = "SKY ePOS";
                 var brandSize = 8f;
                 Font fBrand;
                 while (true)
                 {
                     fBrand = new Font("Courier New", brandSize, FontStyle.Bold);
-                    if (g.MeasureString(brandName, fBrand).Width <= maxWidth || brandSize <= 5.5f) break;
+                    if (g.MeasureString(brandName, fBrand, int.MaxValue, sfBrand).Width <= maxWidth || brandSize <= 5f) break;
                     fBrand.Dispose();
                     brandSize -= 0.5f;
                 }
                 using (fBrand)
                 {
-                    g.DrawString(brandName, fBrand, brush, new RectangleF(left, y, maxWidth, fBrand.GetHeight(g) + 4), sfC);
+                    g.DrawString(brandName, fBrand, brush, new RectangleF(left, y, maxWidth, fBrand.GetHeight(g) + 2), sfBrand);
                     y += fBrand.GetHeight(g) + 2;
                 }
 
@@ -830,20 +883,57 @@ internal static class GdiReceiptPrinter
                 y += 3;
                 g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
 
+                var isRecapPosReport = PrintLayoutRules.IsRecapPosReport(receipt);
+                if (isRecapPosReport)
+                {
+                    g.DrawString("REKAP LAYANAN POS", fBold, brush, new RectangleF(left, y, maxWidth, 13), sfC);
+                    y += 13;
+                    g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
+                }
+
                 // ── Column headers ────────────────────────────────────────────
-                g.DrawString("Layanan",  fBold, brush, new RectangleF(left,                    y, maxWidth * 0.50f, 13), sfL);
-                g.DrawString("Qty",      fBold, brush, new RectangleF(left + maxWidth * 0.50f, y, maxWidth * 0.15f, 13), sfC);
-                g.DrawString("Subtotal", fBold, brush, new RectangleF(left + maxWidth * 0.65f, y, maxWidth * 0.35f, 13), sfR);
+                if (isRecapPosReport)
+                {
+                    g.DrawString("Layanan", fBold, brush, new RectangleF(left, y, maxWidth * 0.72f, 13), sfL);
+                    g.DrawString("Qty",     fBold, brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
+                }
+                else
+                {
+                    g.DrawString("Layanan",  fBold, brush, new RectangleF(left,                    y, maxWidth * 0.50f, 13), sfL);
+                    g.DrawString("Qty",      fBold, brush, new RectangleF(left + maxWidth * 0.50f, y, maxWidth * 0.15f, 13), sfC);
+                    g.DrawString("Subtotal", fBold, brush, new RectangleF(left + maxWidth * 0.65f, y, maxWidth * 0.35f, 13), sfR);
+                }
                 y += 13;
                 g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
 
                 // ── Items ─────────────────────────────────────────────────────
                 foreach (var item in receipt.Items)
                 {
+                    var name = item.Service_Name ?? "-";
+                    var qtyOnlyItem = isRecapPosReport && PrintLayoutRules.IsQtyOnlyDepartment(name);
+
+                    if (qtyOnlyItem)
+                    {
+                        g.DrawString(name,      fBold,  brush, new RectangleF(left,                   y, maxWidth * 0.72f, 13), sfL);
+                        g.DrawString($"{item.Qty}x", fBold,  brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
+                        y += 13;
+                        g.DrawLine(penThin, left, y, left + maxWidth, y); y += 4;
+                        continue;
+                    }
+
+                    if (isRecapPosReport)
+                    {
+                        g.DrawString(name,      fLabel, brush, new RectangleF(left,                   y, maxWidth * 0.72f, 13), sfL);
+                        g.DrawString($"{item.Qty}x", fLabel, brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
+                        y += 13;
+                        g.DrawLine(penThin, left, y, left + maxWidth, y); y += 4;
+                        continue;
+                    }
+
                     var sub = $"Rp{item.Subtotal:N0}".Replace(',', '.');
-                    g.DrawString(item.Service_Name ?? "-", fLabel, brush, new RectangleF(left,                    y, maxWidth * 0.50f, 13), sfL);
-                    g.DrawString($"{item.Qty}x",           fLabel, brush, new RectangleF(left + maxWidth * 0.50f, y, maxWidth * 0.15f, 13), sfC);
-                    g.DrawString(sub,                      fLabel, brush, new RectangleF(left + maxWidth * 0.65f, y, maxWidth * 0.35f, 13), sfR);
+                    g.DrawString(name,       fLabel, brush, new RectangleF(left,                    y, maxWidth * 0.50f, 13), sfL);
+                    g.DrawString($"{item.Qty}x", fLabel, brush, new RectangleF(left + maxWidth * 0.50f, y, maxWidth * 0.15f, 13), sfC);
+                    g.DrawString(sub,        fLabel, brush, new RectangleF(left + maxWidth * 0.65f, y, maxWidth * 0.35f, 13), sfR);
                     y += 13;
                     if (!string.IsNullOrWhiteSpace(item.Therapist_Name))
                     { g.DrawString($"  ↳ {item.Therapist_Name}", fAddr, Brushes.DarkGray, new RectangleF(left, y, maxWidth, 12), sfL); y += 11; }
@@ -852,16 +942,19 @@ internal static class GdiReceiptPrinter
                 y += 4;
                 g.DrawLine(penThick, left, y, left + maxWidth, y); y += 6;
 
-                // ── TOTAL row — inverted (black bg, white text) ───────────────
-                var payAmount = receipt.Payment_Amount > 0 ? receipt.Payment_Amount : receipt.Total;
-                var totalStr  = $"Rp{receipt.Total:N0}".Replace(',', '.');
-                g.FillRectangle(Brushes.Black, new RectangleF(left - 2, y - 1, maxWidth + 4, 18));
-                g.DrawString("TOTAL",   fTotal, Brushes.White, new RectangleF(left,                    y, maxWidth * 0.5f, 17), sfL);
-                g.DrawString(totalStr,  fTotal, Brushes.White, new RectangleF(left + maxWidth * 0.5f,  y, maxWidth * 0.5f, 17), sfR);
-                y += 18; y += 4;
+                if (!isRecapPosReport)
+                {
+                    // ── TOTAL row — inverted (black bg, white text) ───────────
+                    var payAmount = receipt.Payment_Amount > 0 ? receipt.Payment_Amount : receipt.Total;
+                    var totalStr  = $"Rp{receipt.Total:N0}".Replace(',', '.');
+                    g.FillRectangle(Brushes.Black, new RectangleF(left - 2, y - 1, maxWidth + 4, 18));
+                    g.DrawString("TOTAL",   fTotal, Brushes.White, new RectangleF(left,                    y, maxWidth * 0.5f, 17), sfL);
+                    g.DrawString(totalStr,   fTotal, Brushes.White, new RectangleF(left + maxWidth * 0.5f,  y, maxWidth * 0.5f, 17), sfR);
+                    y += 18; y += 4;
 
-                LabelRow("Bayar",   $"Rp{payAmount:N0}".Replace(',', '.'),               fLabel);
-                LabelRow("Kembali", $"Rp{receipt.Change_Amount:N0}".Replace(',', '.'),   fBold);
+                    LabelRow("Bayar",   $"Rp{payAmount:N0}".Replace(',', '.'),               fLabel);
+                    LabelRow("Kembali", $"Rp{receipt.Change_Amount:N0}".Replace(',', '.'),   fBold);
+                }
 
                 y += 3;
                 g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
