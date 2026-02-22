@@ -87,6 +87,52 @@ const buildReceiptPayload = (order, options = {}) => ({
   }
 })
 
+
+const normalizeCategory = (category) => {
+  const upper = String(category || '').trim().toUpperCase()
+  if (upper === 'KARAOKE') return 'KTV'
+  return upper || 'LAINNYA'
+}
+
+const buildRecapPayload = (report, options = {}) => {
+  const serviceRows = Array.isArray(report.service_details) ? report.service_details : []
+  const items = serviceRows
+    .map((row) => {
+      const category = normalizeCategory(row.category)
+      return {
+        category,
+        service_name: String(row.service_name || '-').trim(),
+        qty: Number(row.qty || 0),
+        subtotal: Number(row.revenue || 0)
+      }
+    })
+    .filter((row) => row.qty > 0)
+
+  return {
+    profile: THERMAL_PROFILE,
+    printer_name: options.printerName || null,
+    receipt: {
+      title: 'RECAP LAPORAN PENDAPATAN',
+      divider: '------------------------',
+      order_id: Number(report.summary?.paid_orders || 0),
+      created_at: report.range ? `${report.range.from || '-'} - ${report.range.to || '-'}` : null,
+      branch_name: report.branch_name || report.outlet_name || 'SKY ePOS',
+      branch_address: null,
+      branch_phone: null,
+      branch_logo_url: null,
+      cashier_name: null,
+      room_name: null,
+      therapist_name: null,
+      payment_method: 'CASH',
+      payment_amount: 0,
+      change_amount: 0,
+      items,
+      total: Number(report.summary?.revenue || 0),
+      printed_at: formatReceiptTime()
+    }
+  }
+}
+
 const printViaUsb = async (order) => {
   const device = new escpos.USB()
   const printer = new escpos.Printer(device)
@@ -137,8 +183,7 @@ const printViaUsb = async (order) => {
   })
 }
 
-async function printViaAgent ({ order, agentUrl, token, printerName }) {
-  const payload = buildReceiptPayload(order, { printerName })
+async function sendReceiptToAgent ({ payload, agentUrl, token }) {
   const headers = token ? { "x-print-agent-token": token } : {}
   const timeoutMs = Number(process.env.PRINT_AGENT_TIMEOUT_MS || 45000)
   const endpoint = `${agentUrl.replace(/\/$/, "")}/print/receipt`
@@ -156,6 +201,16 @@ async function printViaAgent ({ order, agentUrl, token, printerName }) {
   }
 
   return { mode: "agent", agent_url: agentUrl }
+}
+
+async function printViaAgent ({ order, agentUrl, token, printerName }) {
+  const payload = buildReceiptPayload(order, { printerName })
+  return sendReceiptToAgent({ payload, agentUrl, token })
+}
+
+async function printRecapViaAgent ({ report, agentUrl, token, printerName }) {
+  const payload = buildRecapPayload(report, { printerName })
+  return sendReceiptToAgent({ payload, agentUrl, token })
 }
 
 
@@ -239,6 +294,23 @@ exports.printOrder = async ({ order, printer = {} }) => {
   }
 
   return printViaUsb(order)
+}
+
+
+exports.printRecap = async ({ report, printer = {} }) => {
+  const envAgentUrl = process.env.PRINT_AGENT_URL
+  const agentUrl = printer.agent_url || envAgentUrl
+
+  if (!agentUrl) {
+    throw new Error("PRINT_AGENT_URL belum di-set untuk cetak recap POS")
+  }
+
+  return printRecapViaAgent({
+    report,
+    agentUrl,
+    token: printer.agent_token || process.env.PRINT_AGENT_TOKEN,
+    printerName: printer.agent_printer_name || process.env.PRINT_AGENT_PRINTER
+  })
 }
 
 

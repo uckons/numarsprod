@@ -558,69 +558,31 @@ const closeReceiptModal = () => {
 }
 
 // 🖨️ PRINT RECEIPT
-const printReceipt = () => {
-  if (!receiptData.value) return
-  const w = window.open('', '_blank', 'width=420,height=760')
-  if (!w) return
+const printReceipt = async () => {
+  if (!receiptData.value?.id) return
 
-  const esc = (val) => String(val || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
+  try {
+    await api.post(`/printers/print-order`, {
+      order_id: receiptData.value.id,
+      printer: getPrinterAgentConfig()
+    })
 
-  const data = receiptData.value
-  const itemRows = (data.items || []).map((item) => `
-    <div class="item-row">
-      <div class="item-name">${esc(item.service_name)}${item.therapist_name ? `<div class="meta">Terapis: ${esc(item.therapist_name)}</div>` : ''}</div>
-      <div class="item-sub">${esc(item.qty)}x ${esc(formatRupiah(item.price))}</div>
-      <div class="item-subtotal">${esc(formatRupiah(item.subtotal))}</div>
-    </div>
-  `).join('')
+    await SwalTheme.fire({
+      icon: "success",
+      title: "Struk dikirim",
+      text: "🖨 Struk langsung dikirim ke printer POS",
+      confirmButtonText: "OK"
+    })
 
-  w.document.write(`
-    <html><head><title>Receipt</title>
-      <style>
-        @page { size: 58mm auto; margin: 0; }
-        html, body { margin: 0; padding: 0; background: #fff; }
-        body { width: 58mm; font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.25; }
-        .wrap { width: 54mm; margin: 0 auto; padding: 2mm 1mm; }
-        .center { text-align: center; }
-        .logo { max-width: 26mm; max-height: 14mm; object-fit: contain; margin: 0 auto 1mm; display: block; }
-        .line { border-top: 1px dashed #111; margin: 1.5mm 0; }
-        .row { display: flex; justify-content: space-between; gap: 2mm; }
-        .item-row { margin: 1mm 0; }
-        .item-name { font-weight: 700; overflow-wrap: anywhere; }
-        .meta { font-weight: 400; }
-        .item-sub { color: #222; }
-        .item-subtotal { text-align: right; font-weight: 700; }
-        .total { font-size: 11px; font-weight: 800; }
-      </style>
-    </head><body>
-      <div class="wrap">
-        ${data.branch_logo_url ? `<img class="logo" src="${esc(data.branch_logo_url)}" alt="logo" />` : ''}
-        ${data.branch_name ? `<div class="center"><strong>${esc(data.branch_name)}</strong></div>` : ''}
-        ${data.branch_address ? `<div class="center">${esc(data.branch_address)}</div>` : ''}
-        ${data.branch_phone ? `<div class="center">Tel: ${esc(data.branch_phone)}</div>` : ''}
-        <div class="line"></div>
-        <div class="row"><span>No:</span><span>#${esc(data.id)}</span></div>
-        <div class="row"><span>Tanggal:</span><span>${esc(formatDateTime(data.created_at))}</span></div>
-        <div class="row"><span>Kasir:</span><span>${esc(data.cashier_name)}</span></div>
-        ${data.room_name ? `<div class="row"><span>Room:</span><span>${esc(data.room_name)}</span></div>` : ''}
-        <div class="line"></div>
-        ${itemRows}
-        <div class="line"></div>
-        <div class="row total"><span>TOTAL</span><span>${esc(formatRupiah(data.total))}</span></div>
-        <div class="row"><span>Bayar</span><span>${esc(formatRupiah(data.payment_amount))}</span></div>
-        <div class="row"><span>Kembali</span><span>${esc(formatRupiah(data.change_amount))}</span></div>
-        <div class="row"><span>Metode</span><span>${esc(data.payment_method || 'CASH')}</span></div>
-      </div>
-    </body></html>
-  `)
-  w.document.close()
-  w.focus()
-  w.print()
+    closeReceiptModal()
+  } catch (err) {
+    await SwalTheme.fire({
+      icon: "error",
+      title: "Gagal cetak",
+      text: err.response?.data?.message || err.message || "Gagal cetak",
+      confirmButtonText: "OK"
+    })
+  }
 }
 
 // 🖨️ PRINT TO THERMAL PRINTER (existing function - optional)

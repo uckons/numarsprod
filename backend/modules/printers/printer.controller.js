@@ -139,3 +139,24 @@ exports.agentDiagnostics = async (req, res) => {
     })
   }
 }
+
+
+exports.printRecap = async (req, res) => {
+  try {
+    const { report, printer } = req.body || {}
+
+    if (!report || !Array.isArray(report.service_details)) {
+      return res.status(400).json({ message: "report.service_details required" })
+    }
+
+    await printerService.printRecap({ report, printer: printer || {} })
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error("PRINT RECAP ERROR:", err)
+    res.status(500).json({
+      message: err.message,
+      hint: "Pastikan PRINT_AGENT_URL aktif dan bisa diakses dari backend."
+    })
+  }
+}
