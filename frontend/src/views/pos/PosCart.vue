@@ -408,6 +408,9 @@ const lastOrder = ref({
 const showReceiptModal = ref(false)
 const receiptData = ref(null)
 const receiptLoading = ref(false)
+const pendingPayment = ref(null)
+const pendingPrinted = ref(false)
+const pendingFinalizedOrderId = ref(null)
 
 const format = n =>
   Number(n || 0).toLocaleString("id-ID")
@@ -526,6 +529,58 @@ const askPaymentDetails = async () => {
   return res.value
 }
 
+const buildDraftReceiptPreview = (payment) => {
+  const subtotal = Math.round(Number(grandTotal.value || 0))
+  const discount = Math.max(0, Math.round(Number(payment?.discount_amount || 0)))
+  const total = Math.max(0, subtotal - discount)
+  const method = String(payment?.payment_method || 'CASH').toUpperCase()
+  const paymentAmount = method === 'CASH'
+    ? Math.max(total, Math.round(Number(payment?.payment_amount || 0)))
+    : total
+
+  return {
+    id: '-',
+    created_at: new Date().toISOString(),
+    payment_method: method,
+    subtotal,
+    discount_amount: discount,
+    total,
+    payment_amount: paymentAmount,
+    change_amount: Math.max(0, paymentAmount - total),
+    cashier_name: '-',
+    items: (items.value || []).map((it, idx) => ({
+      service_id: it.id || idx,
+      service_name: composeServiceName(it.name, it.variant_name),
+      qty: Number(it.qty || 0),
+      price: Number(it.base_price || 0),
+      subtotal: Number(it.base_price || 0) * Number(it.qty || 0),
+      therapist_name: it.therapist_name || null
+    }))
+  }
+}
+
+const finalizeOrderForPrint = async () => {
+  if (pendingFinalizedOrderId.value) return pendingFinalizedOrderId.value
+  if (!pendingPayment.value) throw new Error('Data pembayaran belum tersedia')
+
+  const payload = {
+    items: toPayloadItems(),
+    payment_method: pendingPayment.value.payment_method,
+    discount_amount: pendingPayment.value.discount_amount,
+    payment_amount: pendingPayment.value.payment_amount
+  }
+
+  let res
+  if (pos.currentOrderId) {
+    res = await api.post(`/orders/${pos.currentOrderId}/close`, payload)
+  } else {
+    res = await api.post('/orders/pos', payload)
+  }
+
+  pendingFinalizedOrderId.value = Number(res.data?.order_id)
+  return pendingFinalizedOrderId.value
+}
+
 const checkout = async () => {
   if (items.value.length === 0) {
     await SwalTheme.fire({
@@ -540,63 +595,11 @@ const checkout = async () => {
   const payment = await askPaymentDetails()
   if (!payment) return
 
-  loading.value = true
-  try {
-    const payload = {
-      items: toPayloadItems(),
-      payment_method: payment.payment_method,
-      discount_amount: payment.discount_amount,
-      payment_amount: payment.payment_amount
-    }
-    
-    let res
-    
-    // 🆕 Kalau ada currentOrderId, UPDATE order existing
-    if (pos.currentOrderId) {
-      console.log('Updating existing order:', pos.currentOrderId)
-      res = await api.post(`/orders/${pos.currentOrderId}/close`, payload)
-    } else {
-      console.log('Creating new order')
-      res = await api.post("/orders/pos", payload)
-    }
-
-     lastOrder.value = {
-      order_id: res.data.order_id,
-      total: res.data.total,
-      items: JSON.parse(JSON.stringify(items.value))
-    }
-
-    console.log('✅ Checkout success, order_id:', lastOrder.value.order_id)
-
-    // Clear local cart
-    pos.clear()
-
-    console.log('🖨️ Calling showReceiptPreview...')
-    
-    // 🖨️ SHOW RECEIPT PREVIEW MODAL (WAIT for modal to close)
-    await showReceiptPreview(lastOrder.value.order_id)
-
-    console.log('Modal closed, creating timers...')
-
-    // After closing receipt modal, create timers and navigate
-    try {
-      await api.post(`/timers/from-order/${lastOrder.value.order_id}`)
-    } catch (e) {
-      console.warn("Timer tidak dibuat:", e?.message || e)
-    }
-
-    console.log('Navigating to /kasir...')
-    router.push("/kasir")
-  } catch (err) {
-    await SwalTheme.fire({
-      icon: "error",
-      title: "Gagal",
-      text: err.response?.data?.message || err.message || "Failed to checkout",
-      confirmButtonText: "OK"
-    })
-  } finally {
-    loading.value = false
-  }
+  pendingPayment.value = payment
+  pendingPrinted.value = false
+  pendingFinalizedOrderId.value = null
+  receiptData.value = buildDraftReceiptPreview(payment)
+  showReceiptModal.value = true
 }
 
 // 🖨️ SHOW RECEIPT PREVIEW
@@ -638,22 +641,40 @@ const showReceiptPreview = async (orderId) => {
 }
 
 // 🖨️ CLOSE RECEIPT MODAL
-const closeReceiptModal = () => {
+const closeReceiptModal = async () => {
   showReceiptModal.value = false
   receiptData.value = null
+
+  if (pendingPrinted.value && pendingFinalizedOrderId.value) {
+    const orderId = pendingFinalizedOrderId.value
+    pendingPrinted.value = false
+    pendingPayment.value = null
+    pendingFinalizedOrderId.value = null
+    pos.clear()
+
+    try {
+      await api.post(`/timers/from-order/${orderId}`)
+    } catch (e) {
+      console.warn("Timer tidak dibuat:", e?.message || e)
+    }
+
+    router.push("/kasir")
+  }
 }
 
 // 🖨️ PRINT RECEIPT
 const printReceipt = async () => {
-  if (!receiptData.value?.id) return
-
   try {
+    const orderId = await finalizeOrderForPrint()
+    const detailRes = await api.get(`/orders/${orderId}/detail`)
+    receiptData.value = detailRes.data
+
     await api.post(`/printers/print-order`, {
-      order_id: receiptData.value.id,
+      order_id: orderId,
       printer: getPrinterAgentConfig()
     })
 
-    closeReceiptModal()
+    pendingPrinted.value = true
     await SwalTheme.fire({
       icon: "success",
       title: "Struk dikirim",
@@ -661,7 +682,6 @@ const printReceipt = async () => {
       confirmButtonText: "OK"
     })
   } catch (err) {
-    closeReceiptModal()
     await SwalTheme.fire({
       icon: "error",
       title: "Gagal cetak",
