@@ -154,6 +154,101 @@ exports.agentDiagnostics = async (req, res) => {
 }
 
 
+
+exports.printBulk = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureOrderPaymentColumns(db)
+    const { order_ids, payment_method, printer } = req.body || {}
+
+    const ids = Array.isArray(order_ids)
+      ? [...new Set(order_ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))]
+      : []
+
+    if (!ids.length) {
+      return res.status(400).json({ message: "order_ids required" })
+    }
+
+    const ordersRes = await db.query(
+      `SELECT
+         o.id,
+         o.total,
+         o.discount_amount,
+         o.payment_amount,
+         o.change_amount,
+         o.created_at,
+         b.name AS branch_name,
+         b.address AS branch_address,
+         b.phone AS branch_phone,
+         b.logo_url AS branch_logo_url,
+         u.name AS cashier_name
+       FROM orders o
+       LEFT JOIN branches b ON b.id = o.branch_id
+       LEFT JOIN users u ON u.id = o.user_id
+       WHERE o.id = ANY($1::int[])
+         AND o.branch_id = $2
+       ORDER BY o.id`,
+      [ids, req.user.branch_id]
+    )
+
+    if (!ordersRes.rows.length) {
+      return res.status(404).json({ message: "Order tidak ditemukan" })
+    }
+
+    if (ordersRes.rows.length !== ids.length) {
+      return res.status(400).json({ message: "Sebagian order tidak ditemukan atau bukan milik branch ini" })
+    }
+
+    const itemsRes = await db.query(
+      `SELECT order_id, service_name, qty, subtotal, therapist_name
+       FROM order_items
+       WHERE order_id = ANY($1::int[])
+       ORDER BY order_id, id`,
+      [ids]
+    )
+
+    const items = itemsRes.rows.map((item) => ({
+      service_name: `[#${item.order_id}] ${item.service_name}`,
+      qty: Number(item.qty || 0),
+      subtotal: Number(item.subtotal || 0),
+      therapist_name: item.therapist_name || null
+    }))
+
+    const firstOrder = ordersRes.rows[0]
+    const total = ordersRes.rows.reduce((sum, row) => sum + Number(row.total || 0), 0)
+    const discountAmount = ordersRes.rows.reduce((sum, row) => sum + Number(row.discount_amount || 0), 0)
+    const paymentAmount = Number(total)
+
+    await printerService.printBulkPayment({
+      bulk: {
+        branch_name: firstOrder?.branch_name || null,
+        branch_address: firstOrder?.branch_address || null,
+        branch_phone: firstOrder?.branch_phone || null,
+        branch_logo_url: firstOrder?.branch_logo_url || null,
+        cashier_name: firstOrder?.cashier_name || null,
+        created_at: new Date(),
+        order_ids: ids,
+        payment_method: String(payment_method || 'CASH').toUpperCase(),
+        subtotal: total + discountAmount,
+        discount_amount: discountAmount,
+        payment_amount: paymentAmount,
+        change_amount: Math.max(0, paymentAmount - total),
+        total,
+        items
+      },
+      printer: printer || {}
+    })
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error("PRINT BULK ERROR:", err)
+    res.status(500).json({
+      message: err.message,
+      hint: "Pastikan PRINT_AGENT_URL aktif dan bisa diakses dari backend."
+    })
+  }
+}
+
 exports.printRecap = async (req, res) => {
   try {
     const { report, printer } = req.body || {}

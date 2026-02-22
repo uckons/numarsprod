@@ -571,6 +571,7 @@ internal sealed class ReceiptModel
     public decimal Discount_Amount { get; set; }
     public decimal Payment_Amount { get; set; }
     public decimal Change_Amount { get; set; }
+    public string? Note { get; set; }
     public List<ReceiptItem> Items { get; set; } = new();
     public decimal Total { get; set; }
     public string? Printed_At { get; set; }

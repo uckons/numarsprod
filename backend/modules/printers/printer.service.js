@@ -89,6 +89,40 @@ const buildReceiptPayload = (order, options = {}) => ({
   }
 })
 
+const buildBulkPaymentPayload = (bulk, options = {}) => ({
+  profile: THERMAL_PROFILE,
+  printer_name: options.printerName || null,
+  receipt: {
+    title: 'PEMBAYARAN GABUNGAN',
+    divider: '------------------------',
+    order_id: 0,
+    created_at: formatReceiptDateTime(bulk.created_at || new Date()),
+    branch_name: bulk.branch_name || null,
+    branch_address: bulk.branch_address || null,
+    branch_phone: bulk.branch_phone || null,
+    branch_logo_url: bulk.branch_logo_url || null,
+    cashier_name: bulk.cashier_name || null,
+    room_name: null,
+    therapist_name: null,
+    note: Array.isArray(bulk.order_ids) && bulk.order_ids.length
+      ? `Order: ${bulk.order_ids.map((id) => `#${id}`).join(', ')}`
+      : null,
+    payment_method: bulk.payment_method || 'CASH',
+    subtotal: Number(bulk.subtotal || bulk.total || 0),
+    discount_amount: Number(bulk.discount_amount || 0),
+    payment_amount: Number(bulk.payment_amount || bulk.total || 0),
+    change_amount: Number(bulk.change_amount || 0),
+    items: (bulk.items || []).map((item) => ({
+      service_name: item.service_name,
+      qty: Number(item.qty || 0),
+      subtotal: Number(item.subtotal || 0),
+      therapist_name: item.therapist_name || null
+    })),
+    total: Number(bulk.total || 0),
+    printed_at: formatReceiptTime()
+  }
+})
+
 
 
 const buildBarInboxPayload = (ticket = {}, options = {}) => {
@@ -457,6 +491,25 @@ exports.printBarInboxTicket = async ({ ticket, printer = {} }) => {
   }
 
   const payload = buildBarInboxPayload(ticket, {
+    printerName: printer.agent_printer_name || process.env.PRINT_AGENT_PRINTER
+  })
+
+  return sendReceiptToAgent({
+    payload,
+    agentUrl,
+    token: printer.agent_token || process.env.PRINT_AGENT_TOKEN
+  })
+}
+
+exports.printBulkPayment = async ({ bulk, printer = {} }) => {
+  const envAgentUrl = process.env.PRINT_AGENT_URL
+  const agentUrl = printer.agent_url || envAgentUrl
+
+  if (!agentUrl) {
+    throw new Error("PRINT_AGENT_URL belum di-set untuk cetak pembayaran gabungan")
+  }
+
+  const payload = buildBulkPaymentPayload(bulk, {
     printerName: printer.agent_printer_name || process.env.PRINT_AGENT_PRINTER
   })
 
