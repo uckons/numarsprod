@@ -597,6 +597,16 @@ internal static class PrintLayoutRules
             || title.Contains("LAPORAN", StringComparison.OrdinalIgnoreCase);
     }
 
+
+
+    public static bool IsBarOrderTicket(ReceiptModel receipt)
+    {
+        var title = receipt.Title ?? string.Empty;
+        var method = receipt.Payment_Method ?? string.Empty;
+        return title.Contains("BAR ORDER", StringComparison.OrdinalIgnoreCase)
+            || method.Equals("BAR", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static string GetItemCategory(ReceiptItem item)
     {
         var raw = item.Category;
@@ -662,6 +672,7 @@ internal static class ReceiptBuilder
         Divider('=');
 
         var isRecapPosReport = PrintLayoutRules.IsRecapPosReport(receipt);
+        var isBarOrderTicket = PrintLayoutRules.IsBarOrderTicket(receipt);
 
         // ── Order info ───────────────────────────────────────────────────────
         Write(ALIGN_LEFT);
@@ -733,6 +744,20 @@ internal static class ReceiptBuilder
                 Divider('-');
             }
         }
+        else if (isBarOrderTicket)
+        {
+            Write(BOLD_ON);
+            WriteLine(PadRow("Item BAR", "QTY", WIDTH));
+            Write(BOLD_OFF);
+            Divider('-');
+
+            foreach (var item in receipt.Items)
+            {
+                WriteLine(PadRow(Truncate(item.Service_Name ?? "-", WIDTH - 6), $"{item.Qty}x", WIDTH));
+            }
+
+            Divider('-');
+        }
         else
         {
             // ── Column header ────────────────────────────────────────────────
@@ -758,7 +783,7 @@ internal static class ReceiptBuilder
         }
 
         // ── Totals ───────────────────────────────────────────────────────────
-        if (!isRecapPosReport)
+        if (!isRecapPosReport && !isBarOrderTicket)
         {
             Write(ALIGN_LEFT);
             var payAmount = receipt.Payment_Amount > 0 ? receipt.Payment_Amount : receipt.Total;
@@ -780,7 +805,7 @@ internal static class ReceiptBuilder
             Write(BOLD_OFF);
         }
 
-        if (!isRecapPosReport)
+        if (!isRecapPosReport && !isBarOrderTicket)
         {
             Write(LF);
             Write(ALIGN_LEFT);
@@ -937,6 +962,7 @@ internal static class GdiReceiptPrinter
                 g.DrawLine(penThick, left, y, left + maxWidth, y); y += 6;
 
                 var isRecapPosReport = PrintLayoutRules.IsRecapPosReport(receipt);
+                var isBarOrderTicket = PrintLayoutRules.IsBarOrderTicket(receipt);
 
                 // ── Order info ────────────────────────────────────────────────
                 if (!isRecapPosReport)
@@ -1004,6 +1030,23 @@ internal static class GdiReceiptPrinter
                     y += 2;
                     g.DrawLine(penThick, left, y, left + maxWidth, y); y += 6;
                 }
+                else if (isBarOrderTicket)
+                {
+                    g.DrawString("Item BAR", fBold, brush, new RectangleF(left,                    y, maxWidth * 0.72f, 13), sfL);
+                    g.DrawString("QTY",      fBold, brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
+                    y += 13;
+                    g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
+
+                    foreach (var item in receipt.Items)
+                    {
+                        g.DrawString(item.Service_Name ?? "-", fLabel, brush, new RectangleF(left, y, maxWidth * 0.72f, 13), sfL);
+                        g.DrawString($"{item.Qty}x", fLabel, brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
+                        y += 13;
+                    }
+
+                    y += 4;
+                    g.DrawLine(penThick, left, y, left + maxWidth, y); y += 6;
+                }
                 else
                 {
                     // ── Column headers ────────────────────────────────────────
@@ -1030,7 +1073,7 @@ internal static class GdiReceiptPrinter
                     g.DrawLine(penThick, left, y, left + maxWidth, y); y += 6;
                 }
 
-                if (!isRecapPosReport)
+                if (!isRecapPosReport && !isBarOrderTicket)
                 {
                     // ── TOTAL row — inverted (black bg, white text) ───────────
                     var subtotal = receipt.Subtotal > 0 ? receipt.Subtotal : receipt.Total + receipt.Discount_Amount;
@@ -1048,7 +1091,7 @@ internal static class GdiReceiptPrinter
                     LabelRow("Kembali", $"Rp{receipt.Change_Amount:N0}".Replace(',', '.'),   fBold);
                 }
 
-                if (!isRecapPosReport)
+                if (!isRecapPosReport && !isBarOrderTicket)
                 {
                     y += 3;
                     g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;

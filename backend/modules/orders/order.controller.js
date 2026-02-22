@@ -90,7 +90,7 @@ const buildBarOrderSnapshot = async (db, orderId) => {
   await ensureOrderItemColumns(db)
   const { rows } = await db.query(
     [
-      "SELECT fi.id AS fnb_item_id, oi.service_id, oi.service_name, oi.qty",
+      "SELECT fi.id AS fnb_item_id, COALESCE(oi.variant_service_id, oi.service_id) AS resolved_service_id, oi.service_name, oi.qty",
       "FROM order_items oi",
       "JOIN services s ON s.id = COALESCE(oi.variant_service_id, oi.service_id)",
       "JOIN fnb_items fi ON fi.service_id = COALESCE(oi.variant_service_id, oi.service_id)",
@@ -100,7 +100,7 @@ const buildBarOrderSnapshot = async (db, orderId) => {
   )
   return rows.map(r => ({
     fnb_item_id: Number(r.fnb_item_id),
-    service_id: Number(r.service_id),
+    service_id: Number(r.resolved_service_id),
     service_name: r.service_name,
     qty: Number(r.qty || 0)
   }))
@@ -110,7 +110,9 @@ const buildBarOrderSnapshot = async (db, orderId) => {
 const mapQtyByService = (rows = []) => {
   const map = new Map()
   for (const row of rows) {
-    const key = Number(row.service_id)
+    const fnbItemId = Number(row.fnb_item_id || 0)
+    const serviceId = Number(row.service_id || 0)
+    const key = fnbItemId > 0 ? `fnb:${fnbItemId}` : `svc:${serviceId}:${String(row.service_name || "-").trim().toLowerCase()}`
     const qty = Number(row.qty || 0)
     map.set(key, (map.get(key) || 0) + qty)
   }
@@ -123,7 +125,10 @@ const buildIncrementalFnbSnapshot = async (db, orderId, previousRows = []) => {
 
   return latestRows
     .map(item => {
-      const prevQty = Number(prevQtyByService.get(Number(item.service_id)) || 0)
+      const fnbItemId = Number(item.fnb_item_id || 0)
+      const serviceId = Number(item.service_id || 0)
+      const key = fnbItemId > 0 ? `fnb:${fnbItemId}` : `svc:${serviceId}:${String(item.service_name || "-").trim().toLowerCase()}`
+      const prevQty = Number(prevQtyByService.get(key) || 0)
       const deltaQty = Number(item.qty || 0) - prevQty
       return {
         ...item,
