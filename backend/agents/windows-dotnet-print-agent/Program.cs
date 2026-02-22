@@ -773,6 +773,13 @@ internal static class GdiReceiptPrinter
                 using var sfC = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
                 using var sfL = new StringFormat { Alignment = StringAlignment.Near,   LineAlignment = StringAlignment.Near };
                 using var sfR = new StringFormat { Alignment = StringAlignment.Far,    LineAlignment = StringAlignment.Near };
+                using var sfBrand = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Near,
+                    FormatFlags = StringFormatFlags.NoWrap,
+                    Trimming = StringTrimming.EllipsisCharacter
+                };
 
                 using var penThin  = new Pen(Color.Black, 0.5f);
                 using var penThick = new Pen(Color.Black, 1.5f);
@@ -786,19 +793,19 @@ internal static class GdiReceiptPrinter
                 }
 
                 // ── Brand name — auto-shrink until fits 1 line ────────────────
-                var brandName = receipt.Branch_Name ?? receipt.Title ?? "NUMARS POS";
+                var brandName = (receipt.Branch_Name ?? receipt.Title ?? "NUMARS POS").Trim();
                 var brandSize = 8f;
                 Font fBrand;
                 while (true)
                 {
                     fBrand = new Font("Courier New", brandSize, FontStyle.Bold);
-                    if (g.MeasureString(brandName, fBrand).Width <= maxWidth || brandSize <= 5.5f) break;
+                    if (g.MeasureString(brandName, fBrand, int.MaxValue, sfBrand).Width <= maxWidth || brandSize <= 5f) break;
                     fBrand.Dispose();
                     brandSize -= 0.5f;
                 }
                 using (fBrand)
                 {
-                    g.DrawString(brandName, fBrand, brush, new RectangleF(left, y, maxWidth, fBrand.GetHeight(g) + 4), sfC);
+                    g.DrawString(brandName, fBrand, brush, new RectangleF(left, y, maxWidth, fBrand.GetHeight(g) + 2), sfBrand);
                     y += fBrand.GetHeight(g) + 2;
                 }
 
