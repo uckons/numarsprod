@@ -714,7 +714,6 @@ internal static class ReceiptBuilder
                 foreach (var item in catItems)
                 {
                     WriteLine(PadRow(Truncate(item.Service_Name ?? "-", WIDTH - 6), $"{item.Qty}x", WIDTH));
-                    Divider('.');
                 }
                 Divider('-');
             }
@@ -728,7 +727,6 @@ internal static class ReceiptBuilder
                 foreach (var item in otherItems)
                 {
                     WriteLine(PadRow(Truncate(item.Service_Name ?? "-", WIDTH - 6), $"{item.Qty}x", WIDTH));
-                    Divider('.');
                 }
                 Divider('-');
             }
@@ -792,6 +790,13 @@ internal static class ReceiptBuilder
             WriteLine("Semoga sehat selalu :)");
             Write(LF);
             Write(LF);
+            Write(LF);
+        }
+        else
+        {
+            Write(LF);
+            Write(ALIGN_CENTER);
+            WriteLine("Printed by SKY ePOS");
             Write(LF);
         }
 
@@ -967,10 +972,10 @@ internal static class GdiReceiptPrinter
                             g.DrawString(item.Service_Name ?? "-", fLabel, brush, new RectangleF(left, y, maxWidth * 0.72f, 13), sfL);
                             g.DrawString($"{item.Qty}x", fLabel, brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
                             y += 13;
-                            g.DrawLine(penThin, left, y, left + maxWidth, y); y += 4;
                         }
 
                         y += 2;
+                        g.DrawLine(penThin, left, y, left + maxWidth, y); y += 4;
                     }
 
                     if (grouped.TryGetValue("LAINNYA", out var otherItems) && otherItems.Count > 0)
@@ -984,8 +989,9 @@ internal static class GdiReceiptPrinter
                             g.DrawString(item.Service_Name ?? "-", fLabel, brush, new RectangleF(left, y, maxWidth * 0.72f, 13), sfL);
                             g.DrawString($"{item.Qty}x", fLabel, brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
                             y += 13;
-                            g.DrawLine(penThin, left, y, left + maxWidth, y); y += 4;
                         }
+                        y += 2;
+                        g.DrawLine(penThin, left, y, left + maxWidth, y); y += 4;
                     }
 
                     y += 2;
@@ -1045,6 +1051,12 @@ internal static class GdiReceiptPrinter
                     // ── Footer ────────────────────────────────────────────────
                     g.DrawString("Terima kasih atas kunjungan Anda!", fFooter, brush, new RectangleF(left, y, maxWidth, 13), sfC); y += 12;
                     g.DrawString("Semoga sehat selalu :)",            fFooter, brush, new RectangleF(left, y, maxWidth, 13), sfC);
+                }
+                else
+                {
+                    y += 3;
+                    g.DrawLine(penThin, left, y, left + maxWidth, y); y += 6;
+                    g.DrawString("Printed by SKY ePOS", fFooter, brush, new RectangleF(left, y, maxWidth, 13), sfC);
                 }
 
                 ev.HasMorePages = false;
