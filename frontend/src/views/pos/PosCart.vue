@@ -63,7 +63,7 @@
     <div class="modal-content receipt-modal" @click.stop>
       <!-- Header -->
       <div class="modal-header">
-        <h2>✓ Transaksi Berhasil</h2>
+        <h2>Konfirmasi Pembayaran</h2>
         <button class="modal-close" @click="closeReceiptModal">✕</button>
       </div>
 
@@ -162,10 +162,10 @@
       <!-- Action Buttons -->
       <div class="modal-actions">
         <button class="btn btn-print" @click="printReceipt">
-          🖨️ Print Sekarang
+          🖨️ Lanjut Print
         </button>
         <button class="btn btn-close" @click="closeReceiptModal">
-          Tutup
+          Cancel
         </button>
       </div>
     </div>
@@ -675,12 +675,7 @@ const printReceipt = async () => {
     })
 
     pendingPrinted.value = true
-    await SwalTheme.fire({
-      icon: "success",
-      title: "Struk dikirim",
-      text: "🖨 Struk langsung dikirim ke printer POS",
-      confirmButtonText: "OK"
-    })
+    await closeReceiptModal()
   } catch (err) {
     await SwalTheme.fire({
       icon: "error",
