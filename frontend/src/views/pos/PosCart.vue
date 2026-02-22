@@ -172,6 +172,7 @@ import api from "@/services/api"
 import { useRouter } from "vue-router"
 import Swal from "sweetalert2"
 import "sweetalert2/dist/sweetalert2.min.css"
+import { getPrinterAgentConfig } from "@/utils/printerAgentConfig"
 
 const router = useRouter()
 const pos = usePosStore()
@@ -625,7 +626,10 @@ const printReceipt = () => {
 // 🖨️ PRINT TO THERMAL PRINTER (existing function - optional)
 const printOrder = async (order_id = lastOrder.value.order_id) => {
   try {
-    await api.post(`/printers/print-order`, { order_id })
+    await api.post(`/printers/print-order`, {
+      order_id,
+      printer: getPrinterAgentConfig()
+    })
     await SwalTheme.fire({
       icon: "success",
       title: "Struk dikirim",

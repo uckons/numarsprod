@@ -15,6 +15,7 @@
         <button class="nav-btn" :class="{active:tab==='rooms'}" @click="tab='rooms'"><DoorOpen size="18" /> Rooms</button>
         <button class="nav-btn" :class="{active:tab==='stock'}" @click="tab='stock'"><Package size="18" /> FNB Stock</button>
         <button class="nav-btn" :class="{active:tab==='grades'}" @click="tab='grades'"><Trophy size="18" /> Grades</button>
+        <button class="nav-btn" :class="{active:tab==='printer-agent'}" @click="tab='printer-agent'"><Printer size="18" /> Printer Agent</button>
       </nav>
 
       <!-- LOGOUT -->
@@ -33,6 +34,7 @@
       <Rooms v-if="tab==='rooms'" />
       <StockDashboard v-if="tab==='stock'" />
       <Grades v-if="tab==='grades'" />
+      <PrinterAgentTools v-if="tab==='printer-agent'" />
     </main>
   </div>
 </template>
@@ -41,7 +43,7 @@
 import { ref } from "vue"
 import { useRouter } from "vue-router"
 import { useAuthStore } from "@/store/auth.store"
-import { Users as UsersIcon, Store, Package, ShieldCheck, Building2, ReceiptText, Timer, UsersRound, DoorOpen, Trophy, LogOut } from "lucide-vue-next"
+import { Users as UsersIcon, Store, Package, ShieldCheck, Building2, ReceiptText, Timer, UsersRound, DoorOpen, Trophy, LogOut, Printer } from "lucide-vue-next"
 import AuditLogs from "./AuditLogs.vue"
 import StockDashboard from "@/views/stock/StockDashboard.vue"
 import Users from "./Users.vue"
@@ -52,6 +54,7 @@ import Services from "./Services.vue"
 import Therapists from './Therapists.vue'
 import Rooms from './Rooms.vue'
 import Grades from './Grades.vue'
+import PrinterAgentTools from './PrinterAgentTools.vue'
 
 
 const tab = ref("users")
