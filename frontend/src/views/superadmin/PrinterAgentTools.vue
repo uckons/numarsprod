@@ -56,6 +56,11 @@
       <button class="btn" :disabled="loading" @click="testPrint">Test Print</button>
     </div>
 
+    <p v-if="effectivePrinterTarget" class="resolved-info">
+      Effective target: <strong>{{ effectivePrinterTarget.branch_name }}</strong> / <strong>{{ effectivePrinterTarget.channel }}</strong>
+      → <strong>{{ effectivePrinterTarget.agent_url }}</strong>
+    </p>
+
     <div class="result" v-if="targets.length">
       <h3>Registered Printer Routes</h3>
       <table class="target-table">
@@ -105,6 +110,7 @@ import { setPrinterAgentConfig } from "@/utils/printerAgentConfig"
 const loading = ref(false)
 const diagnostics = ref(null)
 const AGENT_REQUEST_TIMEOUT_MS = 65000
+const effectivePrinterTarget = ref(null)
 const branches = ref([])
 const targets = ref([])
 
@@ -171,18 +177,57 @@ const applySelectedTargetToTest = () => {
   Swal.fire({ icon: "success", title: "Diagnostics target updated", text: "Target saat ini dipakai untuk test-agent dan test-print." })
 }
 
+
+const resolvePrinterForDiagnostics = async () => {
+  const params = {
+    branch_id: targetForm.value.branch_id ? Number(targetForm.value.branch_id) : undefined,
+    channel: targetForm.value.channel
+  }
+
+  const res = await api.get("/superadmin/printer-targets", { params })
+  const rows = Array.isArray(res.data) ? res.data : []
+  const active = rows.find((row) => Boolean(row.is_active)) || rows[0] || null
+
+  if (!active) {
+    effectivePrinterTarget.value = null
+    return {
+      agent_url: targetForm.value.agent_url,
+      agent_token: targetForm.value.agent_token,
+      agent_printer_name: targetForm.value.agent_printer_name,
+      source: "form"
+    }
+  }
+
+  const resolved = {
+    agent_url: active.agent_url || "",
+    agent_token: active.agent_token || "",
+    agent_printer_name: active.agent_printer_name || "",
+    source: "backend",
+    branch_name: active.branch_name || "GLOBAL",
+    channel: active.channel || targetForm.value.channel
+  }
+
+  effectivePrinterTarget.value = resolved
+  targetForm.value.agent_url = resolved.agent_url
+  targetForm.value.agent_token = resolved.agent_token
+  targetForm.value.agent_printer_name = resolved.agent_printer_name
+
+  return resolved
+}
+
 const checkDiagnostics = async () => {
   loading.value = true
   diagnostics.value = null
   try {
+    const resolved = await resolvePrinterForDiagnostics()
     const printer = {
-      agent_url: targetForm.value.agent_url,
-      agent_token: targetForm.value.agent_token,
-      agent_printer_name: targetForm.value.agent_printer_name
+      agent_url: resolved.agent_url,
+      agent_token: resolved.agent_token,
+      agent_printer_name: resolved.agent_printer_name
     }
     const res = await api.post("/printers/agent-diagnostics", { printer }, { timeout: AGENT_REQUEST_TIMEOUT_MS })
     diagnostics.value = res.data
-    await Swal.fire({ icon: "success", title: "Agent reachable", text: "Status health dan daftar printer berhasil diambil." })
+    await Swal.fire({ icon: "success", title: "Agent reachable", text: `Status health berhasil diambil dari ${printer.agent_url}` })
   } catch (err) {
     const isTimeout = err?.code === "ECONNABORTED" || String(err?.message || "").toLowerCase().includes("timeout")
     const backendMessage = err.response?.data?.message || err.message || "Gagal cek agent"
@@ -200,13 +245,14 @@ const checkDiagnostics = async () => {
 const testPrint = async () => {
   loading.value = true
   try {
+    const resolved = await resolvePrinterForDiagnostics()
     const printer = {
-      agent_url: targetForm.value.agent_url,
-      agent_token: targetForm.value.agent_token,
-      agent_printer_name: targetForm.value.agent_printer_name
+      agent_url: resolved.agent_url,
+      agent_token: resolved.agent_token,
+      agent_printer_name: resolved.agent_printer_name
     }
     await api.post("/printers/test-agent-print", { printer }, { timeout: AGENT_REQUEST_TIMEOUT_MS })
-    await Swal.fire({ icon: "success", title: "Test print dikirim", text: "Cek printer apakah struk test tercetak." })
+    await Swal.fire({ icon: "success", title: "Test print dikirim", text: `Cek printer ${printer.agent_printer_name || "(default)"} di ${printer.agent_url}` })
   } catch (err) {
     const isTimeout = err?.code === "ECONNABORTED" || String(err?.message || "").toLowerCase().includes("timeout")
     const backendMessage = err.response?.data?.message || err.message || "Gagal test print"
@@ -242,6 +288,7 @@ input, select { background: #0f0f0f; border: 1px solid #444; color: #fff; border
 .status { padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
 .status.active { background: rgba(26,188,156,.18); color: #5ef0cb; border: 1px solid rgba(26,188,156,.3); }
 .status.inactive { background: rgba(231,76,60,.16); color: #ff9b91; border: 1px solid rgba(231,76,60,.3); }
+.resolved-info { margin-top: 10px; color: #d8d8d8; font-size: 13px; }
 
 @media (max-width: 980px) {
   .grid.three { grid-template-columns: 1fr; }
