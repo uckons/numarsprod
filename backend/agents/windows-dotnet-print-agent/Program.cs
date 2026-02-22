@@ -607,6 +607,15 @@ internal static class PrintLayoutRules
             || method.Equals("BAR", StringComparison.OrdinalIgnoreCase);
     }
 
+
+    public static (string MainName, string Variant) SplitPackageVariant(string raw)
+    {
+        var text = (raw ?? "-").Trim();
+        var idx = text.IndexOf(" - ", StringComparison.Ordinal);
+        if (idx <= 0 || idx >= text.Length - 3) return (text, string.Empty);
+        return (text[..idx].Trim(), text[(idx + 3)..].Trim());
+    }
+
     public static string GetItemCategory(ReceiptItem item)
     {
         var raw = item.Category;
@@ -753,7 +762,16 @@ internal static class ReceiptBuilder
 
             foreach (var item in receipt.Items)
             {
-                WriteLine(PadRow(Truncate(item.Service_Name ?? "-", WIDTH - 6), $"{item.Qty}x", WIDTH));
+                var (mainName, variantName) = PrintLayoutRules.SplitPackageVariant(item.Service_Name ?? "-");
+                if (!string.IsNullOrWhiteSpace(variantName))
+                {
+                    WriteLine(Truncate(mainName, WIDTH));
+                    WriteLine(PadRow($"  • {Truncate(variantName, WIDTH - 10)}", $"{item.Qty}x", WIDTH));
+                }
+                else
+                {
+                    WriteLine(PadRow(Truncate(mainName, WIDTH - 6), $"{item.Qty}x", WIDTH));
+                }
             }
 
             Divider('-');
@@ -1039,9 +1057,21 @@ internal static class GdiReceiptPrinter
 
                     foreach (var item in receipt.Items)
                     {
-                        g.DrawString(item.Service_Name ?? "-", fLabel, brush, new RectangleF(left, y, maxWidth * 0.72f, 13), sfL);
-                        g.DrawString($"{item.Qty}x", fLabel, brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
-                        y += 13;
+                        var (mainName, variantName) = PrintLayoutRules.SplitPackageVariant(item.Service_Name ?? "-");
+                        if (!string.IsNullOrWhiteSpace(variantName))
+                        {
+                            g.DrawString(mainName, fBold, brush, new RectangleF(left, y, maxWidth * 0.72f, 13), sfL);
+                            y += 13;
+                            g.DrawString($"• {variantName}", fLabel, brush, new RectangleF(left + 6, y, maxWidth * 0.66f, 13), sfL);
+                            g.DrawString($"{item.Qty}x", fLabel, brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
+                            y += 13;
+                        }
+                        else
+                        {
+                            g.DrawString(mainName, fLabel, brush, new RectangleF(left, y, maxWidth * 0.72f, 13), sfL);
+                            g.DrawString($"{item.Qty}x", fLabel, brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
+                            y += 13;
+                        }
                     }
 
                     y += 4;

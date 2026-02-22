@@ -119,19 +119,42 @@ const mapQtyByService = (rows = []) => {
   return map
 }
 
+const aggregateFnbSnapshotRows = (rows = []) => {
+  const aggregated = new Map()
+  for (const row of rows) {
+    const fnbItemId = Number(row.fnb_item_id || 0)
+    const serviceId = Number(row.service_id || 0)
+    const serviceName = String(row.service_name || "-").trim()
+    const key = fnbItemId > 0 ? `fnb:${fnbItemId}` : `svc:${serviceId}:${serviceName.toLowerCase()}`
+
+    const current = aggregated.get(key) || {
+      key,
+      fnb_item_id: fnbItemId,
+      service_id: serviceId,
+      service_name: serviceName,
+      qty: 0
+    }
+
+    current.qty += Number(row.qty || 0)
+    if (!current.service_name && serviceName) current.service_name = serviceName
+    aggregated.set(key, current)
+  }
+
+  return Array.from(aggregated.values())
+}
+
 const buildIncrementalFnbSnapshot = async (db, orderId, previousRows = []) => {
-  const latestRows = await buildBarOrderSnapshot(db, orderId)
-  const prevQtyByService = mapQtyByService(previousRows)
+  const latestRows = aggregateFnbSnapshotRows(await buildBarOrderSnapshot(db, orderId))
+  const prevQtyByService = mapQtyByService(aggregateFnbSnapshotRows(previousRows))
 
   return latestRows
     .map(item => {
-      const fnbItemId = Number(item.fnb_item_id || 0)
-      const serviceId = Number(item.service_id || 0)
-      const key = fnbItemId > 0 ? `fnb:${fnbItemId}` : `svc:${serviceId}:${String(item.service_name || "-").trim().toLowerCase()}`
-      const prevQty = Number(prevQtyByService.get(key) || 0)
+      const prevQty = Number(prevQtyByService.get(item.key) || 0)
       const deltaQty = Number(item.qty || 0) - prevQty
       return {
-        ...item,
+        fnb_item_id: Number(item.fnb_item_id || 0),
+        service_id: Number(item.service_id || 0),
+        service_name: item.service_name,
         qty: deltaQty
       }
     })
