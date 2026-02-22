@@ -58,12 +58,39 @@
     </div>
   </div>
 
+
+  <!-- 💳 PAYMENT CONFIRM MODAL -->
+  <div v-if="showPaymentConfirmModal" class="modal-overlay" @click="closePaymentConfirmModal">
+    <div class="modal-content receipt-modal" @click.stop>
+      <div class="modal-header">
+        <h2>Konfirmasi Pembayaran</h2>
+        <button class="modal-close" @click="closePaymentConfirmModal">✕</button>
+      </div>
+
+      <div class="receipt-preview" style="padding:20px;text-align:center;">
+        <p style="margin:0 0 10px 0;">Pastikan pembayaran sudah benar.</p>
+        <p style="margin:0 0 4px 0;"><strong>Metode:</strong> {{ receiptData?.payment_method || 'CASH' }}</p>
+        <p style="margin:0 0 4px 0;"><strong>Total:</strong> {{ formatRupiah(receiptData?.total || 0) }}</p>
+        <p style="margin:0;"><strong>Bayar:</strong> {{ formatRupiah(receiptData?.payment_amount || 0) }}</p>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-print" @click="proceedToPrintCartStep">
+          🧾 Lanjut Print
+        </button>
+        <button class="btn btn-close" @click="closePaymentConfirmModal">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- 🖨️ RECEIPT PREVIEW MODAL -->
   <div v-if="showReceiptModal" class="modal-overlay" @click="closeReceiptModal">
     <div class="modal-content receipt-modal" @click.stop>
       <!-- Header -->
       <div class="modal-header">
-        <h2>✓ Transaksi Berhasil</h2>
+        <h2>Print Cart</h2>
         <button class="modal-close" @click="closeReceiptModal">✕</button>
       </div>
 
@@ -130,6 +157,14 @@
           <!-- Total -->
           <div class="receipt-total">
             <div class="total-row">
+              <span>SubTotal:</span>
+              <span>{{ formatRupiah(receiptData?.subtotal ?? ((Number(receiptData?.total || 0) + Number(receiptData?.discount_amount || 0)))) }}</span>
+            </div>
+            <div class="total-row">
+              <span>Discount:</span>
+              <span>{{ formatRupiah(receiptData?.discount_amount || 0) }}</span>
+            </div>
+            <div class="total-row">
               <span>TOTAL:</span>
               <span class="total-amount">{{ formatRupiah(receiptData?.total) }}</span>
             </div>
@@ -157,7 +192,7 @@
           🖨️ Print Sekarang
         </button>
         <button class="btn btn-close" @click="closeReceiptModal">
-          Tutup
+          Cancel
         </button>
       </div>
     </div>
@@ -398,8 +433,14 @@ const lastOrder = ref({
 
 // 🖨️ RECEIPT PREVIEW STATE
 const showReceiptModal = ref(false)
+const showPaymentConfirmModal = ref(false)
 const receiptData = ref(null)
 const receiptLoading = ref(false)
+const pendingPayment = ref(null)
+const pendingPrinted = ref(false)
+const pendingFinalizedOrderId = ref(null)
+// backward-compatible state for stale cached templates
+const inPrintCartStep = ref(false)
 
 const format = n =>
   Number(n || 0).toLocaleString("id-ID")
@@ -445,6 +486,131 @@ const clear = async () => {
   })
 }
 
+
+const askPaymentDetails = async () => {
+  const total = Math.round(Number(grandTotal.value || 0))
+
+  const res = await SwalTheme.fire({
+    icon: "question",
+    title: "Metode Pembayaran",
+    html: `
+      <div style="text-align:left;margin-top:8px;">
+        <label style="display:block;margin-bottom:6px;font-size:13px;">Metode</label>
+        <select id="pay-method" class="swal2-input" style="margin:0 0 12px 0;max-width:100%;">
+          <option value="CASH">CASH</option>
+          <option value="QRIS">QRIS</option>
+          <option value="DEBIT">DEBIT</option>
+          <option value="CC">CC</option>
+          <option value="TRANSFER BANK">TRANSFER BANK</option>
+        </select>
+
+        <label style="display:block;margin-bottom:6px;font-size:13px;">Discount (Rp)</label>
+        <input id="pay-discount" type="number" min="0" class="swal2-input" style="margin:0 0 12px 0;max-width:100%;" value="0" />
+
+        <label id="pay-amount-label" style="display:block;margin-bottom:6px;font-size:13px;">Jumlah Bayar Cash (Rp)</label>
+        <input id="pay-amount" type="number" min="0" class="swal2-input" style="margin:0;max-width:100%;" value="${total}" />
+      </div>
+    `,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: "Bayar",
+    cancelButtonText: "Batal",
+    didOpen: () => {
+      const methodEl = document.getElementById("pay-method")
+      const amountEl = document.getElementById("pay-amount")
+      const amountLabelEl = document.getElementById("pay-amount-label")
+
+      const toggleAmountInput = () => {
+        const isCash = methodEl?.value === "CASH"
+        if (amountEl) {
+          amountEl.disabled = !isCash
+          if (!isCash) amountEl.value = String(total)
+        }
+        if (amountLabelEl) {
+          amountLabelEl.style.opacity = isCash ? "1" : "0.6"
+        }
+      }
+
+      methodEl?.addEventListener("change", toggleAmountInput)
+      toggleAmountInput()
+    },
+    preConfirm: () => {
+      const method = String(document.getElementById("pay-method")?.value || "CASH").toUpperCase()
+      const discountAmount = Math.max(0, Math.round(Number(document.getElementById("pay-discount")?.value || 0)))
+      const subtotal = total
+      const finalTotal = Math.max(0, subtotal - discountAmount)
+
+      let paymentAmount = Math.round(Number(document.getElementById("pay-amount")?.value || 0))
+      if (method !== "CASH") paymentAmount = finalTotal
+      if (method === "CASH" && paymentAmount < finalTotal) {
+        Swal.showValidationMessage("Jumlah bayar cash kurang dari total setelah discount")
+        return false
+      }
+
+      return {
+        payment_method: method,
+        discount_amount: discountAmount,
+        payment_amount: paymentAmount
+      }
+    }
+  })
+
+  if (!res.isConfirmed) return null
+  return res.value
+}
+
+const buildDraftReceiptPreview = (payment) => {
+  const subtotal = Math.round(Number(grandTotal.value || 0))
+  const discount = Math.max(0, Math.round(Number(payment?.discount_amount || 0)))
+  const total = Math.max(0, subtotal - discount)
+  const method = String(payment?.payment_method || 'CASH').toUpperCase()
+  const paymentAmount = method === 'CASH'
+    ? Math.max(total, Math.round(Number(payment?.payment_amount || 0)))
+    : total
+
+  return {
+    id: '-',
+    created_at: new Date().toISOString(),
+    payment_method: method,
+    subtotal,
+    discount_amount: discount,
+    total,
+    payment_amount: paymentAmount,
+    change_amount: Math.max(0, paymentAmount - total),
+    cashier_name: '-',
+    items: (items.value || []).map((it, idx) => ({
+      service_id: it.id || idx,
+      service_name: composeServiceName(it.name, it.variant_name),
+      qty: Number(it.qty || 0),
+      price: Number(it.base_price || 0),
+      subtotal: Number(it.base_price || 0) * Number(it.qty || 0),
+      therapist_name: it.therapist_name || null
+    }))
+  }
+}
+
+const finalizeOrderForPrint = async () => {
+  if (pendingFinalizedOrderId.value) return pendingFinalizedOrderId.value
+  if (!pendingPayment.value) throw new Error('Data pembayaran belum tersedia')
+
+  const payload = {
+    items: toPayloadItems(),
+    payment_method: pendingPayment.value.payment_method,
+    discount_amount: pendingPayment.value.discount_amount,
+    payment_amount: pendingPayment.value.payment_amount
+  }
+
+  let res
+  if (pos.currentOrderId) {
+    res = await api.post(`/orders/${pos.currentOrderId}/close`, payload)
+  } else {
+    res = await api.post('/orders/pos', payload)
+  }
+
+  pendingFinalizedOrderId.value = Number(res.data?.order_id)
+  return pendingFinalizedOrderId.value
+}
+
 const checkout = async () => {
   if (items.value.length === 0) {
     await SwalTheme.fire({
@@ -456,61 +622,15 @@ const checkout = async () => {
     return
   }
 
-  loading.value = true
-  try {
-    const payload = {
-      items: toPayloadItems(),
-      payment_method: "CASH"
-    }
-    
-    let res
-    
-    // 🆕 Kalau ada currentOrderId, UPDATE order existing
-    if (pos.currentOrderId) {
-      console.log('Updating existing order:', pos.currentOrderId)
-      res = await api.post(`/orders/${pos.currentOrderId}/close`, payload)
-    } else {
-      console.log('Creating new order')
-      res = await api.post("/orders/pos", payload)
-    }
+  const payment = await askPaymentDetails()
+  if (!payment) return
 
-     lastOrder.value = {
-      order_id: res.data.order_id,
-      total: res.data.total,
-      items: JSON.parse(JSON.stringify(items.value))
-    }
-
-    console.log('✅ Checkout success, order_id:', lastOrder.value.order_id)
-
-    // Clear local cart
-    pos.clear()
-
-    console.log('🖨️ Calling showReceiptPreview...')
-    
-    // 🖨️ SHOW RECEIPT PREVIEW MODAL (WAIT for modal to close)
-    await showReceiptPreview(lastOrder.value.order_id)
-
-    console.log('Modal closed, creating timers...')
-
-    // After closing receipt modal, create timers and navigate
-    try {
-      await api.post(`/timers/from-order/${lastOrder.value.order_id}`)
-    } catch (e) {
-      console.warn("Timer tidak dibuat:", e?.message || e)
-    }
-
-    console.log('Navigating to /kasir...')
-    router.push("/kasir")
-  } catch (err) {
-    await SwalTheme.fire({
-      icon: "error",
-      title: "Gagal",
-      text: err.response?.data?.message || err.message || "Failed to checkout",
-      confirmButtonText: "OK"
-    })
-  } finally {
-    loading.value = false
-  }
+  pendingPayment.value = payment
+  pendingPrinted.value = false
+  pendingFinalizedOrderId.value = null
+  inPrintCartStep.value = false
+  receiptData.value = buildDraftReceiptPreview(payment)
+  showPaymentConfirmModal.value = true
 }
 
 // 🖨️ SHOW RECEIPT PREVIEW
@@ -551,76 +671,83 @@ const showReceiptPreview = async (orderId) => {
   })
 }
 
-// 🖨️ CLOSE RECEIPT MODAL
-const closeReceiptModal = () => {
-  showReceiptModal.value = false
+
+const finalizeCompletedOrder = async (orderId) => {
+  pendingPrinted.value = false
+  pendingPayment.value = null
+  pendingFinalizedOrderId.value = null
+  pos.clear()
+
+  try {
+    await api.post(`/timers/from-order/${orderId}`)
+  } catch (e) {
+    console.warn("Timer tidak dibuat:", e?.message || e)
+  }
+
+  router.push("/kasir")
+}
+
+
+// backward-compatible handler for stale cached templates
+const proceedToPrintCartStep = async () => {
+  showPaymentConfirmModal.value = false
+  showReceiptModal.value = true
+  inPrintCartStep.value = true
+}
+
+const closePaymentConfirmModal = async () => {
+  showPaymentConfirmModal.value = false
   receiptData.value = null
+  pendingPayment.value = null
+  pendingPrinted.value = false
+  pendingFinalizedOrderId.value = null
+  inPrintCartStep.value = false
+}
+
+// 🖨️ CLOSE RECEIPT MODAL
+const closeReceiptModal = async () => {
+  showReceiptModal.value = false
+  showPaymentConfirmModal.value = false
+  receiptData.value = null
+  inPrintCartStep.value = false
+
+  if (pendingPrinted.value && pendingFinalizedOrderId.value) {
+    await finalizeCompletedOrder(pendingFinalizedOrderId.value)
+  }
 }
 
 // 🖨️ PRINT RECEIPT
-const printReceipt = () => {
-  if (!receiptData.value) return
-  const w = window.open('', '_blank', 'width=420,height=760')
-  if (!w) return
+const printReceipt = async () => {
+  try {
+    const orderId = await finalizeOrderForPrint()
+    const detailRes = await api.get(`/orders/${orderId}/detail`)
+    receiptData.value = detailRes.data
 
-  const esc = (val) => String(val || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
+    await api.post(`/printers/print-order`, {
+      order_id: orderId,
+      printer: getPrinterAgentConfig()
+    })
 
-  const data = receiptData.value
-  const itemRows = (data.items || []).map((item) => `
-    <div class="item-row">
-      <div class="item-name">${esc(item.service_name)}${item.therapist_name ? `<div class="meta">Terapis: ${esc(item.therapist_name)}</div>` : ''}</div>
-      <div class="item-sub">${esc(item.qty)}x ${esc(formatRupiah(item.price))}</div>
-      <div class="item-subtotal">${esc(formatRupiah(item.subtotal))}</div>
-    </div>
-  `).join('')
+    pendingPrinted.value = true
+    showReceiptModal.value = false
+    receiptData.value = null
 
-  w.document.write(`
-    <html><head><title>Receipt</title>
-      <style>
-        @page { size: 58mm auto; margin: 0; }
-        html, body { margin: 0; padding: 0; background: #fff; }
-        body { width: 58mm; font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.25; }
-        .wrap { width: 54mm; margin: 0 auto; padding: 2mm 1mm; }
-        .center { text-align: center; }
-        .logo { max-width: 26mm; max-height: 14mm; object-fit: contain; margin: 0 auto 1mm; display: block; }
-        .line { border-top: 1px dashed #111; margin: 1.5mm 0; }
-        .row { display: flex; justify-content: space-between; gap: 2mm; }
-        .item-row { margin: 1mm 0; }
-        .item-name { font-weight: 700; overflow-wrap: anywhere; }
-        .meta { font-weight: 400; }
-        .item-sub { color: #222; }
-        .item-subtotal { text-align: right; font-weight: 700; }
-        .total { font-size: 11px; font-weight: 800; }
-      </style>
-    </head><body>
-      <div class="wrap">
-        ${data.branch_logo_url ? `<img class="logo" src="${esc(data.branch_logo_url)}" alt="logo" />` : ''}
-        ${data.branch_name ? `<div class="center"><strong>${esc(data.branch_name)}</strong></div>` : ''}
-        ${data.branch_address ? `<div class="center">${esc(data.branch_address)}</div>` : ''}
-        ${data.branch_phone ? `<div class="center">Tel: ${esc(data.branch_phone)}</div>` : ''}
-        <div class="line"></div>
-        <div class="row"><span>No:</span><span>#${esc(data.id)}</span></div>
-        <div class="row"><span>Tanggal:</span><span>${esc(formatDateTime(data.created_at))}</span></div>
-        <div class="row"><span>Kasir:</span><span>${esc(data.cashier_name)}</span></div>
-        ${data.room_name ? `<div class="row"><span>Room:</span><span>${esc(data.room_name)}</span></div>` : ''}
-        <div class="line"></div>
-        ${itemRows}
-        <div class="line"></div>
-        <div class="row total"><span>TOTAL</span><span>${esc(formatRupiah(data.total))}</span></div>
-        <div class="row"><span>Bayar</span><span>${esc(formatRupiah(data.payment_amount))}</span></div>
-        <div class="row"><span>Kembali</span><span>${esc(formatRupiah(data.change_amount))}</span></div>
-        <div class="row"><span>Metode</span><span>${esc(data.payment_method || 'CASH')}</span></div>
-      </div>
-    </body></html>
-  `)
-  w.document.close()
-  w.focus()
-  w.print()
+    await SwalTheme.fire({
+      icon: "success",
+      title: "Struk dikirim",
+      text: "🖨 Struk berhasil diprint.",
+      confirmButtonText: "OK"
+    })
+
+    await finalizeCompletedOrder(orderId)
+  } catch (err) {
+    await SwalTheme.fire({
+      icon: "error",
+      title: "Gagal cetak",
+      text: err.response?.data?.message || err.message || "Gagal cetak",
+      confirmButtonText: "OK"
+    })
+  }
 }
 
 // 🖨️ PRINT TO THERMAL PRINTER (existing function - optional)
