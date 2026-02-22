@@ -723,10 +723,18 @@ internal static class ReceiptBuilder
             Write(BOLD_OFF);
             WriteLine(PadRow("Total Order", $"{Math.Max(receipt.Order_Id, 0)}", WIDTH));
             WriteLine(PadRow("Total Pendapatan", FormatRp(receipt.Total), WIDTH));
-            Divider('-');
 
             var grouped = receipt.Items.GroupBy(PrintLayoutRules.GetItemCategory)
                 .ToDictionary(g => g.Key, g => g.ToList());
+
+            foreach (var category in PrintLayoutRules.CategoryDisplayOrder)
+            {
+                if (!grouped.TryGetValue(category, out var catItems) || catItems.Count == 0) continue;
+                var categoryRevenue = catItems.Sum(i => i.Subtotal);
+                WriteLine(PadRow($"Total {category}", FormatRp(categoryRevenue), WIDTH));
+            }
+
+            Divider('-');
 
             foreach (var category in PrintLayoutRules.CategoryDisplayOrder)
             {
@@ -1009,11 +1017,18 @@ internal static class GdiReceiptPrinter
                     LabelRow("Total Order", $"{Math.Max(receipt.Order_Id, 0)}", fLabel);
                     LabelRow("Total Pendapatan", $"Rp{receipt.Total:N0}".Replace(',', '.'), fBold);
 
-                    y += 2;
-                    g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
-
                     var grouped = receipt.Items.GroupBy(PrintLayoutRules.GetItemCategory)
                         .ToDictionary(gx => gx.Key, gx => gx.ToList());
+
+                    foreach (var category in PrintLayoutRules.CategoryDisplayOrder)
+                    {
+                        if (!grouped.TryGetValue(category, out var catItems) || catItems.Count == 0) continue;
+                        var categoryRevenue = catItems.Sum(i => i.Subtotal);
+                        LabelRow($"Total {category}", $"Rp{categoryRevenue:N0}".Replace(',', '.'), fLabel);
+                    }
+
+                    y += 2;
+                    g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
 
                     foreach (var category in PrintLayoutRules.CategoryDisplayOrder)
                     {

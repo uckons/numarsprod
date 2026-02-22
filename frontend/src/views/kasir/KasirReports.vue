@@ -63,6 +63,22 @@
         <span>Range</span>
         <strong>{{ analytics.range.from }} — {{ analytics.range.to }}</strong>
       </article>
+      <article class="summary-card">
+        <span>Total SPA</span>
+        <strong>Rp {{ format(spaTotalRevenue) }}</strong>
+      </article>
+      <article class="summary-card">
+        <span>Total LC</span>
+        <strong>Rp {{ format(lcTotalRevenue) }}</strong>
+      </article>
+      <article class="summary-card">
+        <span>Total FNB</span>
+        <strong>Rp {{ format(fnbTotalRevenue) }}</strong>
+      </article>
+      <article class="summary-card">
+        <span>Total KTV</span>
+        <strong>Rp {{ format(ktvTotalRevenue) }}</strong>
+      </article>
     </section>
 
     <section class="chart-panel compact-panel">
@@ -350,6 +366,18 @@ const fnbTotalRevenue = computed(() => {
   return fnbServiceRows.value.reduce((sum, row) => sum + Number(row.revenue || 0), 0)
 })
 
+const spaTotalRevenue = computed(() => {
+  return spaServiceRows.value.reduce((sum, row) => sum + Number(row.revenue || 0), 0)
+})
+
+const lcTotalRevenue = computed(() => {
+  return lcServiceRows.value.reduce((sum, row) => sum + Number(row.revenue || 0), 0)
+})
+
+const ktvTotalRevenue = computed(() => {
+  return ktvServiceRows.value.reduce((sum, row) => sum + Number(row.revenue || 0), 0)
+})
+
 const fnbTotalQty = computed(() => {
   return fnbServiceRows.value.reduce((sum, row) => sum + Number(row.qty || 0), 0)
 })
@@ -437,7 +465,10 @@ const printReport = () => {
           <div><strong>Total Pendapatan:</strong> Rp ${format(analytics.value.summary.revenue)}</div>
           <div><strong>Total Order PAID:</strong> ${analytics.value.summary.paid_orders}</div>
           <div><strong>Total Item Terjual:</strong> ${analytics.value.summary.items_sold}</div>
+          <div><strong>Total SPA:</strong> Rp ${format(spaTotalRevenue.value)}</div>
+          <div><strong>Total LC:</strong> Rp ${format(lcTotalRevenue.value)}</div>
           <div><strong>Total FNB:</strong> Rp ${format(fnbTotalRevenue.value)}</div>
+          <div><strong>Total KTV:</strong> Rp ${format(ktvTotalRevenue.value)}</div>
         </div>
 
         <h2>Recap Kategori (SPA / LC / FNB / KTV)</h2>
