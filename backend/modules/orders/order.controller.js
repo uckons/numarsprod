@@ -195,12 +195,26 @@ const queueBarInboxAutoPrint = (req, payload = {}) => {
 
     if (!target?.agent_url || target.is_active === false) return
 
+    const { rows: orderMetaRows } = await db.query(
+      `SELECT r.name AS room_name
+       FROM orders o
+       LEFT JOIN rooms r ON r.id = o.room_id
+       WHERE o.id = $1
+       LIMIT 1`,
+      [payload.order_id]
+    )
+    const roomName = payload.room_name || orderMetaRows[0]?.room_name || null
+    const ticketNote = [roomName ? `Room/Sofa: ${roomName}` : null, payload.note || null]
+      .filter(Boolean)
+      .join(" | ") || null
+
     await printerService.printBarInboxTicket({
       ticket: {
         order_id: payload.order_id,
         branch_name: payload.branch_name || "BAR",
         created_at: new Date().toISOString(),
-        note: payload.note || null,
+        room_name: roomName,
+        note: ticketNote,
         source: payload.source || "KASIR -> BAR",
         items: Array.isArray(payload.items) ? payload.items : []
       },
