@@ -74,6 +74,8 @@ const buildReceiptPayload = (order, options = {}) => ({
     room_name: order.room_name || null,
     therapist_name: order.therapist_name || null,
     payment_method: order.payment_method || "CASH",
+    subtotal: Number(order.subtotal || (Number(order.total || 0) + Number(order.discount_amount || 0))),
+    discount_amount: Number(order.discount_amount || 0),
     payment_amount: Number(order.payment_amount || order.total || 0),
     change_amount: Number(order.change_amount || 0),
     items: (order.items || []).map((item) => ({

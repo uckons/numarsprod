@@ -130,6 +130,14 @@
           <!-- Total -->
           <div class="receipt-total">
             <div class="total-row">
+              <span>SubTotal:</span>
+              <span>{{ formatRupiah(receiptData?.subtotal ?? ((Number(receiptData?.total || 0) + Number(receiptData?.discount_amount || 0)))) }}</span>
+            </div>
+            <div class="total-row">
+              <span>Discount:</span>
+              <span>{{ formatRupiah(receiptData?.discount_amount || 0) }}</span>
+            </div>
+            <div class="total-row">
               <span>TOTAL:</span>
               <span class="total-amount">{{ formatRupiah(receiptData?.total) }}</span>
             </div>
@@ -445,6 +453,79 @@ const clear = async () => {
   })
 }
 
+
+const askPaymentDetails = async () => {
+  const total = Math.round(Number(grandTotal.value || 0))
+
+  const res = await SwalTheme.fire({
+    icon: "question",
+    title: "Metode Pembayaran",
+    html: `
+      <div style="text-align:left;margin-top:8px;">
+        <label style="display:block;margin-bottom:6px;font-size:13px;">Metode</label>
+        <select id="pay-method" class="swal2-input" style="margin:0 0 12px 0;max-width:100%;">
+          <option value="CASH">CASH</option>
+          <option value="QRIS">QRIS</option>
+          <option value="DEBIT">DEBIT</option>
+          <option value="CC">CC</option>
+          <option value="TRANSFER BANK">TRANSFER BANK</option>
+        </select>
+
+        <label style="display:block;margin-bottom:6px;font-size:13px;">Discount (Rp)</label>
+        <input id="pay-discount" type="number" min="0" class="swal2-input" style="margin:0 0 12px 0;max-width:100%;" value="0" />
+
+        <label id="pay-amount-label" style="display:block;margin-bottom:6px;font-size:13px;">Jumlah Bayar Cash (Rp)</label>
+        <input id="pay-amount" type="number" min="0" class="swal2-input" style="margin:0;max-width:100%;" value="${total}" />
+      </div>
+    `,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: "Bayar",
+    cancelButtonText: "Batal",
+    didOpen: () => {
+      const methodEl = document.getElementById("pay-method")
+      const amountEl = document.getElementById("pay-amount")
+      const amountLabelEl = document.getElementById("pay-amount-label")
+
+      const toggleAmountInput = () => {
+        const isCash = methodEl?.value === "CASH"
+        if (amountEl) {
+          amountEl.disabled = !isCash
+          if (!isCash) amountEl.value = String(total)
+        }
+        if (amountLabelEl) {
+          amountLabelEl.style.opacity = isCash ? "1" : "0.6"
+        }
+      }
+
+      methodEl?.addEventListener("change", toggleAmountInput)
+      toggleAmountInput()
+    },
+    preConfirm: () => {
+      const method = String(document.getElementById("pay-method")?.value || "CASH").toUpperCase()
+      const discountAmount = Math.max(0, Math.round(Number(document.getElementById("pay-discount")?.value || 0)))
+      const subtotal = total
+      const finalTotal = Math.max(0, subtotal - discountAmount)
+
+      let paymentAmount = Math.round(Number(document.getElementById("pay-amount")?.value || 0))
+      if (method !== "CASH") paymentAmount = finalTotal
+      if (method === "CASH" && paymentAmount < finalTotal) {
+        Swal.showValidationMessage("Jumlah bayar cash kurang dari total setelah discount")
+        return false
+      }
+
+      return {
+        payment_method: method,
+        discount_amount: discountAmount,
+        payment_amount: paymentAmount
+      }
+    }
+  })
+
+  if (!res.isConfirmed) return null
+  return res.value
+}
+
 const checkout = async () => {
   if (items.value.length === 0) {
     await SwalTheme.fire({
@@ -456,11 +537,16 @@ const checkout = async () => {
     return
   }
 
+  const payment = await askPaymentDetails()
+  if (!payment) return
+
   loading.value = true
   try {
     const payload = {
       items: toPayloadItems(),
-      payment_method: "CASH"
+      payment_method: payment.payment_method,
+      discount_amount: payment.discount_amount,
+      payment_amount: payment.payment_amount
     }
     
     let res

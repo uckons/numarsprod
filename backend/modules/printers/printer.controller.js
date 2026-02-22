@@ -1,8 +1,16 @@
 const printerService = require("./printer.service")
 
+
+const ensureOrderPaymentColumns = async (db) => {
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0`)
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_amount NUMERIC(12,2) DEFAULT 0`)
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS change_amount NUMERIC(12,2) DEFAULT 0`)
+}
+
 exports.printOrder = async (req, res) => {
   try {
     const db = req.app.get("db")
+    await ensureOrderPaymentColumns(db)
     const { order_id, printer } = req.body
 
     if (!order_id) {
@@ -16,6 +24,9 @@ exports.printOrder = async (req, res) => {
         o.id,
         o.total,
         o.payment_method,
+        o.discount_amount,
+        o.payment_amount,
+        o.change_amount,
         o.created_at,
         b.name AS branch_name,
         b.address AS branch_address,
@@ -57,8 +68,10 @@ exports.printOrder = async (req, res) => {
     )
 
     order.items = itemsRes.rows
-    order.payment_amount = Number(order.total || 0)
-    order.change_amount = 0
+    order.discount_amount = Number(order.discount_amount || 0)
+    order.payment_amount = Number(order.payment_amount || order.total || 0)
+    order.change_amount = Number(order.change_amount || 0)
+    order.subtotal = Math.max(0, Number(order.total || 0) + Number(order.discount_amount || 0))
 
     // 🔹 PRINT
     await printerService.printOrder({ order, printer })

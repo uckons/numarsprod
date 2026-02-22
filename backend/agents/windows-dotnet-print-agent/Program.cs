@@ -567,6 +567,8 @@ internal sealed class ReceiptModel
     public string? Room_Name { get; set; }
     public string? Therapist_Name { get; set; }
     public string? Payment_Method { get; set; }
+    public decimal Subtotal { get; set; }
+    public decimal Discount_Amount { get; set; }
     public decimal Payment_Amount { get; set; }
     public decimal Change_Amount { get; set; }
     public List<ReceiptItem> Items { get; set; } = new();
@@ -760,6 +762,11 @@ internal static class ReceiptBuilder
         {
             Write(ALIGN_LEFT);
             var payAmount = receipt.Payment_Amount > 0 ? receipt.Payment_Amount : receipt.Total;
+
+            var subtotal = receipt.Subtotal > 0 ? receipt.Subtotal : receipt.Total + receipt.Discount_Amount;
+
+            WriteLine(PadRow("SubTotal", FormatRp(subtotal), WIDTH));
+            WriteLine(PadRow("Discount", FormatRp(receipt.Discount_Amount), WIDTH));
 
             // TOTAL — bold + double width
             Write(BOLD_ON);
@@ -1026,8 +1033,12 @@ internal static class GdiReceiptPrinter
                 if (!isRecapPosReport)
                 {
                     // ── TOTAL row — inverted (black bg, white text) ───────────
+                    var subtotal = receipt.Subtotal > 0 ? receipt.Subtotal : receipt.Total + receipt.Discount_Amount;
                     var payAmount = receipt.Payment_Amount > 0 ? receipt.Payment_Amount : receipt.Total;
                     var totalStr  = $"Rp{receipt.Total:N0}".Replace(',', '.');
+                    LabelRow("SubTotal", $"Rp{subtotal:N0}".Replace(',', '.'), fLabel);
+                    LabelRow("Discount", $"Rp{receipt.Discount_Amount:N0}".Replace(',', '.'), fLabel);
+
                     g.FillRectangle(Brushes.Black, new RectangleF(left - 2, y - 1, maxWidth + 4, 18));
                     g.DrawString("TOTAL",   fTotal, Brushes.White, new RectangleF(left,                    y, maxWidth * 0.5f, 17), sfL);
                     g.DrawString(totalStr,   fTotal, Brushes.White, new RectangleF(left + maxWidth * 0.5f,  y, maxWidth * 0.5f, 17), sfR);
