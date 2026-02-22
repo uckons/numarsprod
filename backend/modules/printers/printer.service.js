@@ -90,6 +90,43 @@ const buildReceiptPayload = (order, options = {}) => ({
 })
 
 
+
+const buildBarInboxPayload = (ticket = {}, options = {}) => {
+  const createdAt = ticket.created_at ? formatReceiptDateTime(ticket.created_at) : formatReceiptDateTime(new Date())
+  const sourceLabel = String(ticket.source || 'BAR INBOX').trim().toUpperCase()
+
+  return {
+    profile: THERMAL_PROFILE,
+    printer_name: options.printerName || null,
+    receipt: {
+      title: 'BAR ORDER TICKET',
+      divider: '------------------------',
+      order_id: Number(ticket.order_id || 0),
+      created_at: createdAt,
+      branch_name: ticket.branch_name || 'BAR',
+      branch_address: null,
+      branch_phone: null,
+      branch_logo_url: null,
+      cashier_name: sourceLabel,
+      room_name: null,
+      therapist_name: ticket.note || null,
+      payment_method: 'BAR',
+      subtotal: 0,
+      discount_amount: 0,
+      payment_amount: 0,
+      change_amount: 0,
+      items: (ticket.items || []).map((item) => ({
+        service_name: item.service_name,
+        qty: Number(item.qty || 0),
+        subtotal: 0,
+        therapist_name: null
+      })),
+      total: 0,
+      printed_at: formatReceiptTime()
+    }
+  }
+}
+
 const normalizeCategory = (category) => {
   const upper = String(category || '').trim().toUpperCase()
   if (upper === 'KARAOKE') return 'KTV'
@@ -407,4 +444,24 @@ exports.getAgentDiagnostics = async ({ agentUrl, token }) => {
       : (err.code || err.message)
     throw new Error(`Diagnosa agent gagal (${base}): ${detail}`)
   }
+}
+
+
+exports.printBarInboxTicket = async ({ ticket, printer = {} }) => {
+  const envAgentUrl = process.env.PRINT_AGENT_URL
+  const agentUrl = printer.agent_url || envAgentUrl
+
+  if (!agentUrl) {
+    throw new Error("PRINT_AGENT_URL belum di-set untuk cetak BAR inbox")
+  }
+
+  const payload = buildBarInboxPayload(ticket, {
+    printerName: printer.agent_printer_name || process.env.PRINT_AGENT_PRINTER
+  })
+
+  return sendReceiptToAgent({
+    payload,
+    agentUrl,
+    token: printer.agent_token || process.env.PRINT_AGENT_TOKEN
+  })
 }

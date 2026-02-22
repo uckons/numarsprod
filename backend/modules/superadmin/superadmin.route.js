@@ -59,4 +59,14 @@ router.get("/therapist-payroll", allowAdminManager, c.getTherapistPayrollSummary
 router.post("/therapist-payroll/settle", allowAdminManager, audit("THERAPIST_PAYROLL_SETTLE"), c.settleTherapistPayroll)
 router.get("/audit-logs", allowSuperAdminOnly, c.auditLogs)
 
+
+router.get("/printer-targets", allowSuperAdminOnly, c.getPrinterTargets)
+router.post(
+  "/printer-targets",
+  allowSuperAdminOnly,
+  audit("UPSERT_PRINTER_TARGET"),
+  c.upsertPrinterTarget
+)
+
+
 module.exports = router

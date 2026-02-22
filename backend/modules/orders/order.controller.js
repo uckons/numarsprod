@@ -2,6 +2,8 @@ const service = require("./order.service")
 const stockService = require("../stock/stock.service")
 const { writeAuditLog: writeAuditEntry } = require("../../utils/audit")
 const dashboardService = require("../dashboard/dashboard.service")
+const printerService = require("../printers/printer.service")
+const printerTargetService = require("../printers/printer-target.service")
 
 const parseOrderId = (rawId) => {
   const orderId = Number(rawId)
@@ -150,6 +152,39 @@ const emitUndoVoidRequestNew = (req, payload) => {
   if (!io) return
   io.to(roleRoom(payload.branch_id, "Supervisor")).emit("orders:undo-void:request:new", payload)
   io.to(roleRoom(payload.branch_id, "Manager")).emit("orders:undo-void:request:new", payload)
+}
+
+
+
+const queueBarInboxAutoPrint = (req, payload = {}) => {
+  Promise.resolve().then(async () => {
+    const db = req.app.get("db")
+    const target = await printerTargetService.getResolvedPrinterTarget({
+      db,
+      branchId: payload.branch_id,
+      channel: printerTargetService.CHANNELS.BAR_INBOX
+    })
+
+    if (!target?.agent_url || target.is_active === false) return
+
+    await printerService.printBarInboxTicket({
+      ticket: {
+        order_id: payload.order_id,
+        branch_name: payload.branch_name || "BAR",
+        created_at: new Date().toISOString(),
+        note: payload.note || null,
+        source: payload.source || "KASIR -> BAR",
+        items: Array.isArray(payload.items) ? payload.items : []
+      },
+      printer: {
+        agent_url: target.agent_url,
+        agent_token: target.agent_token,
+        agent_printer_name: target.agent_printer_name
+      }
+    })
+  }).catch((err) => {
+    console.error("BAR AUTO PRINT ERROR:", err.message || err)
+  })
 }
 
 const createKasirBarMessage = async (db, payload = {}) => {
@@ -1007,6 +1042,14 @@ exports.createDraftFromPos = async (req, res) => {
         note: barNote,
         items: fnbSnapshot
       })
+
+      queueBarInboxAutoPrint(req, {
+        order_id: orderId,
+        branch_id: branchId,
+        source: "POS DRAFT",
+        note: barNote,
+        items: fnbSnapshot
+      })
     }
 
     res.json({
@@ -1085,6 +1128,14 @@ exports.saveDraft = async (req, res) => {
         order_id: idOrder,
         branch_id: req.user.branch_id,
         status: "PENDING",
+        note: barNote,
+        items: incrementalFnbSnapshot
+      })
+
+      queueBarInboxAutoPrint(req, {
+        order_id: idOrder,
+        branch_id: req.user.branch_id,
+        source: "POS SAVE DRAFT",
         note: barNote,
         items: incrementalFnbSnapshot
       })
