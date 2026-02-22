@@ -196,7 +196,17 @@ const queueBarInboxAutoPrint = (req, payload = {}) => {
     if (!target?.agent_url || target.is_active === false) return
 
     const { rows: orderMetaRows } = await db.query(
-      `SELECT r.name AS room_name
+      `SELECT
+         r.name AS room_name,
+         (
+           SELECT string_agg(DISTINCT t_name, ', ' ORDER BY t_name)
+           FROM (
+             SELECT NULLIF(BTRIM(regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',')), '') AS t_name
+             FROM order_items oi
+             WHERE oi.order_id = o.id
+           ) t
+           WHERE t_name IS NOT NULL
+         ) AS therapist_name
        FROM orders o
        LEFT JOIN rooms r ON r.id = o.room_id
        WHERE o.id = $1
@@ -204,6 +214,7 @@ const queueBarInboxAutoPrint = (req, payload = {}) => {
       [payload.order_id]
     )
     const roomName = payload.room_name || orderMetaRows[0]?.room_name || null
+    const therapistName = payload.therapist_name || orderMetaRows[0]?.therapist_name || null
     const ticketNote = [roomName ? `Room/Sofa: ${roomName}` : null, payload.note || null]
       .filter(Boolean)
       .join(" | ") || null
@@ -214,6 +225,7 @@ const queueBarInboxAutoPrint = (req, payload = {}) => {
         branch_name: payload.branch_name || "BAR",
         created_at: new Date().toISOString(),
         room_name: roomName,
+        therapist_name: therapistName,
         note: ticketNote,
         source: payload.source || "KASIR -> BAR",
         items: Array.isArray(payload.items) ? payload.items : []
