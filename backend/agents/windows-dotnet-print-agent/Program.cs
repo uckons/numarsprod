@@ -567,6 +567,8 @@ internal sealed class ReceiptModel
     public string? Room_Name { get; set; }
     public string? Therapist_Name { get; set; }
     public string? Payment_Method { get; set; }
+    public decimal Subtotal { get; set; }
+    public decimal Discount_Amount { get; set; }
     public decimal Payment_Amount { get; set; }
     public decimal Change_Amount { get; set; }
     public List<ReceiptItem> Items { get; set; } = new();
@@ -577,9 +579,49 @@ internal sealed class ReceiptModel
 internal sealed class ReceiptItem
 {
     public string? Service_Name { get; set; }
+    public string? Category { get; set; }
     public int Qty { get; set; }
     public decimal Subtotal { get; set; }
     public string? Therapist_Name { get; set; }
+}
+
+
+internal static class PrintLayoutRules
+{
+    public static readonly string[] CategoryDisplayOrder = new[] { "FNB", "SPA", "LC", "KTV" };
+
+    public static bool IsRecapPosReport(ReceiptModel receipt)
+    {
+        var title = receipt.Title ?? string.Empty;
+        return title.Contains("RECAP", StringComparison.OrdinalIgnoreCase)
+            || title.Contains("LAPORAN", StringComparison.OrdinalIgnoreCase);
+    }
+
+
+
+    public static bool IsBarOrderTicket(ReceiptModel receipt)
+    {
+        var title = receipt.Title ?? string.Empty;
+        var method = receipt.Payment_Method ?? string.Empty;
+        return title.Contains("BAR ORDER", StringComparison.OrdinalIgnoreCase)
+            || method.Equals("BAR", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static string GetItemCategory(ReceiptItem item)
+    {
+        var raw = item.Category;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            var name = item.Service_Name ?? string.Empty;
+            var token = name.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+            raw = token;
+        }
+
+        var normalized = (raw ?? string.Empty).Trim().ToUpperInvariant();
+        if (normalized == "KARAOKE") return "KTV";
+        if (CategoryDisplayOrder.Contains(normalized)) return normalized;
+        return "LAINNYA";
+    }
 }
 
 internal static class ReceiptBuilder
@@ -629,80 +671,166 @@ internal static class ReceiptBuilder
         Write(LF);
         Divider('=');
 
+        var isRecapPosReport = PrintLayoutRules.IsRecapPosReport(receipt);
+        var isBarOrderTicket = PrintLayoutRules.IsBarOrderTicket(receipt);
+
         // ── Order info ───────────────────────────────────────────────────────
         Write(ALIGN_LEFT);
-        if (receipt.Order_Id > 0)
+        if (!isRecapPosReport)
+        {
+            if (receipt.Order_Id > 0)
+            {
+                Write(BOLD_ON);
+                WriteLine($"Order# : {receipt.Order_Id}");
+                Write(BOLD_OFF);
+            }
+            if (!string.IsNullOrWhiteSpace(receipt.Created_At))
+                WriteLine($"Tanggal: {receipt.Created_At}");
+            if (!string.IsNullOrWhiteSpace(receipt.Cashier_Name))
+                WriteLine($"Kasir  : {receipt.Cashier_Name}");
+            if (!string.IsNullOrWhiteSpace(receipt.Therapist_Name))
+                WriteLine($"Terapis: {receipt.Therapist_Name}");
+            if (!string.IsNullOrWhiteSpace(receipt.Room_Name))
+                WriteLine($"Room   : {receipt.Room_Name}");
+
+            Divider('-');
+        }
+
+        if (isRecapPosReport)
         {
             Write(BOLD_ON);
-            WriteLine($"Order# : {receipt.Order_Id}");
+            WriteLine(Center("REKAP LAYANAN POS", WIDTH));
             Write(BOLD_OFF);
+            Divider('-');
         }
-        if (!string.IsNullOrWhiteSpace(receipt.Created_At))
-            WriteLine($"Tanggal: {receipt.Created_At}");
-        if (!string.IsNullOrWhiteSpace(receipt.Cashier_Name))
-            WriteLine($"Kasir  : {receipt.Cashier_Name}");
-        if (!string.IsNullOrWhiteSpace(receipt.Therapist_Name))
-            WriteLine($"Terapis: {receipt.Therapist_Name}");
-        if (!string.IsNullOrWhiteSpace(receipt.Room_Name))
-            WriteLine($"Room   : {receipt.Room_Name}");
 
-        Divider('-');
-
-        // ── Column header ────────────────────────────────────────────────────
-        Write(BOLD_ON);
-        WriteLine(PadRow("Layanan", "Subtotal", WIDTH));
-        Write(BOLD_OFF);
-        Divider('-');
-
-        // ── Items ────────────────────────────────────────────────────────────
-        foreach (var item in receipt.Items)
+        if (isRecapPosReport)
         {
-            var name    = item.Service_Name ?? "-";
-            var sub     = FormatRp(item.Subtotal);
-            var qtyLine = $"  {item.Qty}x @ {FormatRp(item.Subtotal / (item.Qty > 0 ? item.Qty : 1))}";
+            Write(BOLD_ON);
+            WriteLine(PadRow("Periode", receipt.Created_At ?? "-", WIDTH));
+            Write(BOLD_OFF);
+            WriteLine(PadRow("Total Order", $"{Math.Max(receipt.Order_Id, 0)}", WIDTH));
+            WriteLine(PadRow("Total Pendapatan", FormatRp(receipt.Total), WIDTH));
+            Divider('-');
 
-            // service name left, subtotal right
-            WriteLine(PadRow(Truncate(name, WIDTH - sub.Length - 1), sub, WIDTH));
-            // qty detail indented
-            WriteLine(qtyLine);
+            var grouped = receipt.Items.GroupBy(PrintLayoutRules.GetItemCategory)
+                .ToDictionary(g => g.Key, g => g.ToList());
 
-            if (!string.IsNullOrWhiteSpace(item.Therapist_Name))
-                WriteLine($"  Terapis: {item.Therapist_Name}");
+            foreach (var category in PrintLayoutRules.CategoryDisplayOrder)
+            {
+                if (!grouped.TryGetValue(category, out var catItems) || catItems.Count == 0) continue;
+                Write(BOLD_ON);
+                WriteLine(category);
+                Write(BOLD_OFF);
+                Divider('.');
+
+                foreach (var item in catItems)
+                {
+                    WriteLine(PadRow(Truncate(item.Service_Name ?? "-", WIDTH - 6), $"{item.Qty}x", WIDTH));
+                }
+                Divider('-');
+            }
+
+            if (grouped.TryGetValue("LAINNYA", out var otherItems) && otherItems.Count > 0)
+            {
+                Write(BOLD_ON);
+                WriteLine("LAINNYA");
+                Write(BOLD_OFF);
+                Divider('.');
+                foreach (var item in otherItems)
+                {
+                    WriteLine(PadRow(Truncate(item.Service_Name ?? "-", WIDTH - 6), $"{item.Qty}x", WIDTH));
+                }
+                Divider('-');
+            }
         }
+        else if (isBarOrderTicket)
+        {
+            Write(BOLD_ON);
+            WriteLine(PadRow("Item BAR", "QTY", WIDTH));
+            Write(BOLD_OFF);
+            Divider('-');
 
-        Divider('-');
+            foreach (var item in receipt.Items)
+            {
+                WriteLine(PadRow(Truncate(item.Service_Name ?? "-", WIDTH - 6), $"{item.Qty}x", WIDTH));
+            }
+
+            Divider('-');
+        }
+        else
+        {
+            // ── Column header ────────────────────────────────────────────────
+            Write(BOLD_ON);
+            WriteLine(PadRow("Layanan", "Subtotal", WIDTH));
+            Write(BOLD_OFF);
+            Divider('-');
+
+            // ── Items ────────────────────────────────────────────────────────
+            foreach (var item in receipt.Items)
+            {
+                var name = item.Service_Name ?? "-";
+                var sub = FormatRp(item.Subtotal);
+                var qtyLine = $"  {item.Qty}x @ {FormatRp(item.Subtotal / (item.Qty > 0 ? item.Qty : 1))}";
+                WriteLine(PadRow(Truncate(name, WIDTH - sub.Length - 1), sub, WIDTH));
+                WriteLine(qtyLine);
+
+                if (!string.IsNullOrWhiteSpace(item.Therapist_Name))
+                    WriteLine($"  Terapis: {item.Therapist_Name}");
+            }
+
+            Divider('-');
+        }
 
         // ── Totals ───────────────────────────────────────────────────────────
-        Write(ALIGN_LEFT);
-        var payAmount = receipt.Payment_Amount > 0 ? receipt.Payment_Amount : receipt.Total;
+        if (!isRecapPosReport && !isBarOrderTicket)
+        {
+            Write(ALIGN_LEFT);
+            var payAmount = receipt.Payment_Amount > 0 ? receipt.Payment_Amount : receipt.Total;
 
-        // TOTAL — bold + double width
-        Write(BOLD_ON);
-        WriteLine(PadRow("TOTAL", FormatRp(receipt.Total), WIDTH));
-        Write(BOLD_OFF);
+            var subtotal = receipt.Subtotal > 0 ? receipt.Subtotal : receipt.Total + receipt.Discount_Amount;
 
-        WriteLine(PadRow("Bayar", FormatRp(payAmount), WIDTH));
+            WriteLine(PadRow("SubTotal", FormatRp(subtotal), WIDTH));
+            WriteLine(PadRow("Discount", FormatRp(receipt.Discount_Amount), WIDTH));
 
-        Write(BOLD_ON);
-        WriteLine(PadRow("Kembali", FormatRp(receipt.Change_Amount), WIDTH));
-        Write(BOLD_OFF);
+            // TOTAL — bold + double width
+            Write(BOLD_ON);
+            WriteLine(PadRow("TOTAL", FormatRp(receipt.Total), WIDTH));
+            Write(BOLD_OFF);
 
-        Write(LF);
-        Write(ALIGN_LEFT);
-        WriteLine($"Metode : {receipt.Payment_Method ?? "CASH"}");
-        WriteLine($"Jam    : {receipt.Printed_At ?? DateTime.Now.ToString("dd/MM/yyyy HH:mm")}");
+            WriteLine(PadRow("Bayar", FormatRp(payAmount), WIDTH));
 
-        Divider('=');
+            Write(BOLD_ON);
+            WriteLine(PadRow("Kembali", FormatRp(receipt.Change_Amount), WIDTH));
+            Write(BOLD_OFF);
+        }
 
-        // ── Footer ───────────────────────────────────────────────────────────
-        Write(ALIGN_CENTER);
-        Write(BOLD_ON);
-        WriteLine("Terima kasih!");
-        Write(BOLD_OFF);
-        WriteLine("Semoga sehat selalu :)");
-        Write(LF);
-        Write(LF);
-        Write(LF);
+        if (!isRecapPosReport && !isBarOrderTicket)
+        {
+            Write(LF);
+            Write(ALIGN_LEFT);
+            WriteLine($"Metode : {receipt.Payment_Method ?? "CASH"}");
+            WriteLine($"Jam    : {receipt.Printed_At ?? DateTime.Now.ToString("dd/MM/yyyy HH:mm")}");
+
+            Divider('=');
+
+            // ── Footer ───────────────────────────────────────────────────────
+            Write(ALIGN_CENTER);
+            Write(BOLD_ON);
+            WriteLine("Terima kasih!");
+            Write(BOLD_OFF);
+            WriteLine("Semoga sehat selalu :)");
+            Write(LF);
+            Write(LF);
+            Write(LF);
+        }
+        else
+        {
+            Write(LF);
+            Write(ALIGN_CENTER);
+            WriteLine("Printed by SKY ePOS");
+            Write(LF);
+        }
 
         // ── Cut ──────────────────────────────────────────────────────────────
         Write(CUT);
@@ -773,6 +901,13 @@ internal static class GdiReceiptPrinter
                 using var sfC = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Near };
                 using var sfL = new StringFormat { Alignment = StringAlignment.Near,   LineAlignment = StringAlignment.Near };
                 using var sfR = new StringFormat { Alignment = StringAlignment.Far,    LineAlignment = StringAlignment.Near };
+                using var sfBrand = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Near,
+                    FormatFlags = StringFormatFlags.NoWrap,
+                    Trimming = StringTrimming.EllipsisCharacter
+                };
 
                 using var penThin  = new Pen(Color.Black, 0.5f);
                 using var penThick = new Pen(Color.Black, 1.5f);
@@ -786,19 +921,25 @@ internal static class GdiReceiptPrinter
                 }
 
                 // ── Brand name — auto-shrink until fits 1 line ────────────────
-                var brandName = receipt.Branch_Name ?? receipt.Title ?? "NUMARS POS";
+                var rawBrandName = receipt.Branch_Name ?? receipt.Title ?? "NUMARS POS";
+                var brandName = string.Join(" ", rawBrandName
+                    .Replace("\r", " ")
+                    .Replace("\n", " ")
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                    .Trim();
+                if (string.IsNullOrWhiteSpace(brandName)) brandName = "SKY ePOS";
                 var brandSize = 8f;
                 Font fBrand;
                 while (true)
                 {
                     fBrand = new Font("Courier New", brandSize, FontStyle.Bold);
-                    if (g.MeasureString(brandName, fBrand).Width <= maxWidth || brandSize <= 5.5f) break;
+                    if (g.MeasureString(brandName, fBrand, int.MaxValue, sfBrand).Width <= maxWidth || brandSize <= 5f) break;
                     fBrand.Dispose();
                     brandSize -= 0.5f;
                 }
                 using (fBrand)
                 {
-                    g.DrawString(brandName, fBrand, brush, new RectangleF(left, y, maxWidth, fBrand.GetHeight(g) + 4), sfC);
+                    g.DrawString(brandName, fBrand, brush, new RectangleF(left, y, maxWidth, fBrand.GetHeight(g) + 2), sfBrand);
                     y += fBrand.GetHeight(g) + 2;
                 }
 
@@ -820,61 +961,157 @@ internal static class GdiReceiptPrinter
                 y += 3;
                 g.DrawLine(penThick, left, y, left + maxWidth, y); y += 6;
 
+                var isRecapPosReport = PrintLayoutRules.IsRecapPosReport(receipt);
+                var isBarOrderTicket = PrintLayoutRules.IsBarOrderTicket(receipt);
+
                 // ── Order info ────────────────────────────────────────────────
-                if (receipt.Order_Id > 0)          LabelRow("Order#", $"{receipt.Order_Id}",     fBold);
-                if (!string.IsNullOrWhiteSpace(receipt.Created_At))      LabelRow("Tanggal",   receipt.Created_At,      fLabel);
-                if (!string.IsNullOrWhiteSpace(receipt.Cashier_Name))    LabelRow("Kasir",     receipt.Cashier_Name,    fLabel);
-                if (!string.IsNullOrWhiteSpace(receipt.Therapist_Name))  LabelRow("Terapis",   receipt.Therapist_Name,  fLabel);
-                if (!string.IsNullOrWhiteSpace(receipt.Room_Name))       LabelRow("Room",      receipt.Room_Name,       fLabel);
-
-                y += 3;
-                g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
-
-                // ── Column headers ────────────────────────────────────────────
-                g.DrawString("Layanan",  fBold, brush, new RectangleF(left,                    y, maxWidth * 0.50f, 13), sfL);
-                g.DrawString("Qty",      fBold, brush, new RectangleF(left + maxWidth * 0.50f, y, maxWidth * 0.15f, 13), sfC);
-                g.DrawString("Subtotal", fBold, brush, new RectangleF(left + maxWidth * 0.65f, y, maxWidth * 0.35f, 13), sfR);
-                y += 13;
-                g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
-
-                // ── Items ─────────────────────────────────────────────────────
-                foreach (var item in receipt.Items)
+                if (!isRecapPosReport)
                 {
-                    var sub = $"Rp{item.Subtotal:N0}".Replace(',', '.');
-                    g.DrawString(item.Service_Name ?? "-", fLabel, brush, new RectangleF(left,                    y, maxWidth * 0.50f, 13), sfL);
-                    g.DrawString($"{item.Qty}x",           fLabel, brush, new RectangleF(left + maxWidth * 0.50f, y, maxWidth * 0.15f, 13), sfC);
-                    g.DrawString(sub,                      fLabel, brush, new RectangleF(left + maxWidth * 0.65f, y, maxWidth * 0.35f, 13), sfR);
-                    y += 13;
-                    if (!string.IsNullOrWhiteSpace(item.Therapist_Name))
-                    { g.DrawString($"  ↳ {item.Therapist_Name}", fAddr, Brushes.DarkGray, new RectangleF(left, y, maxWidth, 12), sfL); y += 11; }
+                    if (receipt.Order_Id > 0)          LabelRow("Order#", $"{receipt.Order_Id}",     fBold);
+                    if (!string.IsNullOrWhiteSpace(receipt.Created_At))      LabelRow("Tanggal",   receipt.Created_At,      fLabel);
+                    if (!string.IsNullOrWhiteSpace(receipt.Cashier_Name))    LabelRow("Kasir",     receipt.Cashier_Name,    fLabel);
+                    if (!string.IsNullOrWhiteSpace(receipt.Therapist_Name))  LabelRow("Terapis",   receipt.Therapist_Name,  fLabel);
+                    if (!string.IsNullOrWhiteSpace(receipt.Room_Name))       LabelRow("Room",      receipt.Room_Name,       fLabel);
+
+                    y += 3;
+                    g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
                 }
 
-                y += 4;
-                g.DrawLine(penThick, left, y, left + maxWidth, y); y += 6;
+                if (isRecapPosReport)
+                {
+                    g.DrawString("REKAP LAYANAN POS", fBold, brush, new RectangleF(left, y, maxWidth, 13), sfC);
+                    y += 13;
+                    g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
 
-                // ── TOTAL row — inverted (black bg, white text) ───────────────
-                var payAmount = receipt.Payment_Amount > 0 ? receipt.Payment_Amount : receipt.Total;
-                var totalStr  = $"Rp{receipt.Total:N0}".Replace(',', '.');
-                g.FillRectangle(Brushes.Black, new RectangleF(left - 2, y - 1, maxWidth + 4, 18));
-                g.DrawString("TOTAL",   fTotal, Brushes.White, new RectangleF(left,                    y, maxWidth * 0.5f, 17), sfL);
-                g.DrawString(totalStr,  fTotal, Brushes.White, new RectangleF(left + maxWidth * 0.5f,  y, maxWidth * 0.5f, 17), sfR);
-                y += 18; y += 4;
+                    LabelRow("Periode", receipt.Created_At ?? "-", fLabel);
+                    LabelRow("Total Order", $"{Math.Max(receipt.Order_Id, 0)}", fLabel);
+                    LabelRow("Total Pendapatan", $"Rp{receipt.Total:N0}".Replace(',', '.'), fBold);
 
-                LabelRow("Bayar",   $"Rp{payAmount:N0}".Replace(',', '.'),               fLabel);
-                LabelRow("Kembali", $"Rp{receipt.Change_Amount:N0}".Replace(',', '.'),   fBold);
+                    y += 2;
+                    g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
 
-                y += 3;
-                g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
+                    var grouped = receipt.Items.GroupBy(PrintLayoutRules.GetItemCategory)
+                        .ToDictionary(gx => gx.Key, gx => gx.ToList());
 
-                LabelRow("Metode", receipt.Payment_Method ?? "CASH",                                          fLabel);
-                LabelRow("Jam",    receipt.Printed_At ?? DateTime.Now.ToString("dd/MM/yyyy HH:mm"),           fLabel);
+                    foreach (var category in PrintLayoutRules.CategoryDisplayOrder)
+                    {
+                        if (!grouped.TryGetValue(category, out var catItems) || catItems.Count == 0) continue;
+                        g.DrawString(category, fBold, brush, new RectangleF(left, y, maxWidth, 13), sfL);
+                        y += 13;
+                        g.DrawLine(penThin, left, y, left + maxWidth, y); y += 4;
 
-                y += 5;
-                g.DrawLine(penThin, left, y, left + maxWidth, y); y += 8;
+                        foreach (var item in catItems)
+                        {
+                            g.DrawString(item.Service_Name ?? "-", fLabel, brush, new RectangleF(left, y, maxWidth * 0.72f, 13), sfL);
+                            g.DrawString($"{item.Qty}x", fLabel, brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
+                            y += 13;
+                        }
 
-                // ── Footer ────────────────────────────────────────────────────
-                g.DrawString("Terima kasih atas kunjungan Anda!", fFooter, brush, new RectangleF(left, y, maxWidth, 13), sfC); y += 12;
-                g.DrawString("Semoga sehat selalu :)",            fFooter, brush, new RectangleF(left, y, maxWidth, 13), sfC);
+                        y += 2;
+                        g.DrawLine(penThin, left, y, left + maxWidth, y); y += 4;
+                    }
+
+                    if (grouped.TryGetValue("LAINNYA", out var otherItems) && otherItems.Count > 0)
+                    {
+                        g.DrawString("LAINNYA", fBold, brush, new RectangleF(left, y, maxWidth, 13), sfL);
+                        y += 13;
+                        g.DrawLine(penThin, left, y, left + maxWidth, y); y += 4;
+
+                        foreach (var item in otherItems)
+                        {
+                            g.DrawString(item.Service_Name ?? "-", fLabel, brush, new RectangleF(left, y, maxWidth * 0.72f, 13), sfL);
+                            g.DrawString($"{item.Qty}x", fLabel, brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
+                            y += 13;
+                        }
+                        y += 2;
+                        g.DrawLine(penThin, left, y, left + maxWidth, y); y += 4;
+                    }
+
+                    y += 2;
+                    g.DrawLine(penThick, left, y, left + maxWidth, y); y += 6;
+                }
+                else if (isBarOrderTicket)
+                {
+                    g.DrawString("Item BAR", fBold, brush, new RectangleF(left,                    y, maxWidth * 0.72f, 13), sfL);
+                    g.DrawString("QTY",      fBold, brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
+                    y += 13;
+                    g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
+
+                    foreach (var item in receipt.Items)
+                    {
+                        g.DrawString(item.Service_Name ?? "-", fLabel, brush, new RectangleF(left, y, maxWidth * 0.72f, 13), sfL);
+                        g.DrawString($"{item.Qty}x", fLabel, brush, new RectangleF(left + maxWidth * 0.72f, y, maxWidth * 0.28f, 13), sfR);
+                        y += 13;
+                    }
+
+                    y += 4;
+                    g.DrawLine(penThick, left, y, left + maxWidth, y); y += 6;
+                }
+                else
+                {
+                    // ── Column headers ────────────────────────────────────────
+                    g.DrawString("Layanan",  fBold, brush, new RectangleF(left,                    y, maxWidth * 0.50f, 13), sfL);
+                    g.DrawString("Qty",      fBold, brush, new RectangleF(left + maxWidth * 0.50f, y, maxWidth * 0.15f, 13), sfC);
+                    g.DrawString("Subtotal", fBold, brush, new RectangleF(left + maxWidth * 0.65f, y, maxWidth * 0.35f, 13), sfR);
+                    y += 13;
+                    g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
+
+                    // ── Items ─────────────────────────────────────────────────
+                    foreach (var item in receipt.Items)
+                    {
+                        var name = item.Service_Name ?? "-";
+                        var sub = $"Rp{item.Subtotal:N0}".Replace(',', '.');
+                        g.DrawString(name,       fLabel, brush, new RectangleF(left,                    y, maxWidth * 0.50f, 13), sfL);
+                        g.DrawString($"{item.Qty}x", fLabel, brush, new RectangleF(left + maxWidth * 0.50f, y, maxWidth * 0.15f, 13), sfC);
+                        g.DrawString(sub,        fLabel, brush, new RectangleF(left + maxWidth * 0.65f, y, maxWidth * 0.35f, 13), sfR);
+                        y += 13;
+                        if (!string.IsNullOrWhiteSpace(item.Therapist_Name))
+                        { g.DrawString($"  ↳ {item.Therapist_Name}", fAddr, Brushes.DarkGray, new RectangleF(left, y, maxWidth, 12), sfL); y += 11; }
+                    }
+
+                    y += 4;
+                    g.DrawLine(penThick, left, y, left + maxWidth, y); y += 6;
+                }
+
+                if (!isRecapPosReport && !isBarOrderTicket)
+                {
+                    // ── TOTAL row — inverted (black bg, white text) ───────────
+                    var subtotal = receipt.Subtotal > 0 ? receipt.Subtotal : receipt.Total + receipt.Discount_Amount;
+                    var payAmount = receipt.Payment_Amount > 0 ? receipt.Payment_Amount : receipt.Total;
+                    var totalStr  = $"Rp{receipt.Total:N0}".Replace(',', '.');
+                    LabelRow("SubTotal", $"Rp{subtotal:N0}".Replace(',', '.'), fLabel);
+                    LabelRow("Discount", $"Rp{receipt.Discount_Amount:N0}".Replace(',', '.'), fLabel);
+
+                    g.FillRectangle(Brushes.Black, new RectangleF(left - 2, y - 1, maxWidth + 4, 18));
+                    g.DrawString("TOTAL",   fTotal, Brushes.White, new RectangleF(left,                    y, maxWidth * 0.5f, 17), sfL);
+                    g.DrawString(totalStr,   fTotal, Brushes.White, new RectangleF(left + maxWidth * 0.5f,  y, maxWidth * 0.5f, 17), sfR);
+                    y += 18; y += 4;
+
+                    LabelRow("Bayar",   $"Rp{payAmount:N0}".Replace(',', '.'),               fLabel);
+                    LabelRow("Kembali", $"Rp{receipt.Change_Amount:N0}".Replace(',', '.'),   fBold);
+                }
+
+                if (!isRecapPosReport && !isBarOrderTicket)
+                {
+                    y += 3;
+                    g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
+
+                    LabelRow("Metode", receipt.Payment_Method ?? "CASH",                                          fLabel);
+                    LabelRow("Jam",    receipt.Printed_At ?? DateTime.Now.ToString("dd/MM/yyyy HH:mm"),           fLabel);
+
+                    y += 5;
+                    g.DrawLine(penThin, left, y, left + maxWidth, y); y += 8;
+
+                    // ── Footer ────────────────────────────────────────────────
+                    g.DrawString("Terima kasih atas kunjungan Anda!", fFooter, brush, new RectangleF(left, y, maxWidth, 13), sfC); y += 12;
+                    g.DrawString("Semoga sehat selalu :)",            fFooter, brush, new RectangleF(left, y, maxWidth, 13), sfC);
+                }
+                else
+                {
+                    y += 3;
+                    g.DrawLine(penThin, left, y, left + maxWidth, y); y += 6;
+                    g.DrawString("Printed by SKY ePOS", fFooter, brush, new RectangleF(left, y, maxWidth, 13), sfC);
+                }
 
                 ev.HasMorePages = false;
             };

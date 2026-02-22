@@ -1,5 +1,6 @@
 const db = require("../../config/db")
 const bcrypt = require("bcrypt")
+const printerTargetService = require("../printers/printer-target.service")
 
 exports.dashboard = async () => {
   const users = await db.query("SELECT COUNT(*) FROM users")
@@ -320,4 +321,20 @@ exports.settleTherapistPayroll = async (user, { branch_id, date_from, date_to, n
     settled_count: settleRows.length,
     settled_amount: settleRows.reduce((a, r) => a + Number(r.unsettled_amount || 0), 0)
   }
+}
+
+
+exports.getPrinterTargets = async ({ branch_id, channel }) => {
+  return printerTargetService.listPrinterTargets({
+    db,
+    branchId: branch_id,
+    channel
+  })
+}
+
+exports.upsertPrinterTarget = async (payload = {}) => {
+  return printerTargetService.upsertPrinterTarget({
+    db,
+    payload
+  })
 }
