@@ -71,3 +71,20 @@ exports.settleTherapistPayroll = async (req, res) => {
     res.status(400).json({ message: err.message })
   }
 }
+
+
+exports.getPrinterTargets = async (req, res) => {
+  try {
+    res.json(await s.getPrinterTargets(req.query || {}))
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
+
+exports.upsertPrinterTarget = async (req, res) => {
+  try {
+    res.json(await s.upsertPrinterTarget(req.body || {}))
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
