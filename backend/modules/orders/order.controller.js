@@ -70,6 +70,13 @@ const ensureUndoVoidApprovalTable = async (db) => {
   `)
 }
 
+
+const ensureOrderPaymentColumns = async (db) => {
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0`)
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_amount NUMERIC(12,2) DEFAULT 0`)
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS change_amount NUMERIC(12,2) DEFAULT 0`)
+}
+
 const ensureOrderItemColumns = async (db) => {
   await db.query(`
     ALTER TABLE order_items
@@ -211,7 +218,8 @@ exports.close = async (req, res) => {
     const db = req.app.get("db")
     const orderId = parseOrderId(req.params.id)
     await ensureOrderItemColumns(db)
-    const { items, payment_method } = req.body
+    await ensureOrderPaymentColumns(db)
+    const { items, payment_method, discount_amount, payment_amount } = req.body
     const orderStatusRes = await db.query(
       "SELECT status FROM orders WHERE id = $1",
       [orderId]
@@ -295,7 +303,24 @@ exports.close = async (req, res) => {
        WHERE order_id = $1`,
       [orderId]
     )
-    const total = Math.round(Number(totalResult.rows[0].total || 0))
+    const subtotal = Math.round(Number(totalResult.rows[0].total || 0))
+    const discountAmount = Math.max(0, Math.min(subtotal, Math.round(Number(discount_amount || 0))))
+    const total = Math.max(0, subtotal - discountAmount)
+    const paymentMethod = String(payment_method || 'CASH').toUpperCase()
+
+    let paymentAmount = Math.round(Number(payment_amount || 0))
+    let changeAmount = 0
+
+    if (paymentMethod === 'CASH') {
+      if (!(paymentAmount > 0)) paymentAmount = total
+      if (paymentAmount < total) {
+        return res.status(400).json({ message: 'Jumlah bayar cash kurang dari total.' })
+      }
+      changeAmount = paymentAmount - total
+    } else {
+      paymentAmount = total
+      changeAmount = 0
+    }
 
     // Update order dengan payment & status PAID
     const result = await db.query(
@@ -303,10 +328,13 @@ exports.close = async (req, res) => {
        SET status = 'PAID', 
            payment_method = $2,
            total = $3,
-           total_amount = $3
+           total_amount = $3,
+           discount_amount = $4,
+           payment_amount = $5,
+           change_amount = $6
        WHERE id = $1
        RETURNING *`,
-      [orderId, payment_method || 'CASH', total]
+      [orderId, paymentMethod, total, discountAmount, paymentAmount, changeAmount]
     )
 
     if (!result.rows.length) {
@@ -335,13 +363,20 @@ exports.close = async (req, res) => {
     await writeAuditEntry(db, req.user?.id, "ORDER_PAID", {
       order_id: result.rows[0].id,
       total: result.rows[0].total,
-      payment_method: payment_method || "CASH",
+      payment_method: paymentMethod,
+      discount_amount: discountAmount,
+      payment_amount: paymentAmount,
+      change_amount: changeAmount,
       item_count: Array.isArray(items) ? items.length : 0
     })
 
     res.json({ 
       order_id: result.rows[0].id,
+      subtotal,
+      discount_amount: discountAmount,
       total: result.rows[0].total,
+      payment_amount: paymentAmount,
+      change_amount: changeAmount,
       status: result.rows[0].status
     })
   } catch (err) {
@@ -665,8 +700,9 @@ exports.createFromPos = async (req, res) => {
     const db = req.app.get("db")
     const user = req.user
     await ensureOrderItemColumns(db)
+    await ensureOrderPaymentColumns(db)
     await dashboardService.ensureOutletCanReceiveOrder(user)
-    const { items, payment_method } = req.body
+    const { items, payment_method, discount_amount, payment_amount } = req.body
 
     // 1️⃣ ambil branch
     const userRes = await db.query(
@@ -748,14 +784,28 @@ exports.createFromPos = async (req, res) => {
       }
     }
 
+    const subtotal = Math.round(Number(total || 0))
+    const discountAmount = Math.max(0, Math.min(subtotal, Math.round(Number(discount_amount || 0))))
+    const finalTotal = Math.max(0, subtotal - discountAmount)
+    const paymentMethod = String(payment_method || "CASH").toUpperCase()
+
+    let paymentAmount = Math.round(Number(payment_amount || 0))
+    let changeAmount = 0
+    if (paymentMethod === "CASH") {
+      if (!(paymentAmount > 0)) paymentAmount = finalTotal
+      if (paymentAmount < finalTotal) {
+        return res.status(400).json({ message: "Jumlah bayar cash kurang dari total." })
+      }
+      changeAmount = paymentAmount - finalTotal
+    } else {
+      paymentAmount = finalTotal
+      changeAmount = 0
+    }
+
     // 5️⃣ update total
     await db.query(
-    //  "UPDATE orders SET total=$1 WHERE id=$2",
-    //  [total, orderId]
-    //"UPDATE orders SET total=$1, payment_method=$2, status='PAID' WHERE id=$3",
-     // [total, payment_method || "CASH", orderId]
-     "UPDATE orders SET total=$1, payment_method=$2, status='PAID' WHERE id=$3",
-      [total, payment_method || "CASH", orderId]
+     "UPDATE orders SET total=$1, total_amount=$1, payment_method=$2, status='PAID', discount_amount=$4, payment_amount=$5, change_amount=$6 WHERE id=$3",
+      [finalTotal, paymentMethod, orderId, discountAmount, paymentAmount, changeAmount]
     )
     const fnbItemsRes = await db.query(
       [
@@ -779,7 +829,11 @@ exports.createFromPos = async (req, res) => {
       success: true,
       order_id: orderId,
     //  total
-      total,
+      subtotal,
+      discount_amount: discountAmount,
+      total: finalTotal,
+      payment_amount: paymentAmount,
+      change_amount: changeAmount,
       status: "PAID"
     })
   } catch (err) {
@@ -1275,6 +1329,7 @@ exports.getById = async (req, res) => {
 exports.getOrderDetail = async (req, res) => {
   try {
     const db = req.app.get("db")
+    await ensureOrderPaymentColumns(db)
     await db.query(`ALTER TABLE branches ADD COLUMN IF NOT EXISTS phone VARCHAR(40)`) 
     await db.query(`ALTER TABLE branches ADD COLUMN IF NOT EXISTS logo_url TEXT`)
     const orderId = parseOrderId(req.params.id)
@@ -1287,6 +1342,9 @@ exports.getOrderDetail = async (req, res) => {
         o.status,
         o.total,
         o.payment_method,
+        o.discount_amount,
+        o.payment_amount,
+        o.change_amount,
         o.created_at,
         COALESCE(ot.therapist_name, th.name) AS therapist_name,
         r.name AS room_name,
@@ -1352,9 +1410,10 @@ exports.getOrderDetail = async (req, res) => {
 
     order.items = items
     
-    // Set default payment info (columns don't exist in table)
-    order.payment_amount = order.total
-    order.change_amount = 0
+    order.discount_amount = Number(order.discount_amount || 0)
+    order.payment_amount = Number(order.payment_amount || order.total || 0)
+    order.change_amount = Number(order.change_amount || 0)
+    order.subtotal = Math.max(0, Number(order.total || 0) + Number(order.discount_amount || 0))
     
     await writeAuditEntry(db, req.user?.id, "ORDER_REPRINT_VIEW", { order_id: orderId, branch_id: branchId })
 

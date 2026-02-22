@@ -1,8 +1,16 @@
 const printerService = require("./printer.service")
 
+
+const ensureOrderPaymentColumns = async (db) => {
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(12,2) DEFAULT 0`)
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_amount NUMERIC(12,2) DEFAULT 0`)
+  await db.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS change_amount NUMERIC(12,2) DEFAULT 0`)
+}
+
 exports.printOrder = async (req, res) => {
   try {
     const db = req.app.get("db")
+    await ensureOrderPaymentColumns(db)
     const { order_id, printer } = req.body
 
     if (!order_id) {
@@ -16,6 +24,9 @@ exports.printOrder = async (req, res) => {
         o.id,
         o.total,
         o.payment_method,
+        o.discount_amount,
+        o.payment_amount,
+        o.change_amount,
         o.created_at,
         b.name AS branch_name,
         b.address AS branch_address,
@@ -57,8 +68,10 @@ exports.printOrder = async (req, res) => {
     )
 
     order.items = itemsRes.rows
-    order.payment_amount = Number(order.total || 0)
-    order.change_amount = 0
+    order.discount_amount = Number(order.discount_amount || 0)
+    order.payment_amount = Number(order.payment_amount || order.total || 0)
+    order.change_amount = Number(order.change_amount || 0)
+    order.subtotal = Math.max(0, Number(order.total || 0) + Number(order.discount_amount || 0))
 
     // 🔹 PRINT
     await printerService.printOrder({ order, printer })
@@ -136,6 +149,27 @@ exports.agentDiagnostics = async (req, res) => {
     res.status(500).json({
       message: err.message,
       hint: "Pastikan endpoint /health dan /printers di print agent bisa diakses dari VPS."
+    })
+  }
+}
+
+
+exports.printRecap = async (req, res) => {
+  try {
+    const { report, printer } = req.body || {}
+
+    if (!report || !Array.isArray(report.service_details)) {
+      return res.status(400).json({ message: "report.service_details required" })
+    }
+
+    await printerService.printRecap({ report, printer: printer || {} })
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error("PRINT RECAP ERROR:", err)
+    res.status(500).json({
+      message: err.message,
+      hint: "Pastikan PRINT_AGENT_URL aktif dan bisa diakses dari backend."
     })
   }
 }
