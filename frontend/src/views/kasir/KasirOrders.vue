@@ -729,7 +729,7 @@ const paySelectedOrders = async () => {
     html: `Akan membayar <b>${selectedOrderIds.value.length}</b> order DRAFT sekaligus.`,
     icon: 'question',
     showCancelButton: true,
-    confirmButtonText: 'Ya, Bayar Semua',
+    confirmButtonText: 'Lanjut',
     cancelButtonText: 'Batal',
     confirmButtonColor: '#c9a24d',
     background: '#111',
@@ -738,12 +738,34 @@ const paySelectedOrders = async () => {
 
   if (!confirm.isConfirmed) return
 
+  const methodPick = await Swal.fire({
+    title: 'Pilih metode pembayaran',
+    input: 'select',
+    inputOptions: {
+      CASH: 'CASH',
+      QRIS: 'QRIS',
+      DEBIT: 'DEBIT',
+      CC: 'CC',
+      'TRANSFER BANK': 'TRANSFER BANK'
+    },
+    inputValue: 'CASH',
+    showCancelButton: true,
+    confirmButtonText: 'Bayar Sekarang',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#c9a24d',
+    background: '#111',
+    color: '#fff'
+  })
+
+  if (!methodPick.isConfirmed || !methodPick.value) return
+
   try {
     loading.value = true
     const requestedIds = [...selectedOrderIds.value]
+    const selectedMethod = String(methodPick.value || 'CASH').toUpperCase()
     const { data } = await api.post('/orders/pay-bulk', {
       order_ids: requestedIds,
-      payment_method: 'CASH'
+      payment_method: selectedMethod
     })
 
     const paidOrderIds = Array.isArray(data?.paid_order_ids) && data.paid_order_ids.length
@@ -1159,18 +1181,30 @@ const sendToThermalPrinter = async () => {
 
   try {
     printLoading.value = true
-    for (const orderId of orderIds) {
-      await api.post('/printers/print-order', {
-        order_id: Number(orderId),
+    const isBulkPrint = Boolean(bulkReceipt.value?.order_ids?.length)
+
+    if (isBulkPrint) {
+      await api.post('/printers/print-bulk', {
+        order_ids: bulkReceipt.value.order_ids,
+        payment_method: bulkReceipt.value.payment_method || 'CASH',
         printer: getPrinterAgentConfig()
       })
+    } else {
+      for (const orderId of orderIds) {
+        await api.post('/printers/print-order', {
+          order_id: Number(orderId),
+          printer: getPrinterAgentConfig()
+        })
+      }
     }
 
     await closePrintModal()
     await Swal.fire({
       icon: 'success',
       title: 'Print berhasil',
-      text: 'Struk order berhasil dikirim ke printer.',
+      text: isBulkPrint
+        ? 'Struk gabungan berhasil dikirim ke printer.'
+        : 'Struk order berhasil dikirim ke printer.',
       background: '#111',
       color: '#fff'
     })
