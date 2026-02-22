@@ -161,8 +161,8 @@
 
       <!-- Action Buttons -->
       <div class="modal-actions">
-        <button class="btn btn-print" @click="printReceipt">
-          🖨️ Lanjut Print
+        <button class="btn btn-print" @click="inPrintCartStep ? printReceipt() : proceedToPrintCartStep()">
+          {{ inPrintCartStep ? '🖨️ Print Sekarang' : '🧾 Lanjut Print' }}
         </button>
         <button class="btn btn-close" @click="closeReceiptModal">
           Cancel
@@ -411,6 +411,7 @@ const receiptLoading = ref(false)
 const pendingPayment = ref(null)
 const pendingPrinted = ref(false)
 const pendingFinalizedOrderId = ref(null)
+const inPrintCartStep = ref(false)
 
 const format = n =>
   Number(n || 0).toLocaleString("id-ID")
@@ -598,6 +599,7 @@ const checkout = async () => {
   pendingPayment.value = payment
   pendingPrinted.value = false
   pendingFinalizedOrderId.value = null
+  inPrintCartStep.value = false
   receiptData.value = buildDraftReceiptPreview(payment)
   showReceiptModal.value = true
 }
@@ -640,10 +642,15 @@ const showReceiptPreview = async (orderId) => {
   })
 }
 
+const proceedToPrintCartStep = async () => {
+  inPrintCartStep.value = true
+}
+
 // 🖨️ CLOSE RECEIPT MODAL
 const closeReceiptModal = async () => {
   showReceiptModal.value = false
   receiptData.value = null
+  inPrintCartStep.value = false
 
   if (pendingPrinted.value && pendingFinalizedOrderId.value) {
     const orderId = pendingFinalizedOrderId.value
@@ -675,7 +682,12 @@ const printReceipt = async () => {
     })
 
     pendingPrinted.value = true
-    await closeReceiptModal()
+    await SwalTheme.fire({
+      icon: "success",
+      title: "Struk dikirim",
+      text: "🖨 Struk berhasil diprint. Klik Cancel untuk menyelesaikan transaksi.",
+      confirmButtonText: "OK"
+    })
   } catch (err) {
     await SwalTheme.fire({
       icon: "error",
