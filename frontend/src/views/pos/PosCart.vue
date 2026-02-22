@@ -130,6 +130,14 @@
           <!-- Total -->
           <div class="receipt-total">
             <div class="total-row">
+              <span>SubTotal:</span>
+              <span>{{ formatRupiah(receiptData?.subtotal ?? ((Number(receiptData?.total || 0) + Number(receiptData?.discount_amount || 0)))) }}</span>
+            </div>
+            <div class="total-row">
+              <span>Discount:</span>
+              <span>{{ formatRupiah(receiptData?.discount_amount || 0) }}</span>
+            </div>
+            <div class="total-row">
               <span>TOTAL:</span>
               <span class="total-amount">{{ formatRupiah(receiptData?.total) }}</span>
             </div>
@@ -445,6 +453,79 @@ const clear = async () => {
   })
 }
 
+
+const askPaymentDetails = async () => {
+  const total = Math.round(Number(grandTotal.value || 0))
+
+  const res = await SwalTheme.fire({
+    icon: "question",
+    title: "Metode Pembayaran",
+    html: `
+      <div style="text-align:left;margin-top:8px;">
+        <label style="display:block;margin-bottom:6px;font-size:13px;">Metode</label>
+        <select id="pay-method" class="swal2-input" style="margin:0 0 12px 0;max-width:100%;">
+          <option value="CASH">CASH</option>
+          <option value="QRIS">QRIS</option>
+          <option value="DEBIT">DEBIT</option>
+          <option value="CC">CC</option>
+          <option value="TRANSFER BANK">TRANSFER BANK</option>
+        </select>
+
+        <label style="display:block;margin-bottom:6px;font-size:13px;">Discount (Rp)</label>
+        <input id="pay-discount" type="number" min="0" class="swal2-input" style="margin:0 0 12px 0;max-width:100%;" value="0" />
+
+        <label id="pay-amount-label" style="display:block;margin-bottom:6px;font-size:13px;">Jumlah Bayar Cash (Rp)</label>
+        <input id="pay-amount" type="number" min="0" class="swal2-input" style="margin:0;max-width:100%;" value="${total}" />
+      </div>
+    `,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: "Bayar",
+    cancelButtonText: "Batal",
+    didOpen: () => {
+      const methodEl = document.getElementById("pay-method")
+      const amountEl = document.getElementById("pay-amount")
+      const amountLabelEl = document.getElementById("pay-amount-label")
+
+      const toggleAmountInput = () => {
+        const isCash = methodEl?.value === "CASH"
+        if (amountEl) {
+          amountEl.disabled = !isCash
+          if (!isCash) amountEl.value = String(total)
+        }
+        if (amountLabelEl) {
+          amountLabelEl.style.opacity = isCash ? "1" : "0.6"
+        }
+      }
+
+      methodEl?.addEventListener("change", toggleAmountInput)
+      toggleAmountInput()
+    },
+    preConfirm: () => {
+      const method = String(document.getElementById("pay-method")?.value || "CASH").toUpperCase()
+      const discountAmount = Math.max(0, Math.round(Number(document.getElementById("pay-discount")?.value || 0)))
+      const subtotal = total
+      const finalTotal = Math.max(0, subtotal - discountAmount)
+
+      let paymentAmount = Math.round(Number(document.getElementById("pay-amount")?.value || 0))
+      if (method !== "CASH") paymentAmount = finalTotal
+      if (method === "CASH" && paymentAmount < finalTotal) {
+        Swal.showValidationMessage("Jumlah bayar cash kurang dari total setelah discount")
+        return false
+      }
+
+      return {
+        payment_method: method,
+        discount_amount: discountAmount,
+        payment_amount: paymentAmount
+      }
+    }
+  })
+
+  if (!res.isConfirmed) return null
+  return res.value
+}
+
 const checkout = async () => {
   if (items.value.length === 0) {
     await SwalTheme.fire({
@@ -456,11 +537,16 @@ const checkout = async () => {
     return
   }
 
+  const payment = await askPaymentDetails()
+  if (!payment) return
+
   loading.value = true
   try {
     const payload = {
       items: toPayloadItems(),
-      payment_method: "CASH"
+      payment_method: payment.payment_method,
+      discount_amount: payment.discount_amount,
+      payment_amount: payment.payment_amount
     }
     
     let res
@@ -558,69 +644,31 @@ const closeReceiptModal = () => {
 }
 
 // 🖨️ PRINT RECEIPT
-const printReceipt = () => {
-  if (!receiptData.value) return
-  const w = window.open('', '_blank', 'width=420,height=760')
-  if (!w) return
+const printReceipt = async () => {
+  if (!receiptData.value?.id) return
 
-  const esc = (val) => String(val || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
+  try {
+    await api.post(`/printers/print-order`, {
+      order_id: receiptData.value.id,
+      printer: getPrinterAgentConfig()
+    })
 
-  const data = receiptData.value
-  const itemRows = (data.items || []).map((item) => `
-    <div class="item-row">
-      <div class="item-name">${esc(item.service_name)}${item.therapist_name ? `<div class="meta">Terapis: ${esc(item.therapist_name)}</div>` : ''}</div>
-      <div class="item-sub">${esc(item.qty)}x ${esc(formatRupiah(item.price))}</div>
-      <div class="item-subtotal">${esc(formatRupiah(item.subtotal))}</div>
-    </div>
-  `).join('')
-
-  w.document.write(`
-    <html><head><title>Receipt</title>
-      <style>
-        @page { size: 58mm auto; margin: 0; }
-        html, body { margin: 0; padding: 0; background: #fff; }
-        body { width: 58mm; font-family: 'Courier New', monospace; font-size: 10px; line-height: 1.25; }
-        .wrap { width: 54mm; margin: 0 auto; padding: 2mm 1mm; }
-        .center { text-align: center; }
-        .logo { max-width: 26mm; max-height: 14mm; object-fit: contain; margin: 0 auto 1mm; display: block; }
-        .line { border-top: 1px dashed #111; margin: 1.5mm 0; }
-        .row { display: flex; justify-content: space-between; gap: 2mm; }
-        .item-row { margin: 1mm 0; }
-        .item-name { font-weight: 700; overflow-wrap: anywhere; }
-        .meta { font-weight: 400; }
-        .item-sub { color: #222; }
-        .item-subtotal { text-align: right; font-weight: 700; }
-        .total { font-size: 11px; font-weight: 800; }
-      </style>
-    </head><body>
-      <div class="wrap">
-        ${data.branch_logo_url ? `<img class="logo" src="${esc(data.branch_logo_url)}" alt="logo" />` : ''}
-        ${data.branch_name ? `<div class="center"><strong>${esc(data.branch_name)}</strong></div>` : ''}
-        ${data.branch_address ? `<div class="center">${esc(data.branch_address)}</div>` : ''}
-        ${data.branch_phone ? `<div class="center">Tel: ${esc(data.branch_phone)}</div>` : ''}
-        <div class="line"></div>
-        <div class="row"><span>No:</span><span>#${esc(data.id)}</span></div>
-        <div class="row"><span>Tanggal:</span><span>${esc(formatDateTime(data.created_at))}</span></div>
-        <div class="row"><span>Kasir:</span><span>${esc(data.cashier_name)}</span></div>
-        ${data.room_name ? `<div class="row"><span>Room:</span><span>${esc(data.room_name)}</span></div>` : ''}
-        <div class="line"></div>
-        ${itemRows}
-        <div class="line"></div>
-        <div class="row total"><span>TOTAL</span><span>${esc(formatRupiah(data.total))}</span></div>
-        <div class="row"><span>Bayar</span><span>${esc(formatRupiah(data.payment_amount))}</span></div>
-        <div class="row"><span>Kembali</span><span>${esc(formatRupiah(data.change_amount))}</span></div>
-        <div class="row"><span>Metode</span><span>${esc(data.payment_method || 'CASH')}</span></div>
-      </div>
-    </body></html>
-  `)
-  w.document.close()
-  w.focus()
-  w.print()
+    closeReceiptModal()
+    await SwalTheme.fire({
+      icon: "success",
+      title: "Struk dikirim",
+      text: "🖨 Struk langsung dikirim ke printer POS",
+      confirmButtonText: "OK"
+    })
+  } catch (err) {
+    closeReceiptModal()
+    await SwalTheme.fire({
+      icon: "error",
+      title: "Gagal cetak",
+      text: err.response?.data?.message || err.message || "Gagal cetak",
+      confirmButtonText: "OK"
+    })
+  }
 }
 
 // 🖨️ PRINT TO THERMAL PRINTER (existing function - optional)
