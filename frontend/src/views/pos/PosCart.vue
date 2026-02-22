@@ -76,7 +76,7 @@
 
       <div class="modal-actions">
         <button class="btn btn-print" @click="proceedToPrintCartStep">
-          🧾 Lanjut Print
+          🧾 Lanjut ke Print Cart
         </button>
         <button class="btn btn-close" @click="closePaymentConfirmModal">
           Cancel
@@ -90,7 +90,7 @@
     <div class="modal-content receipt-modal" @click.stop>
       <!-- Header -->
       <div class="modal-header">
-        <h2>Konfirmasi Pembayaran</h2>
+        <h2>Print Cart</h2>
         <button class="modal-close" @click="closeReceiptModal">✕</button>
       </div>
 
