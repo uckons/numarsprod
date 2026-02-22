@@ -1775,3 +1775,82 @@ exports.markKasirBarMessageRead = async (req, res) => {
     res.status(500).json({ message: err.message })
   }
 }
+
+
+exports.reprintBarOrder = async (req, res) => {
+  try {
+    const db = req.app.get("db")
+    await ensureBarWorkflowTables(db)
+
+    const barOrderId = Number(req.params.barOrderId)
+    const { rows } = await db.query(
+      `SELECT bo.*, b.name AS branch_name
+       FROM bar_orders bo
+       LEFT JOIN branches b ON b.id = bo.branch_id
+       WHERE bo.id = $1 AND bo.branch_id = $2`,
+      [barOrderId, req.user.branch_id]
+    )
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Inbox order not found" })
+    }
+
+    const bo = rows[0]
+    const target = await printerTargetService.getResolvedPrinterTarget({
+      db,
+      branchId: bo.branch_id,
+      channel: printerTargetService.CHANNELS.BAR_INBOX
+    })
+
+    if (!target?.agent_url || target.is_active === false) {
+      return res.status(400).json({ message: "Target printer BAR_INBOX belum aktif" })
+    }
+
+    const { rows: orderMetaRows } = await db.query(
+      `SELECT
+         r.name AS room_name,
+         (
+           SELECT string_agg(DISTINCT t_name, ', ' ORDER BY t_name)
+           FROM (
+             SELECT NULLIF(BTRIM(regexp_split_to_table(COALESCE(oi.therapist_name, '')), ','), '') AS t_name
+             FROM order_items oi
+             WHERE oi.order_id = o.id
+           ) t
+           WHERE t_name IS NOT NULL
+         ) AS therapist_name
+       FROM orders o
+       LEFT JOIN rooms r ON r.id = o.room_id
+       WHERE o.id = $1
+       LIMIT 1`,
+      [bo.order_id]
+    )
+
+    const roomName = orderMetaRows[0]?.room_name || null
+    const therapistName = orderMetaRows[0]?.therapist_name || null
+    const ticketNote = [roomName ? `Room/Sofa: ${roomName}` : null, bo.note || null]
+      .filter(Boolean)
+      .join(" | ") || null
+
+    await printerService.printBarInboxTicket({
+      ticket: {
+        order_id: bo.order_id,
+        branch_name: bo.branch_name || "BAR",
+        created_at: bo.created_at ? new Date(bo.created_at).toISOString() : new Date().toISOString(),
+        room_name: roomName,
+        therapist_name: therapistName,
+        note: ticketNote,
+        source: `BAR REPRINT ${bo.status || ''}`.trim(),
+        items: Array.isArray(bo.items_snapshot) ? bo.items_snapshot : []
+      },
+      printer: {
+        agent_url: target.agent_url,
+        agent_token: target.agent_token,
+        agent_printer_name: target.agent_printer_name
+      }
+    })
+
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ message: err.message })
+  }
+}

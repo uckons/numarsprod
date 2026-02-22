@@ -67,6 +67,19 @@ router.post(
   controller.deliverBarOrder
 )
 
+
+router.post(
+  "/bar/:barOrderId/reprint",
+  auth,
+  (req, res, next) => {
+    if (!["Staff Bar", "Supervisor", "Manager"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Role not allowed" })
+    }
+    next()
+  },
+  controller.reprintBarOrder
+)
+
 router.post(
   "/bar/:barOrderId/cancel",
   auth,

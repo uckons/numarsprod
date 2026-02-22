@@ -110,6 +110,7 @@ const buildBarInboxPayload = (ticket = {}, options = {}) => {
       cashier_name: sourceLabel,
       room_name: ticket.room_name || null,
       therapist_name: ticket.therapist_name || null,
+      note: ticket.note || null,
       payment_method: 'BAR',
       subtotal: 0,
       discount_amount: 0,

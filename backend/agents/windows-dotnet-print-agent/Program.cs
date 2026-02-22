@@ -701,6 +701,8 @@ internal static class ReceiptBuilder
                 WriteLine($"Terapis: {receipt.Therapist_Name}");
             if (!string.IsNullOrWhiteSpace(receipt.Room_Name))
                 WriteLine($"Room   : {receipt.Room_Name}");
+            if (!string.IsNullOrWhiteSpace(receipt.Note))
+                WriteLine($"Catatan: {receipt.Note}");
 
             Divider('-');
         }
@@ -990,6 +992,7 @@ internal static class GdiReceiptPrinter
                     if (!string.IsNullOrWhiteSpace(receipt.Cashier_Name))    LabelRow("Kasir",     receipt.Cashier_Name,    fLabel);
                     if (!string.IsNullOrWhiteSpace(receipt.Therapist_Name))  LabelRow("Terapis",   receipt.Therapist_Name,  fLabel);
                     if (!string.IsNullOrWhiteSpace(receipt.Room_Name))       LabelRow("Room",      receipt.Room_Name,       fLabel);
+                    if (!string.IsNullOrWhiteSpace(receipt.Note))            LabelRow("Catatan",   receipt.Note,            fLabel);
 
                     y += 3;
                     g.DrawLine(penThin, left, y, left + maxWidth, y); y += 5;
