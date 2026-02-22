@@ -76,7 +76,7 @@
 
       <div class="modal-actions">
         <button class="btn btn-print" @click="proceedToPrintCartStep">
-          🧾 Lanjut ke Print Cart
+          🧾 Lanjut Print
         </button>
         <button class="btn btn-close" @click="closePaymentConfirmModal">
           Cancel
@@ -90,7 +90,7 @@
     <div class="modal-content receipt-modal" @click.stop>
       <!-- Header -->
       <div class="modal-header">
-        <h2>Print Cart</h2>
+        <h2>Konfirmasi Pembayaran</h2>
         <button class="modal-close" @click="closeReceiptModal">✕</button>
       </div>
 
@@ -688,11 +688,27 @@ const finalizeCompletedOrder = async (orderId) => {
 }
 
 
-// backward-compatible handler for stale cached templates
+// lanjut ke modal print utama (tanpa modal perantara draft)
 const proceedToPrintCartStep = async () => {
-  showPaymentConfirmModal.value = false
-  showReceiptModal.value = true
-  inPrintCartStep.value = true
+  try {
+    receiptLoading.value = true
+    const orderId = await finalizeOrderForPrint()
+    const detailRes = await api.get(`/orders/${orderId}/detail`)
+    receiptData.value = detailRes.data
+
+    showPaymentConfirmModal.value = false
+    showReceiptModal.value = true
+    inPrintCartStep.value = true
+  } catch (err) {
+    await SwalTheme.fire({
+      icon: "error",
+      title: "Gagal",
+      text: err.response?.data?.message || err.message || "Gagal menyiapkan print cart",
+      confirmButtonText: "OK"
+    })
+  } finally {
+    receiptLoading.value = false
+  }
 }
 
 const closePaymentConfirmModal = async () => {
@@ -718,15 +734,11 @@ const closeReceiptModal = async () => {
 
 // 🖨️ PRINT RECEIPT
 const printReceipt = async () => {
-  if (showPaymentConfirmModal.value && !showReceiptModal.value) {
-    await proceedToPrintCartStep()
-    return
-  }
-
   try {
-    const orderId = await finalizeOrderForPrint()
-    const detailRes = await api.get(`/orders/${orderId}/detail`)
-    receiptData.value = detailRes.data
+    let orderId = pendingFinalizedOrderId.value
+    if (!orderId) {
+      orderId = await finalizeOrderForPrint()
+    }
 
     await api.post(`/printers/print-order`, {
       order_id: orderId,
