@@ -90,7 +90,7 @@
     <div class="modal-content receipt-modal" @click.stop>
       <!-- Header -->
       <div class="modal-header">
-        <h2>Print Cart</h2>
+        <h2>Konfirmasi Pembayaran</h2>
         <button class="modal-close" @click="closeReceiptModal">✕</button>
       </div>
 
@@ -718,6 +718,11 @@ const closeReceiptModal = async () => {
 
 // 🖨️ PRINT RECEIPT
 const printReceipt = async () => {
+  if (showPaymentConfirmModal.value && !showReceiptModal.value) {
+    await proceedToPrintCartStep()
+    return
+  }
+
   try {
     const orderId = await finalizeOrderForPrint()
     const detailRes = await api.get(`/orders/${orderId}/detail`)
