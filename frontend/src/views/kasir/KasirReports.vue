@@ -63,6 +63,22 @@
         <span>Range</span>
         <strong>{{ analytics.range.from }} — {{ analytics.range.to }}</strong>
       </article>
+      <article class="summary-card">
+        <span>Total SPA</span>
+        <strong>Rp {{ format(spaTotalRevenue) }}</strong>
+      </article>
+      <article class="summary-card">
+        <span>Total LC</span>
+        <strong>Rp {{ format(lcTotalRevenue) }}</strong>
+      </article>
+      <article class="summary-card">
+        <span>Total FNB</span>
+        <strong>Rp {{ format(fnbTotalRevenue) }}</strong>
+      </article>
+      <article class="summary-card">
+        <span>Total KTV</span>
+        <strong>Rp {{ format(ktvTotalRevenue) }}</strong>
+      </article>
     </section>
 
     <section class="chart-panel compact-panel">
@@ -224,6 +240,7 @@ import api from '@/services/api'
 import { useAuthStore } from '@/store/auth.store'
 import Swal from 'sweetalert2'
 import ApexChart from '@/components/ApexChart.vue'
+import { getPrinterAgentConfig } from '@/utils/printerAgentConfig'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -349,97 +366,56 @@ const fnbTotalRevenue = computed(() => {
   return fnbServiceRows.value.reduce((sum, row) => sum + Number(row.revenue || 0), 0)
 })
 
+const spaTotalRevenue = computed(() => {
+  return spaServiceRows.value.reduce((sum, row) => sum + Number(row.revenue || 0), 0)
+})
+
+const lcTotalRevenue = computed(() => {
+  return lcServiceRows.value.reduce((sum, row) => sum + Number(row.revenue || 0), 0)
+})
+
+const ktvTotalRevenue = computed(() => {
+  return ktvServiceRows.value.reduce((sum, row) => sum + Number(row.revenue || 0), 0)
+})
+
 const fnbTotalQty = computed(() => {
   return fnbServiceRows.value.reduce((sum, row) => sum + Number(row.qty || 0), 0)
 })
 
 
-const printPosReport = () => {
-  const reportWindow = window.open('', '_blank', 'width=380,height=760')
-  if (!reportWindow) return
+const printPosReport = async () => {
+  try {
+    const outletName = auth.user?.branch_name
+      || auth.user?.branch
+      || auth.user?.branch?.name
+      || 'Outlet'
 
-  const outletName = auth.user?.branch_name
-    || auth.user?.branch
-    || auth.user?.branch?.name
-    || 'Outlet'
-
-  const esc = (value) => String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-
-  const renderRows = (rows) => rows.map((row) => `
-    <div class="item-row">
-      <div class="item-name">${esc(row.service_name)}</div>
-      <div class="item-sub">${esc(row.qty)}x</div>
-      <div class="item-subtotal">Rp ${esc(format(row.revenue))}</div>
-    </div>
-  `).join('')
-
-  reportWindow.document.write(`
-    <html><head><title>POS Report</title>
-    <style>
-      @page { size: 58mm auto; margin: 0; }
-      /* TM-58V profile: CMD ESC, Font 12x24, LF, Max dots 128, CP437 */
-      html, body { margin: 0; padding: 0; width: 58mm; background: #fff; }
-      body {
-        font-family: 'Courier New', monospace;
-        font-weight: 400;
-        letter-spacing: 0;
-        text-rendering: auto;
-        font-size: 9px;
-        line-height: 1.2;
-        -webkit-text-size-adjust: 100%;
-        print-color-adjust: exact;
+    await api.post('/printers/print-recap', {
+      printer: getPrinterAgentConfig(),
+      report: {
+        branch_name: outletName,
+        range: analytics.value.range,
+        summary: analytics.value.summary,
+        service_details: analytics.value.service_details || []
       }
-      * { box-sizing: border-box; }
-      .wrap { width: 46mm; margin: 0 auto; padding: 1.5mm 0 2mm; }
-      .center { text-align: center; }
-      .line { border-top: 1px dashed #111; margin: 1.25mm 0; }
-      .row { display: flex; justify-content: space-between; gap: 2mm; }
-      .section-title { margin: 0 0 1mm; font-weight: 700; font-size: 9px; }
-      .item-row { margin: 0.75mm 0; }
-      .item-name { font-weight: 700; overflow-wrap: anywhere; }
-      .item-sub { color: #222; }
-      .item-subtotal { text-align: right; font-weight: 600; }
-      .total { font-size: 9px; font-weight: 700; }
-    </style>
-    </head><body>
-      <div class="wrap">
-        <div class="center"><strong>SKY ePOS</strong></div>
-        <div class="center">REKAP PENDAPATAN</div>
-        <div class="center">${esc(outletName)}</div>
-        <div class="line"></div>
-        <div class="row"><span>Periode</span><span>${esc(analytics.value.range.from)} - ${esc(analytics.value.range.to)}</span></div>
-        <div class="line"></div>
-        <div class="row total"><span>TOTAL</span><span>Rp ${esc(format(analytics.value.summary.revenue))}</span></div>
-        <div class="row"><span>ORDER</span><span>${esc(analytics.value.summary.paid_orders)}</span></div>
-        <div class="row"><span>ITEM</span><span>${esc(analytics.value.summary.items_sold)}</span></div>
+    })
 
-        <div class="line"></div>
-        <div class="section-title">FNB</div>
-        ${renderRows(fnbServiceRows.value)}
-        <div class="row"><span>Total Qty FNB</span><span>${esc(fnbTotalQty.value)}</span></div>
-
-        <div class="line"></div>
-        <div class="section-title">SPA</div>
-        ${renderRows(spaServiceRows.value)}
-
-        <div class="line"></div>
-        <div class="section-title">LC</div>
-        ${renderRows(lcServiceRows.value)}
-
-        <div class="line"></div>
-        <div class="section-title">KTV</div>
-        ${renderRows(ktvServiceRows.value)}
-      </div>
-    </body></html>
-  `)
-  reportWindow.document.close()
-  reportWindow.focus()
-  reportWindow.print()
+    await Swal.fire({
+      icon: 'success',
+      title: 'Recap dikirim',
+      text: '🖨 Cetak POS langsung dikirim ke printer',
+      background: '#111',
+      color: '#fff'
+    })
+  } catch (err) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Gagal cetak POS',
+      text: err.response?.data?.message || 'Gagal kirim recap ke printer agent.',
+      background: '#111',
+      color: '#fff'
+    })
+  }
 }
 
 const printReport = () => {
@@ -489,7 +465,10 @@ const printReport = () => {
           <div><strong>Total Pendapatan:</strong> Rp ${format(analytics.value.summary.revenue)}</div>
           <div><strong>Total Order PAID:</strong> ${analytics.value.summary.paid_orders}</div>
           <div><strong>Total Item Terjual:</strong> ${analytics.value.summary.items_sold}</div>
+          <div><strong>Total SPA:</strong> Rp ${format(spaTotalRevenue.value)}</div>
+          <div><strong>Total LC:</strong> Rp ${format(lcTotalRevenue.value)}</div>
           <div><strong>Total FNB:</strong> Rp ${format(fnbTotalRevenue.value)}</div>
+          <div><strong>Total KTV:</strong> Rp ${format(ktvTotalRevenue.value)}</div>
         </div>
 
         <h2>Recap Kategori (SPA / LC / FNB / KTV)</h2>

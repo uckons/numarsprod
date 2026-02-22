@@ -106,6 +106,14 @@
     >
       Bayar Gabungan
     </button>
+    <button
+      v-if="lastBulkReceiptForReprint"
+      class="btn-bulk-reprint"
+      :disabled="loading || printLoading"
+      @click="reprintLastBulkPayment"
+    >
+      Reprint Copy Kasir
+    </button>
   </div>
 </div>
 
@@ -729,7 +737,7 @@ const paySelectedOrders = async () => {
     html: `Akan membayar <b>${selectedOrderIds.value.length}</b> order DRAFT sekaligus.`,
     icon: 'question',
     showCancelButton: true,
-    confirmButtonText: 'Ya, Bayar Semua',
+    confirmButtonText: 'Lanjut',
     cancelButtonText: 'Batal',
     confirmButtonColor: '#c9a24d',
     background: '#111',
@@ -738,12 +746,34 @@ const paySelectedOrders = async () => {
 
   if (!confirm.isConfirmed) return
 
+  const methodPick = await Swal.fire({
+    title: 'Pilih metode pembayaran',
+    input: 'select',
+    inputOptions: {
+      CASH: 'CASH',
+      QRIS: 'QRIS',
+      DEBIT: 'DEBIT',
+      CC: 'CC',
+      'TRANSFER BANK': 'TRANSFER BANK'
+    },
+    inputValue: 'CASH',
+    showCancelButton: true,
+    confirmButtonText: 'Bayar Sekarang',
+    cancelButtonText: 'Batal',
+    confirmButtonColor: '#c9a24d',
+    background: '#111',
+    color: '#fff'
+  })
+
+  if (!methodPick.isConfirmed || !methodPick.value) return
+
   try {
     loading.value = true
     const requestedIds = [...selectedOrderIds.value]
+    const selectedMethod = String(methodPick.value || 'CASH').toUpperCase()
     const { data } = await api.post('/orders/pay-bulk', {
       order_ids: requestedIds,
-      payment_method: 'CASH'
+      payment_method: selectedMethod
     })
 
     const paidOrderIds = Array.isArray(data?.paid_order_ids) && data.paid_order_ids.length
@@ -932,6 +962,8 @@ const getPageRange = () => {
 const showPrintModal = ref(false)
 const printOrder = ref(null)
 const bulkReceipt = ref(null)
+const BULK_REPRINT_STORAGE_KEY = 'kasir:last-bulk-receipt'
+const lastBulkReceiptForReprint = ref(null)
 const printLoading = ref(false)
 const isCompactReceipt = computed(() => {
   const itemCount = bulkReceipt.value?.items?.length ?? printOrder.value?.items?.length ?? 0
@@ -974,6 +1006,8 @@ const openBulkReceipt = async (orderIds, totalAmount, paymentMethod = 'CASH') =>
       change_amount: 0,
       payment_method: paymentMethod || 'CASH'
     }
+    lastBulkReceiptForReprint.value = bulkReceipt.value
+    localStorage.setItem(BULK_REPRINT_STORAGE_KEY, JSON.stringify(bulkReceipt.value))
 
     printOrder.value = null
     showPrintModal.value = true
@@ -989,6 +1023,24 @@ const openBulkReceipt = async (orderIds, totalAmount, paymentMethod = 'CASH') =>
   } finally {
     printLoading.value = false
   }
+}
+
+const reprintLastBulkPayment = async () => {
+  const receipt = lastBulkReceiptForReprint.value
+  if (!receipt?.order_ids?.length) {
+    await Swal.fire({
+      icon: 'info',
+      title: 'Belum ada struk gabungan',
+      text: 'Belum ada data pembayaran gabungan untuk direprint.',
+      background: '#111',
+      color: '#fff'
+    })
+    return
+  }
+
+  bulkReceipt.value = receipt
+  printOrder.value = null
+  showPrintModal.value = true
 }
 
 // 🖨️ REPRINT RECEIPT
@@ -1159,18 +1211,30 @@ const sendToThermalPrinter = async () => {
 
   try {
     printLoading.value = true
-    for (const orderId of orderIds) {
-      await api.post('/printers/print-order', {
-        order_id: Number(orderId),
+    const isBulkPrint = Boolean(bulkReceipt.value?.order_ids?.length)
+
+    if (isBulkPrint) {
+      await api.post('/printers/print-bulk', {
+        order_ids: bulkReceipt.value.order_ids,
+        payment_method: bulkReceipt.value.payment_method || 'CASH',
         printer: getPrinterAgentConfig()
       })
+    } else {
+      for (const orderId of orderIds) {
+        await api.post('/printers/print-order', {
+          order_id: Number(orderId),
+          printer: getPrinterAgentConfig()
+        })
+      }
     }
 
     await closePrintModal()
     await Swal.fire({
       icon: 'success',
       title: 'Print berhasil',
-      text: 'Struk order berhasil dikirim ke printer.',
+      text: isBulkPrint
+        ? 'Struk gabungan berhasil dikirim ke printer.'
+        : 'Struk order berhasil dikirim ke printer.',
       background: '#111',
       color: '#fff'
     })
@@ -1210,6 +1274,18 @@ const formatDateTime = (dateString) => {
 }
 // 🎬 INIT
 onMounted(() => {
+  try {
+    const stored = localStorage.getItem(BULK_REPRINT_STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed?.order_ids) && parsed.order_ids.length) {
+        lastBulkReceiptForReprint.value = parsed
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load bulk reprint cache:', err)
+  }
+
   loadOrders()
   loadTherapists()
   loadRooms()
@@ -1568,6 +1644,25 @@ th {
 }
 
 .btn-bulk-pay:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-bulk-reprint {
+  background: transparent;
+  color: #f0c46a;
+  border: 1px solid #6e5b2a;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-bulk-reprint:hover {
+  background: rgba(240, 196, 106, 0.12);
+}
+
+.btn-bulk-reprint:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }

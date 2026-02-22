@@ -1,5 +1,66 @@
 const service = require("./timer.service")
 const { writeAuditLog: writeAuditEntry } = require("../../utils/audit")
+const printerService = require("../printers/printer.service")
+const printerTargetService = require("../printers/printer-target.service")
+
+
+
+const queueBarInboxAutoPrint = (req, payload = {}) => {
+  Promise.resolve().then(async () => {
+    const db = req.app.get("db")
+    const target = await printerTargetService.getResolvedPrinterTarget({
+      db,
+      branchId: payload.branch_id,
+      channel: printerTargetService.CHANNELS.BAR_INBOX
+    })
+
+    if (!target?.agent_url || target.is_active === false) return
+
+    const { rows: orderMetaRows } = await db.query(
+      `SELECT
+         r.name AS room_name,
+         (
+           SELECT string_agg(DISTINCT t_name, ', ' ORDER BY t_name)
+           FROM (
+             SELECT NULLIF(BTRIM(regexp_split_to_table(COALESCE(oi.therapist_name, ''), ',')), '') AS t_name
+             FROM order_items oi
+             WHERE oi.order_id = o.id
+           ) t
+           WHERE t_name IS NOT NULL
+         ) AS therapist_name
+       FROM orders o
+       LEFT JOIN rooms r ON r.id = o.room_id
+       WHERE o.id = $1
+       LIMIT 1`,
+      [payload.order_id]
+    )
+    const roomName = payload.room_name || orderMetaRows[0]?.room_name || null
+    const therapistName = payload.therapist_name || orderMetaRows[0]?.therapist_name || null
+    const ticketNote = [roomName ? `Room/Sofa: ${roomName}` : null, payload.note || null]
+      .filter(Boolean)
+      .join(" | ") || null
+
+    await printerService.printBarInboxTicket({
+      ticket: {
+        order_id: payload.order_id,
+        branch_name: payload.branch_name || "BAR",
+        created_at: new Date().toISOString(),
+        room_name: roomName,
+        therapist_name: therapistName,
+        note: ticketNote,
+        source: payload.source || "TIMER KTV -> BAR",
+        items: Array.isArray(payload.items) ? payload.items : []
+      },
+      printer: {
+        agent_url: target.agent_url,
+        agent_token: target.agent_token,
+        agent_printer_name: target.agent_printer_name
+      }
+    })
+  }).catch((err) => {
+    console.error("BAR AUTO PRINT TIMER ERROR:", err.message || err)
+  })
+}
 
 exports.start = async (req, res) => {
 
@@ -679,6 +740,14 @@ exports.startTimer = async (req, res) => {
           order_id: finalOrderId,
           branch_id: branchId,
           status: 'PENDING',
+          note: barNote,
+          items: barSnapshot
+        })
+
+        queueBarInboxAutoPrint(req, {
+          order_id: finalOrderId,
+          branch_id: branchId,
+          source: "KTV TIMER",
           note: barNote,
           items: barSnapshot
         })
