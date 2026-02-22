@@ -411,6 +411,8 @@ const receiptLoading = ref(false)
 const pendingPayment = ref(null)
 const pendingPrinted = ref(false)
 const pendingFinalizedOrderId = ref(null)
+// backward-compatible state for stale cached templates
+const inPrintCartStep = ref(false)
 
 const format = n =>
   Number(n || 0).toLocaleString("id-ID")
@@ -598,6 +600,7 @@ const checkout = async () => {
   pendingPayment.value = payment
   pendingPrinted.value = false
   pendingFinalizedOrderId.value = null
+  inPrintCartStep.value = false
   receiptData.value = buildDraftReceiptPreview(payment)
   showReceiptModal.value = true
 }
@@ -656,10 +659,17 @@ const finalizeCompletedOrder = async (orderId) => {
   router.push("/kasir")
 }
 
+
+// backward-compatible handler for stale cached templates
+const proceedToPrintCartStep = async () => {
+  inPrintCartStep.value = true
+}
+
 // 🖨️ CLOSE RECEIPT MODAL
 const closeReceiptModal = async () => {
   showReceiptModal.value = false
   receiptData.value = null
+  inPrintCartStep.value = false
 
   if (pendingPrinted.value && pendingFinalizedOrderId.value) {
     await finalizeCompletedOrder(pendingFinalizedOrderId.value)
