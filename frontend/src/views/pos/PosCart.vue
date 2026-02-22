@@ -188,8 +188,8 @@
 
       <!-- Action Buttons -->
       <div class="modal-actions">
-        <button class="btn btn-print" @click="printReceipt">
-          🖨️ Print Sekarang
+        <button class="btn btn-print" @click="inPrintCartStep ? printReceipt() : proceedToPrintCartStep()">
+          {{ inPrintCartStep ? '🖨️ Print Sekarang' : '🧾 Lanjut Print' }}
         </button>
         <button class="btn btn-close" @click="closeReceiptModal">
           Cancel
