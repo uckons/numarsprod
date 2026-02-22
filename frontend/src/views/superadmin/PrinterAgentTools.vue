@@ -104,6 +104,7 @@ import { setPrinterAgentConfig } from "@/utils/printerAgentConfig"
 
 const loading = ref(false)
 const diagnostics = ref(null)
+const AGENT_REQUEST_TIMEOUT_MS = 65000
 const branches = ref([])
 const targets = ref([])
 
@@ -179,11 +180,18 @@ const checkDiagnostics = async () => {
       agent_token: targetForm.value.agent_token,
       agent_printer_name: targetForm.value.agent_printer_name
     }
-    const res = await api.post("/printers/agent-diagnostics", { printer })
+    const res = await api.post("/printers/agent-diagnostics", { printer }, { timeout: AGENT_REQUEST_TIMEOUT_MS })
     diagnostics.value = res.data
     await Swal.fire({ icon: "success", title: "Agent reachable", text: "Status health dan daftar printer berhasil diambil." })
   } catch (err) {
-    await Swal.fire({ icon: "error", title: "Diagnosa gagal", text: err.response?.data?.message || err.message || "Gagal cek agent" })
+    const isTimeout = err?.code === "ECONNABORTED" || String(err?.message || "").toLowerCase().includes("timeout")
+    const backendMessage = err.response?.data?.message || err.message || "Gagal cek agent"
+    const timeoutHint = "Request diagnosa timeout. Ping bisa sukses, tapi endpoint HTTP agent dari backend mungkin lambat/tidak terbuka (cek port 19000, firewall, route dari server)."
+    await Swal.fire({
+      icon: "error",
+      title: "Diagnosa gagal",
+      text: isTimeout ? timeoutHint : backendMessage
+    })
   } finally {
     loading.value = false
   }
@@ -197,11 +205,13 @@ const testPrint = async () => {
       agent_token: targetForm.value.agent_token,
       agent_printer_name: targetForm.value.agent_printer_name
     }
-    await api.post("/printers/test-agent-print", { printer })
+    await api.post("/printers/test-agent-print", { printer }, { timeout: AGENT_REQUEST_TIMEOUT_MS })
     await Swal.fire({ icon: "success", title: "Test print dikirim", text: "Cek printer apakah struk test tercetak." })
   } catch (err) {
+    const isTimeout = err?.code === "ECONNABORTED" || String(err?.message || "").toLowerCase().includes("timeout")
     const backendMessage = err.response?.data?.message || err.message || "Gagal test print"
-    await Swal.fire({ icon: "error", title: "Test print gagal", text: backendMessage })
+    const timeoutHint = "Request test print timeout. Pastikan backend dapat mengakses agent URL/port dan token agent benar."
+    await Swal.fire({ icon: "error", title: "Test print gagal", text: isTimeout ? timeoutHint : backendMessage })
   } finally {
     loading.value = false
   }
